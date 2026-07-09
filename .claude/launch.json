@@ -1,0 +1,10 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "meridian-console",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "-p", "app"]
+    }
+  ]
+}

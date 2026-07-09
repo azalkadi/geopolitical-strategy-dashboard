@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <meta name="design_doc_mode" content="prototype">
+  <style>
+    @keyframes toastIn { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 var(--accent-ring); } 70% { box-shadow: 0 0 0 8px rgba(0,0,0,0); } 100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    html, body { margin: 0; padding: 0; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+
+<div style="{{ rootStyle }}">
+
+  <!-- ============ TOP BAR ============ -->
+  <div style="height:52px;min-height:52px;display:flex;align-items:center;gap:18px;padding:0 16px;background:var(--bg-2);border-bottom:1px solid var(--border);position:relative;z-index:20;">
+    <div style="display:flex;align-items:center;gap:9px;cursor:pointer;" onClick="{{ goDashboard }}">
+      <div style="width:20px;height:20px;border-radius:4px;background:var(--accent);position:relative;">
+        <div style="position:absolute;inset:5px;border:1.5px solid var(--bg-2);border-radius:2px;"></div>
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;letter-spacing:1.5px;color:var(--text);">MERIDIAN</div>
+      <div style="font-size:10px;color:var(--text-faint);letter-spacing:2px;border-left:1px solid var(--border);padding-left:9px;">COUNCIL</div>
+    </div>
+
+    <div style="width:1px;height:22px;background:var(--border);"></div>
+
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="{{ homeSwatchStyle }}"></div>
+      <div style="font-size:13px;font-weight:600;color:var(--text);">{{ homeName }}</div>
+      <div style="font-size:11px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;">{{ simDate }}</div>
+    </div>
+
+    <div style="flex:1;display:flex;justify-content:center;">
+      <div onClick="{{ openPalette }}" style="width:420px;max-width:100%;height:32px;border-radius:7px;background:var(--bg-1);border:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 10px;cursor:pointer;color:var(--text-faint);font-size:12.5px;">
+        <span style="opacity:0.7;">&#8981;</span>
+        <span style="flex:1;">Search countries, panels, actions&hellip;</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--bg-3);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text-dim);">&#8984;K</span>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div onClick="{{ toggleTheme }}" title="Toggle theme" style="width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-dim);background:var(--bg-1);border:1px solid var(--border);font-size:14px;">{{ themeIcon }}</div>
+      <div style="position:relative;">
+        <div onClick="{{ toggleNotif }}" title="Notifications" style="width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-dim);background:var(--bg-1);border:1px solid var(--border);font-size:13px;">&#128276;
+          <sc-if value="{{ notifUnread }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:var(--bad);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;">{{ notifUnread }}</div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ notifOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:38px;right:0;width:340px;background:var(--bg-2);border:1px solid var(--border);border-radius:9px;box-shadow:var(--shadow);z-index:60;overflow:hidden;animation:fadeIn 0.12s ease;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border-soft);">
+              <div style="font-size:12px;font-weight:600;color:var(--text);">Notifications</div>
+              <div onClick="{{ markAllRead }}" style="font-size:11px;color:var(--accent);cursor:pointer;">Mark all read</div>
+            </div>
+            <div style="max-height:320px;overflow:auto;">
+              <sc-for list="{{ notifItems }}" as="n" hint-placeholder-count="3">
+                <div style="padding:9px 12px;border-bottom:1px solid var(--border-soft);display:flex;gap:8px;align-items:flex-start;">
+                  <div style="{{ n.dotStyle }}"></div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;color:var(--text);font-weight:500;">{{ n.title }}</div>
+                    <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">{{ n.msg }}</div>
+                    <div style="font-size:10px;color:var(--text-faint);margin-top:3px;font-family:'IBM Plex Mono',monospace;">{{ n.ts }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MAIN ============ -->
+  <div style="flex:1;min-height:0;position:relative;">
+
+    <!-- DASHBOARD -->
+    <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+      <div style="position:relative;height:100%;">
+
+        <!-- FULL-BLEED MAP SURFACE -->
+        <div style="position:absolute;inset:12px;border-radius:10px;overflow:hidden;border:1px solid var(--border);z-index:0;background:
+            repeating-linear-gradient(0deg, var(--grid-line) 0px, transparent 1px, transparent 48px),
+            repeating-linear-gradient(90deg, var(--grid-line) 0px, transparent 1px, transparent 48px), var(--bg-1);">
+          <div style="{{ mapScaleStyle }}">
+            <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;overflow:visible;">
+              <sc-if value="{{ showTradeLines }}" hint-placeholder-val="{{ false }}">
+                <sc-for list="{{ tradeLines }}" as="tl" hint-placeholder-count="4">
+                  <line x1="{{ tl.x1 }}" y1="{{ tl.y1 }}" x2="{{ tl.x2 }}" y2="{{ tl.y2 }}" style="{{ tl.style }}"></line>
+                </sc-for>
+              </sc-if>
+            </svg>
+            <sc-for list="{{ mapCountries }}" as="c" hint-placeholder-count="12">
+              <div onClick="{{ c.select }}" onMouseEnter="{{ c.hover }}" onMouseLeave="{{ leaveCountry }}" style="{{ c.nodeStyle }}" title="{{ c.name }}">
+                <sc-if value="{{ c.showLabel }}" hint-placeholder-val="{{ true }}">
+                  <div style="{{ c.labelStyle }}">{{ c.code }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ hoveredCountry }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ hoveredCountry.tooltipStyle }}">
+              <div style="font-size:12px;font-weight:600;color:var(--text);">{{ hoveredCountry.name }}</div>
+              <div style="font-size:10.5px;color:var(--text-faint);margin-bottom:5px;">{{ hoveredCountry.region }} &middot; {{ hoveredCountry.govType }}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:11px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">
+                <div>GDP {{ hoveredCountry.gdpText }}</div>
+                <div>Growth {{ hoveredCountry.growthText }}</div>
+                <div>Approval {{ hoveredCountry.approvalText }}</div>
+                <div>Readiness {{ hoveredCountry.readinessText }}</div>
+              </div>
+            </div>
+          </sc-if>
+          <div style="position:absolute;left:10px;bottom:8px;display:flex;gap:12px;background:var(--bg-2-t);padding:5px 9px;border-radius:6px;border:1px solid var(--border-soft);backdrop-filter:blur(10px);">
+            <sc-for list="{{ mapLegend }}" as="lg" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--text-dim);">
+                <div style="{{ lg.dotStyle }}"></div>{{ lg.label }}
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- OVERLAY CLUSTER: toolbar + stat tiles, floats above the map -->
+        <sc-if value="{{ overlayVisible }}" hint-placeholder-val="{{ true }}">
+          <div style="{{ overlayColStyle }}">
+            <div style="height:38px;min-height:38px;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--bg-2-t);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:9px;box-shadow:var(--shadow);cursor:grab;">
+              <div style="color:var(--text-faint);font-size:12px;">&#8942;&#8942;</div>
+              <div style="font-size:12px;font-weight:600;color:var(--text);">World Map</div>
+              <div style="display:flex;gap:3px;margin-left:4px;flex-wrap:wrap;">
+                <sc-for list="{{ mapModes }}" as="m" hint-placeholder-count="7">
+                  <div onClick="{{ m.select }}" style="{{ m.tabStyle }}">{{ m.label }}</div>
+                </sc-for>
+              </div>
+              <div style="flex:1;"></div>
+              <div style="display:flex;align-items:center;gap:4px;color:var(--text-dim);font-size:12px;font-family:'IBM Plex Mono',monospace;">
+                <div onClick="{{ zoomOut }}" style="width:20px;height:20px;border-radius:4px;background:var(--bg-1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;">&minus;</div>
+                <div style="width:34px;text-align:center;">{{ mapZoomPct }}</div>
+                <div onClick="{{ zoomIn }}" style="width:20px;height:20px;border-radius:4px;background:var(--bg-1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;">+</div>
+              </div>
+              <div onClick="{{ toggleOverlay }}" title="Hide overlays" style="width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-faint);font-size:12px;">&#128065;</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
+              <sc-for list="{{ statTiles }}" as="t" hint-placeholder-count="4">
+                <div style="background:var(--bg-2-t);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:10px;padding:13px 14px;display:flex;flex-direction:column;gap:6px;min-width:0;box-shadow:var(--shadow);">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                    <div style="font-size:11px;color:var(--text-faint);letter-spacing:0.4px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;">{{ t.label }}</div>
+                    <div style="{{ t.deltaStyle }}white-space:nowrap;flex-shrink:0;">{{ t.deltaText }}</div>
+                  </div>
+                  <div style="display:flex;align-items:baseline;gap:6px;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;color:var(--text);">{{ t.value }}</div>
+                    <svg width="66" height="22" style="margin-left:auto;">
+                      <polyline points="{{ t.sparkPoints }}" fill="none" style="{{ t.sparkStroke }}" stroke-width="1.6"></polyline>
+                    </svg>
+                  </div>
+                  <div style="font-size:11px;color:var(--text-dim);line-height:1.4;border-top:1px solid var(--border-soft);padding-top:6px;">&#8627; {{ t.why }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ overlayHidden }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ toggleOverlay }}" style="position:absolute;top:24px;left:24px;z-index:10;display:flex;align-items:center;gap:8px;background:var(--bg-2-t);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:8px;padding:7px 12px;cursor:pointer;color:var(--accent);font-size:12px;box-shadow:var(--shadow);">
+            &#128065; Show overlays
+          </div>
+        </sc-if>
+
+        <!-- FEED OVERLAY PANEL -->
+        <sc-if value="{{ feedPanelOpen }}" hint-placeholder-val="{{ true }}">
+          <div style="{{ feedPanelStyle }}">
+            <div style="padding:10px 12px 8px 12px;border-bottom:1px solid var(--border-soft);">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="color:var(--text-faint);font-size:12px;cursor:grab;">&#8942;&#8942;</div>
+                <div style="font-size:12px;font-weight:600;color:var(--text);flex:1;">Event &amp; Notification Feed</div>
+                <div onClick="{{ toggleFeedDock }}" title="Move dock side" style="color:var(--text-faint);cursor:pointer;font-size:12px;">&#8646;</div>
+                <div onClick="{{ closeFeedPanel }}" title="Close panel" style="color:var(--text-faint);cursor:pointer;font-size:13px;">&times;</div>
+              </div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;">
+                <sc-for list="{{ feedFilterChipsVM }}" as="fc" hint-placeholder-count="8">
+                  <div onClick="{{ fc.select }}" style="{{ fc.style }}">{{ fc.label }}</div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="flex:1;overflow:auto;min-height:0;">
+              <sc-for list="{{ feedItems }}" as="e" hint-placeholder-count="8">
+                <div style="padding:10px 12px;border-bottom:1px solid var(--border-soft);">
+                  <div style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;" onClick="{{ e.toggle }}">
+                    <div style="{{ e.badgeStyle }}">{{ e.sevLabel }}</div>
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:12px;color:var(--text);font-weight:500;line-height:1.35;">{{ e.title }}</div>
+                      <div style="font-size:11px;color:var(--text-dim);margin-top:3px;line-height:1.4;">&#8627; {{ e.why }}</div>
+                      <div style="font-size:10px;color:var(--text-faint);margin-top:4px;font-family:'IBM Plex Mono',monospace;">{{ e.ts }} &middot; {{ e.categoryLabel }}</div>
+                    </div>
+                    <div style="color:var(--text-faint);font-size:10px;margin-top:3px;">{{ e.chevron }}</div>
+                  </div>
+                  <sc-if value="{{ e.expanded }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin:8px 0 2px 26px;padding:8px 10px;background:var(--bg-1);border:1px solid var(--border-soft);border-radius:7px;">
+                      <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Causal chain</div>
+                      <sc-for list="{{ e.chain }}" as="step" hint-placeholder-count="3">
+                        <div style="display:flex;gap:7px;font-size:11px;color:var(--text-dim);padding:3px 0;">
+                          <div style="color:var(--accent);font-family:'IBM Plex Mono',monospace;">{{ step.n }}</div>
+                          <div>{{ step.text }}</div>
+                        </div>
+                      </sc-for>
+                      <sc-if value="{{ e.hasCountry }}" hint-placeholder-val="{{ false }}">
+                        <div onClick="{{ e.jump }}" style="margin-top:6px;font-size:11px;color:var(--accent);cursor:pointer;">Jump to {{ e.countryName }} &rarr;</div>
+                      </sc-if>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ feedPanelClosed }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ feedRestoreStyle }}">
+            Feed closed
+            <div onClick="{{ reopenFeed }}" style="color:var(--accent);cursor:pointer;border:1px solid var(--border);padding:4px 10px;border-radius:6px;">Restore</div>
+          </div>
+        </sc-if>
+
+      </div>
+    </sc-if>
+
+    <!-- COUNTRY DETAIL -->
+    <sc-if value="{{ isCountry }}" hint-placeholder-val="{{ false }}">
+      <div style="height:100%;display:flex;flex-direction:column;padding:12px;gap:12px;min-height:0;">
+
+        <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px;">
+          <div onClick="{{ back }}" style="cursor:pointer;color:var(--text-dim);font-size:13px;display:flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:6px;padding:5px 10px;">&larr; Dashboard</div>
+          <div style="width:1px;height:26px;background:var(--border);"></div>
+          <div style="{{ country.swatchStyle }}"></div>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--text);">{{ country.name }}</div>
+            <div style="font-size:11px;color:var(--text-faint);">{{ country.region }} &middot; {{ country.govType }} &middot; Capital: {{ country.capital }}</div>
+          </div>
+          <div style="{{ country.allianceStyle }}">{{ country.allianceLabel }}</div>
+          <div style="flex:1;"></div>
+          <sc-for list="{{ country.headline }}" as="h" hint-placeholder-count="4">
+            <div style="text-align:right;padding-left:18px;border-left:1px solid var(--border-soft);">
+              <div style="font-size:10.5px;color:var(--text-faint);">{{ h.label }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;color:var(--text);">{{ h.value }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;gap:4px;background:var(--bg-2);border:1px solid var(--border);border-radius:9px;padding:4px;width:fit-content;">
+          <sc-for list="{{ tabsVM }}" as="tb" hint-placeholder-count="5">
+            <div onClick="{{ tb.select }}" style="{{ tb.style }}">{{ tb.label }}</div>
+          </sc-for>
+        </div>
+
+        <div style="flex:1;overflow:auto;min-height:0;">
+
+          <sc-if value="{{ isEconomy }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
+                <sc-for list="{{ econStats }}" as="t" hint-placeholder-count="4">
+                  <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;display:flex;flex-direction:column;gap:6px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                      <div style="font-size:11px;color:var(--text-faint);letter-spacing:0.4px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;">{{ t.label }}</div>
+                      <div style="{{ t.deltaStyle }}white-space:nowrap;flex-shrink:0;">{{ t.deltaText }}</div>
+                    </div>
+                    <div style="display:flex;align-items:baseline;gap:6px;">
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;color:var(--text);">{{ t.value }}</div>
+                      <svg width="60" height="20" style="margin-left:auto;"><polyline points="{{ t.sparkPoints }}" fill="none" style="{{ t.sparkStroke }}" stroke-width="1.6"></polyline></svg>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-dim);line-height:1.4;border-top:1px solid var(--border-soft);padding-top:6px;">&#8627; {{ t.why }}</div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:12px;align-items:start;">
+                <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+                  <div style="padding:10px 14px;border-bottom:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;">
+                    <div style="font-size:12px;font-weight:600;color:var(--text);">Economic Sectors</div>
+                    <div style="font-size:10.5px;color:var(--text-faint);">% of GDP</div>
+                  </div>
+                  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead>
+                      <tr style="text-align:left;">
+                        <th style="padding:8px 14px;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;">Sector</th>
+                        <th onClick="{{ sortByShare }}" style="padding:8px 8px;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;cursor:pointer;text-align:right;">Share {{ shareSortArrow }}</th>
+                        <th onClick="{{ sortByGrowth }}" style="padding:8px 8px;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;cursor:pointer;text-align:right;">Growth {{ growthSortArrow }}</th>
+                        <th style="padding:8px 8px;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;text-align:right;">Employ.</th>
+                        <th style="padding:8px 14px;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;">Note</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <sc-for list="{{ sectorsVM }}" as="s" hint-placeholder-count="8">
+                        <tr style="border-top:1px solid var(--border-soft);">
+                          <td style="padding:7px 14px;color:var(--text);font-weight:500;">{{ s.name }}</td>
+                          <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--text);">{{ s.shareText }}</td>
+                          <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;{{ s.growthColor }}">{{ s.growthText }}</td>
+                          <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--text-dim);">{{ s.employText }}</td>
+                          <td style="padding:7px 14px;color:var(--text-dim);font-size:11px;">{{ s.note }}</td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                  <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+                    <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;">Budget Allocation</div>
+                    <sc-for list="{{ budgetVM }}" as="b" hint-placeholder-count="6">
+                      <div style="margin-bottom:9px;">
+                        <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text);margin-bottom:3px;">
+                          <div>{{ b.label }}</div>
+                          <div style="font-family:'IBM Plex Mono',monospace;">{{ b.pctText }} <span style="{{ b.deltaColor }}">{{ b.deltaText }}</span></div>
+                        </div>
+                        <div style="height:5px;border-radius:3px;background:var(--bg-1);overflow:hidden;">
+                          <div style="{{ b.barStyle }}"></div>
+                        </div>
+                      </div>
+                    </sc-for>
+                    <div style="font-size:11px;color:var(--text-dim);border-top:1px solid var(--border-soft);padding-top:8px;margin-top:2px;">&#8627; {{ budgetNote }}</div>
+                  </div>
+
+                  <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+                    <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;">Tax Policy</div>
+                    <sc-for list="{{ taxSliders }}" as="tx" hint-placeholder-count="3">
+                      <div style="margin-bottom:11px;">
+                        <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text);margin-bottom:4px;">
+                          <div>{{ tx.label }}</div>
+                          <div style="font-family:'IBM Plex Mono',monospace;color:var(--accent);">{{ tx.valueText }}</div>
+                        </div>
+                        <input type="range" min="0" max="55" value="{{ tx.value }}" onChange="{{ tx.onChange }}" style="width:100%;accent-color:var(--accent);"></input>
+                      </div>
+                    </sc-for>
+                    <div style="font-size:11px;color:var(--text-dim);border-top:1px solid var(--border-soft);padding-top:8px;">&#8627; {{ projectedRevenueText }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isPolitics }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:12px;">
+                <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:14px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div style="font-size:12px;font-weight:600;color:var(--text);">Approval Trend</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:var(--text);">{{ approvalNow }}</div>
+                  </div>
+                  <svg width="100%" height="90" viewBox="0 0 300 90" preserveAspectRatio="none">
+                    <polyline points="{{ approvalPoints }}" fill="none" stroke="var(--accent)" stroke-width="1.8"></polyline>
+                    <sc-for list="{{ approvalMarkers }}" as="am" hint-placeholder-count="3">
+                      <circle cx="{{ am.cx }}" cy="{{ am.cy }}" r="3" fill="var(--warn)" style="cursor:pointer;">
+                      </circle>
+                    </sc-for>
+                  </svg>
+                  <div style="font-size:11px;color:var(--text-dim);border-top:1px solid var(--border-soft);padding-top:8px;">&#8627; {{ approvalWhy }}</div>
+                </div>
+                <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:14px;">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;">Next Election</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:var(--accent);margin-bottom:8px;">{{ electionDaysText }}</div>
+                  <div style="font-size:10.5px;color:var(--text-faint);margin-bottom:6px;text-transform:uppercase;">Projected seat share</div>
+                  <div style="height:16px;border-radius:4px;overflow:hidden;display:flex;">
+                    <sc-for list="{{ projectedSeats }}" as="ps" hint-placeholder-count="5">
+                      <div style="{{ ps.style }}"></div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:12px;">
+                <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+                  <div style="padding:10px 14px;border-bottom:1px solid var(--border-soft);font-size:12px;font-weight:600;color:var(--text);">Cabinet Ministers</div>
+                  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead>
+                      <tr>
+                        <th style="padding:8px 14px;text-align:left;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;">Minister</th>
+                        <th style="padding:8px 8px;text-align:left;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;">Portfolio</th>
+                        <th style="padding:8px 8px;text-align:left;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;">Party</th>
+                        <th onClick="{{ sortByApproval }}" style="padding:8px 8px;text-align:right;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;cursor:pointer;">Approval {{ approvalSortArrow }}</th>
+                        <th style="padding:8px 14px;text-align:left;color:var(--text-faint);font-weight:500;font-size:10.5px;text-transform:uppercase;">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <sc-for list="{{ ministersVM }}" as="mn" hint-placeholder-count="7">
+                        <tr style="border-top:1px solid var(--border-soft);">
+                          <td style="padding:7px 14px;color:var(--text);font-weight:500;">{{ mn.name }}</td>
+                          <td style="padding:7px 8px;color:var(--text-dim);">{{ mn.portfolio }}</td>
+                          <td style="padding:7px 8px;color:var(--text-dim);">{{ mn.party }}</td>
+                          <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--text);">{{ mn.approvalText }}</td>
+                          <td style="padding:7px 14px;"><div style="{{ mn.statusStyle }}">{{ mn.statusLabel }}</div></td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                  <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+                    <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:9px;">Coalition Composition</div>
+                    <sc-for list="{{ partiesVM }}" as="p" hint-placeholder-count="5">
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <div style="{{ p.dotStyle }}"></div>
+                        <div style="flex:1;font-size:11.5px;color:var(--text);">{{ p.name }}</div>
+                        <div style="font-size:10.5px;color:var(--text-faint);">{{ p.stance }}</div>
+                        <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-dim);width:34px;text-align:right;">{{ p.seats }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+                    <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:9px;">Corruption &amp; Scandal Flags</div>
+                    <sc-for list="{{ corruptionVM }}" as="cf" hint-placeholder-count="2">
+                      <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
+                        <div style="{{ cf.badgeStyle }}">{{ cf.sevLabel }}</div>
+                        <div style="flex:1;">
+                          <div style="font-size:11.5px;color:var(--text);font-weight:500;">{{ cf.title }}</div>
+                          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">{{ cf.desc }}</div>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isSociety }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
+                <sc-for list="{{ societyStats }}" as="t" hint-placeholder-count="3">
+                  <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;">
+                    <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;margin-bottom:6px;">{{ t.label }}</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;color:var(--text);margin-bottom:8px;">{{ t.value }}</div>
+                    <div style="font-size:11px;color:var(--text-dim);border-top:1px solid var(--border-soft);padding-top:6px;">&#8627; {{ t.why }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:9px;">Unrest Hotspots</div>
+                <sc-for list="{{ hotspotsVM }}" as="h" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--border-soft);">
+                    <div style="flex:1;font-size:12px;color:var(--text);">{{ h.name }}</div>
+                    <div style="font-size:11px;color:var(--text-dim);flex:1;">{{ h.note }}</div>
+                    <div style="{{ h.style }}">{{ h.value }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isMilitary }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
+                <sc-for list="{{ militaryStats }}" as="t" hint-placeholder-count="3">
+                  <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;">
+                    <div style="font-size:11px;color:var(--text-faint);text-transform:uppercase;margin-bottom:6px;">{{ t.label }}</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;color:var(--text);margin-bottom:8px;">{{ t.value }}</div>
+                    <div style="font-size:11px;color:var(--text-dim);border-top:1px solid var(--border-soft);padding-top:6px;">&#8627; {{ t.why }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:12px;">
+                <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+                  <div style="padding:10px 14px;border-bottom:1px solid var(--border-soft);font-size:12px;font-weight:600;color:var(--text);">Branch Readiness</div>
+                  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead><tr>
+                      <th style="padding:8px 14px;text-align:left;color:var(--text-faint);font-size:10.5px;text-transform:uppercase;">Branch</th>
+                      <th style="padding:8px 8px;text-align:right;color:var(--text-faint);font-size:10.5px;text-transform:uppercase;">Personnel</th>
+                      <th style="padding:8px 8px;text-align:right;color:var(--text-faint);font-size:10.5px;text-transform:uppercase;">Readiness</th>
+                      <th style="padding:8px 14px;text-align:left;color:var(--text-faint);font-size:10.5px;text-transform:uppercase;">Note</th>
+                    </tr></thead>
+                    <tbody>
+                      <sc-for list="{{ branchesVM }}" as="br" hint-placeholder-count="4">
+                        <tr style="border-top:1px solid var(--border-soft);">
+                          <td style="padding:7px 14px;color:var(--text);font-weight:500;">{{ br.name }}</td>
+                          <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--text-dim);">{{ br.personnel }}</td>
+                          <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;{{ br.readinessColor }}">{{ br.readinessText }}</td>
+                          <td style="padding:7px 14px;color:var(--text-dim);font-size:11px;">{{ br.note }}</td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+                <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:9px;">Active Deployments</div>
+                  <sc-for list="{{ deploymentsVM }}" as="d" hint-placeholder-count="3">
+                    <div style="padding:7px 0;border-top:1px solid var(--border-soft);">
+                      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text);">
+                        <div>{{ d.name }}</div>
+                        <div style="{{ d.statusStyle }}">{{ d.status }}</div>
+                      </div>
+                      <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">{{ d.location }} &middot; {{ d.personnel }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isDiplomacy }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:12px;">
+              <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+                <div style="padding:10px 14px;border-bottom:1px solid var(--border-soft);font-size:12px;font-weight:600;color:var(--text);">Bilateral Relations</div>
+                <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                  <thead><tr>
+                    <th style="padding:8px 14px;text-align:left;color:var(--text-faint);font-size:10.5px;text-transform:uppercase;">Nation</th>
+                    <th style="padding:8px 8px;text-align:left;color:var(--text-faint);font-size:10.5px;text-transform:uppercase;">Status</th>
+                    <th style="padding:8px 8px;text-align:left;color:var(--text-faint);font-size:10.5px;text-transform:uppercase;">Trend</th>
+                    <th style="padding:8px 14px;"></th>
+                  </tr></thead>
+                  <tbody>
+                    <sc-for list="{{ relationsVM }}" as="r" hint-placeholder-count="11">
+                      <tr style="border-top:1px solid var(--border-soft);">
+                        <td style="padding:7px 14px;color:var(--text);font-weight:500;">{{ r.name }}</td>
+                        <td style="padding:7px 8px;"><div style="{{ r.statusStyle }}">{{ r.statusLabel }}</div></td>
+                        <td style="padding:7px 8px;{{ r.trendColor }}">{{ r.trendLabel }}</td>
+                        <td style="padding:7px 14px;text-align:right;"><div onClick="{{ r.open }}" style="color:var(--accent);cursor:pointer;font-size:11px;">View &rarr;</div></td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+              <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:9px;">Active Treaties</div>
+                <sc-for list="{{ treatiesVM }}" as="tr2" hint-placeholder-count="3">
+                  <div style="padding:8px 0;border-top:1px solid var(--border-soft);">
+                    <div style="font-size:12px;color:var(--text);font-weight:500;">{{ tr2.name }}</div>
+                    <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">{{ tr2.parties }}</div>
+                    <div style="font-size:10.5px;color:var(--text-faint);margin-top:3px;">{{ tr2.status }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <!-- ============ TOASTS ============ -->
+  <div style="position:fixed;top:64px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:80;width:300px;">
+    <sc-for list="{{ toasts }}" as="ts" hint-placeholder-count="0">
+      <div style="{{ ts.style }}">
+        <div style="{{ ts.dotStyle }}"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:600;color:var(--text);">{{ ts.title }}</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">{{ ts.msg }}</div>
+        </div>
+        <div onClick="{{ ts.dismiss }}" style="color:var(--text-faint);cursor:pointer;font-size:13px;">&times;</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- ============ COMMAND PALETTE ============ -->
+  <sc-if value="{{ paletteOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closePalette }}" style="position:fixed;inset:0;background:var(--scrim);z-index:90;display:flex;align-items:flex-start;justify-content:center;padding-top:100px;animation:fadeIn 0.1s ease;">
+      <div onClick="{{ stopProp }}" style="width:560px;max-width:90vw;background:var(--bg-2);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border-soft);">
+          <span style="color:var(--text-faint);">&#8981;</span>
+          <input autoFocus="{{ true }}" value="{{ paletteQuery }}" onChange="{{ setPaletteQuery }}" onKeyDown="{{ paletteKeyDown }}" placeholder="Type a country, panel, or action&hellip;" style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:'IBM Plex Sans',sans-serif;"></input>
+          <div style="font-size:10.5px;color:var(--text-faint);border:1px solid var(--border);border-radius:4px;padding:2px 6px;">ESC</div>
+        </div>
+        <div style="max-height:360px;overflow:auto;padding:6px;">
+          <sc-for list="{{ paletteResults }}" as="pr" hint-placeholder-count="6">
+            <div onClick="{{ pr.select }}" style="{{ pr.style }}">
+              <div style="{{ pr.tagStyle }}">{{ pr.tag }}</div>
+              <div style="flex:1;font-size:13px;color:var(--text);">{{ pr.label }}</div>
+              <div style="font-size:11px;color:var(--text-faint);">{{ pr.hint }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: {&quot;width&quot;: 1600, &quot;height&quot;: 950},
+  &quot;accentTheme&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;amber&quot;, &quot;tsType&quot;: &quot;'amber'|'blue'|'teal'&quot;, &quot;options&quot;: [&quot;amber&quot;, &quot;blue&quot;, &quot;teal&quot;], &quot;section&quot;: &quot;Appearance&quot;},
+  &quot;density&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;comfortable&quot;, &quot;tsType&quot;: &quot;'comfortable'|'dense'&quot;, &quot;options&quot;: [&quot;comfortable&quot;, &quot;dense&quot;], &quot;section&quot;: &quot;Layout&quot;},
+  &quot;defaultMapMode&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;political&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;options&quot;: [&quot;political&quot;, &quot;economic&quot;, &quot;military&quot;, &quot;trade&quot;, &quot;resources&quot;, &quot;climate&quot;, &quot;election&quot;], &quot;section&quot;: &quot;Behavior&quot;},
+  &quot;expandCausalByDefault&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot;}
+}">
+class Component extends DCLogic {
+
+  constructor(props) {
+    super(props);
+    this.state = {
+      theme: 'dark',
+      screen: 'dashboard',
+      selectedCountryId: null,
+      countryTab: 'economy',
+      mapMode: (props && props.defaultMapMode) || 'political',
+      mapZoom: 1,
+      hoveredCountryId: null,
+      feedFilter: 'all',
+      expandedEventIds: (props && props.expandCausalByDefault) ? 'all' : {},
+      paletteOpen: false,
+      paletteQuery: '',
+      paletteIndex: 0,
+      notifOpen: false,
+      notifUnread: 3,
+      toasts: [],
+      panelClosed: {},
+      overlayHidden: false,
+      feedDockSide: 'right',
+      sectorSort: { key: 'gdpShare', dir: 'desc' },
+      ministerSort: { key: 'approval', dir: 'desc' },
+      taxRates: { corporate: 24, income: 32, vat: 18 },
+    };
+    this._toastSeq = 1;
+    this._timers = [];
+
+    this.countries = [
+      { id: 'velmoria', name: 'Velmoria', code: 'VLM', region: 'Home Nation', govType: 'Federal Republic', capital: 'Astervale', x: 22, y: 36, pop: '84M', gdp: 2140, growth: 1.8, approval: 47, unrest: 38, readiness: 71, climateRisk: 34, resource: 'mixed', alliance: 'home', electionDays: 214, trend: 'stable' },
+      { id: 'kesh', name: 'Kesh Federation', code: 'KSH', region: 'Northern Bloc', govType: 'One-Party State', capital: 'Kesh-Ordu', x: 56, y: 26, pop: '210M', gdp: 3760, growth: 2.4, approval: 61, unrest: 22, readiness: 88, climateRisk: 41, resource: 'energy', alliance: 'rival', electionDays: null, trend: 'worsening' },
+      { id: 'adrenne', name: 'Adrenne Republic', code: 'ADR', region: 'Southern Basin', govType: 'Presidential Republic', capital: 'Adrenne City', x: 50, y: 56, pop: '46M', gdp: 610, growth: -0.6, approval: 33, unrest: 58, readiness: 44, climateRisk: 66, resource: 'energy', alliance: 'neutral', electionDays: 41, trend: 'worsening' },
+      { id: 'thurland', name: 'Thurland', code: 'THL', region: 'Eastern Rim', govType: 'Parliamentary Democracy', capital: 'Shinkoto', x: 80, y: 33, pop: '128M', gdp: 4310, growth: 3.1, approval: 58, unrest: 19, readiness: 66, climateRisk: 37, resource: 'mixed', alliance: 'ally', electionDays: 302, trend: 'improving' },
+      { id: 'sundara', name: 'Sundara Isles', code: 'SND', region: 'Eastern Rim', govType: 'Constitutional Monarchy', capital: 'Palur', x: 83, y: 61, pop: '31M', gdp: 340, growth: 4.2, approval: 64, unrest: 15, readiness: 38, climateRisk: 78, resource: 'agri', alliance: 'ally', electionDays: null, trend: 'stable' },
+      { id: 'meraux', name: 'Meraux Union', code: 'MRX', region: 'Western Basin', govType: 'Federal Republic', capital: 'Meraux', x: 21, y: 63, pop: '96M', gdp: 980, growth: 1.2, approval: 41, unrest: 47, readiness: 52, climateRisk: 55, resource: 'mineral', alliance: 'neutral', electionDays: 88, trend: 'stable' },
+      { id: 'norvask', name: 'Norvask', code: 'NVK', region: 'Northern Bloc', govType: 'Parliamentary Democracy', capital: 'Norvik', x: 46, y: 13, pop: '9M', gdp: 410, growth: 2.0, approval: 71, unrest: 8, readiness: 44, climateRisk: 22, resource: 'energy', alliance: 'ally', electionDays: 190, trend: 'stable' },
+      { id: 'kalidane', name: 'Kalidane', code: 'KLD', region: 'Central Rim', govType: 'Parliamentary Democracy', capital: 'Kalipur', x: 64, y: 50, pop: '340M', gdp: 3980, growth: 5.8, approval: 55, unrest: 44, readiness: 60, climateRisk: 61, resource: 'mixed', alliance: 'neutral', electionDays: 132, trend: 'improving' },
+      { id: 'ostrava', name: 'Ostrava Pact', code: 'OSV', region: 'Northern Bloc', govType: 'Military Junta', capital: 'Ostrava', x: 59, y: 18, pop: '24M', gdp: 260, growth: -1.4, approval: 29, unrest: 63, readiness: 79, climateRisk: 44, resource: 'mineral', alliance: 'rival', electionDays: null, trend: 'worsening' },
+      { id: 'barrow', name: 'Barrow Coast', code: 'BRW', region: 'Arctic Rim', govType: 'Constitutional Monarchy', capital: 'Barrowhead', x: 11, y: 21, pop: '18M', gdp: 720, growth: 2.6, approval: 68, unrest: 11, readiness: 41, climateRisk: 29, resource: 'energy', alliance: 'ally', electionDays: 260, trend: 'improving' },
+      { id: 'tallissa', name: 'Tallissa', code: 'TLS', region: 'Southern Basin', govType: 'Presidential Republic', capital: 'Tallissa City', x: 37, y: 70, pop: '58M', gdp: 390, growth: 3.4, approval: 49, unrest: 36, readiness: 33, climateRisk: 70, resource: 'agri', alliance: 'neutral', electionDays: 55, trend: 'worsening' },
+      { id: 'firaq', name: 'Firaq Emirates', code: 'FRQ', region: 'Central Rim', govType: 'Monarchy', capital: 'Firaq', x: 55, y: 44, pop: '12M', gdp: 890, growth: 1.1, approval: 74, unrest: 14, readiness: 55, climateRisk: 82, resource: 'energy', alliance: 'ally', electionDays: null, trend: 'stable' },
+    ];
+
+    this.events = [
+      { id: 'e1', severity: 'critical', category: 'trade', ts: '09:41 · Today', title: 'Steel export volume falls 12%', why: 'Velmorian steel exports drop sharply after Kesh tariff retaliation', country: 'velmoria', chain: ['Kesh Federation enacts 18% retaliatory tariff on Velmorian steel (Mar 6)', 'Contract cancellations reported at 3 major exporters (Mar 8)', 'Steel export volume falls 12% week-over-week (today)'] },
+      { id: 'e2', severity: 'warning', category: 'politics', ts: '08:15 · Today', title: 'Coalition partner threatens walkout', why: 'Agrarian Bloc unhappy with subsidy cuts in draft budget', country: 'velmoria', chain: ['Draft budget cuts agricultural subsidies 9% (Mar 5)', 'Agrarian Bloc leadership convenes emergency session (Mar 7)', 'Public walkout threat issued (today)'] },
+      { id: 'e3', severity: 'notice', category: 'diplomacy', ts: 'Yesterday · 18:22', title: 'Thurland proposes joint patrol pact', why: 'Response to rising tension in shared trade corridor', country: 'thurland', chain: ['Piracy incidents rise in shared shipping lane (Feb 20)', 'Thurland navy conducts unilateral patrol (Mar 1)', 'Formal joint-patrol proposal delivered (yesterday)'] },
+      { id: 'e4', severity: 'critical', category: 'military', ts: 'Yesterday · 06:03', title: 'Ostrava Pact mobilizes reserve units', why: 'Border posture shift follows failed grain talks', country: 'ostrava', chain: ['Grain export talks with Ostrava collapse (Feb 26)', 'Ostrava recalls ambassador (Mar 2)', 'Reserve mobilization order detected (yesterday)'] },
+      { id: 'e5', severity: 'info', category: 'economy', ts: '2 days ago', title: 'Central bank holds rate at 4.25%', why: 'Inflation steady at 3.1%, no action needed this cycle', country: 'velmoria', chain: ['Inflation reading holds at 3.1% (Mar 3)', 'Bank board votes 6-1 to hold (Mar 4)'] },
+      { id: 'e6', severity: 'warning', category: 'unrest', ts: '2 days ago', title: 'Transit strike enters day 4 in Astervale', why: 'Union rejects revised wage offer', country: 'velmoria', chain: ['Union rejects 4% wage offer (Feb 28)', 'Talks stall after mediator withdrawal (Mar 1)', 'Strike enters day 4, ridership down 60% (2 days ago)'] },
+      { id: 'e7', severity: 'notice', category: 'diplomacy', ts: '3 days ago', title: 'Barrow Coast extends Arctic basing rights', why: 'Ten-year renewal signed ahead of schedule', country: 'barrow', chain: ['Basing agreement set to expire in 14 months (Jan)', 'Renewal talks accelerate after Kesh Arctic survey (Feb 10)', 'Ten-year extension signed (3 days ago)'] },
+      { id: 'e8', severity: 'critical', category: 'economy', ts: '4 days ago', title: 'Adrenne currency falls 6% overnight', why: 'Oil revenue miss triggers reserve concerns', country: 'adrenne', chain: ['Q1 oil export volumes miss forecast by 15% (Mar 1)', 'Sovereign reserves fall below 3-month import cover (Mar 2)', 'Currency depreciates 6% overnight (4 days ago)'] },
+      { id: 'e9', severity: 'notice', category: 'politics', ts: '5 days ago', title: 'Kalidane calls snap provincial elections', why: 'Ruling coalition seeks mandate after redistricting', country: 'kalidane', chain: ['Supreme court upholds new district map (Feb 25)', 'Ruling coalition polls ahead by 8pts (Mar 1)', 'Snap election called for 132 days out (5 days ago)'] },
+      { id: 'e10', severity: 'warning', category: 'climate', ts: '6 days ago', title: 'Sundara Isles issues coastal flood advisory', why: 'Third advisory this quarter amid rising sea levels', country: 'sundara', chain: ['Sea-level monitoring shows +4cm since January (ongoing)', 'Storm surge model flags 3 low-lying districts (Mar 1)', 'Advisory issued for coming spring tides (6 days ago)'] },
+      { id: 'e11', severity: 'info', category: 'trade', ts: '1 week ago', title: 'Firaq Emirates increases crude output quota', why: 'Regional bloc raises quota 200kbd to ease prices', country: 'firaq', chain: ['Bloc members agree to ease output caps (Feb 20)', 'Firaq allocated additional 200kbd quota (Feb 24)', 'New output begins (1 week ago)'] },
+      { id: 'e12', severity: 'notice', category: 'military', ts: '1 week ago', title: 'Joint readiness exercise concludes with Thurland', why: "Annual exercise rated 'high effectiveness' by joint command", country: 'thurland', chain: ['Exercise planning finalized (January)', 'Two-week joint exercise conducted (Feb 20 – Mar 3)', "After-action report rates effectiveness 'high' (1 week ago)"] },
+      { id: 'e13', severity: 'critical', category: 'unrest', ts: '1 week ago', title: 'Tallissa curfew imposed in three provinces', why: 'Unrest index crosses threshold after fuel price protests', country: 'tallissa', chain: ['Fuel subsidy cut announced (Feb 22)', 'Protests spread to 3 provinces (Feb 27)', 'Curfew imposed after unrest index crosses 70 (1 week ago)'] },
+    ];
+
+    this.ministers = [
+      { name: 'Elena Voss', portfolio: 'Finance', party: 'Reform', approval: 52, status: 'ok' },
+      { name: 'Dmitri Kalu', portfolio: 'Defense', party: 'Reform', approval: 61, status: 'ok' },
+      { name: 'Priya Anand', portfolio: 'Foreign Affairs', party: 'Coalition Ind.', approval: 58, status: 'ok' },
+      { name: 'Marcus Feld', portfolio: 'Interior', party: 'Agrarian Bloc', approval: 39, status: 'watch' },
+      { name: 'Sara Lindqvist', portfolio: 'Energy', party: 'Reform', approval: 46, status: 'ok' },
+      { name: 'Tomas Reyes', portfolio: 'Trade', party: 'Reform', approval: 33, status: 'scandal' },
+      { name: 'Anya Brenner', portfolio: 'Health', party: 'Coalition Ind.', approval: 65, status: 'ok' },
+    ];
+
+    this.sectors = [
+      { name: 'Manufacturing', gdpShare: 18.2, growth: -1.4, employ: 1840, note: 'Steel tariff retaliation hits export orders' },
+      { name: 'Financial Services', gdpShare: 16.5, growth: 2.1, employ: 620, note: 'Cross-border fintech licensing boosts activity' },
+      { name: 'Agriculture', gdpShare: 11.0, growth: 0.4, employ: 1490, note: 'Stable yields offset lower subsidy support' },
+      { name: 'Technology', gdpShare: 10.8, growth: 4.6, employ: 510, note: 'AI infrastructure investment wave continues' },
+      { name: 'Energy', gdpShare: 9.4, growth: -0.8, employ: 340, note: 'Grid modernization delays push back output' },
+      { name: 'Construction', gdpShare: 8.6, growth: 1.2, employ: 990, note: 'Public infrastructure spend front-loaded this year' },
+      { name: 'Retail & Consumer', gdpShare: 8.1, growth: -0.3, employ: 1620, note: 'Consumer confidence soft amid transit strike' },
+      { name: 'Healthcare', gdpShare: 7.9, growth: 1.8, employ: 880, note: 'Aging population sustains steady demand' },
+    ];
+
+    this.budget = [
+      { label: 'Defense', pct: 21, delta: 1.2 },
+      { label: 'Health', pct: 18, delta: 0.4 },
+      { label: 'Education', pct: 14, delta: -0.6 },
+      { label: 'Infrastructure', pct: 16, delta: 2.1 },
+      { label: 'Debt Service', pct: 12, delta: 0.8 },
+      { label: 'Welfare', pct: 19, delta: -1.5 },
+    ];
+
+    this.parties = [
+      { name: 'Reform Party', seats: 138, stance: 'Governing', color: 'var(--accent)' },
+      { name: 'Agrarian Bloc', seats: 44, stance: 'Coalition', color: 'var(--good)' },
+      { name: 'Coalition Independents', seats: 22, stance: 'Coalition', color: 'var(--info)' },
+      { name: 'National Union', seats: 96, stance: 'Opposition', color: 'var(--bad)' },
+      { name: 'Civic Front', seats: 40, stance: 'Opposition', color: 'var(--warn)' },
+    ];
+
+    this.corruption = [
+      { severity: 'warning', title: 'Trade Ministry procurement probe', desc: "Reyes' office under review for steel-quota allocation irregularities" },
+      { severity: 'notice', title: 'Campaign finance disclosure delay', desc: 'Reform Party files Q1 disclosure 6 days late, no penalty expected' },
+    ];
+
+    this.approvalSeries = [52, 51, 50, 50, 49, 48, 49, 48, 47, 46, 47, 46, 45, 47];
+    this.approvalMarkerIdx = [4, 9, 12];
+
+    this.societyStats = [
+      { label: 'Population Growth', value: '0.6%/yr', why: 'Net migration turns positive for first time in 3 years' },
+      { label: 'Unrest Index', value: '38', why: 'Elevated by transit strike and subsidy protests' },
+      { label: 'HDI Composite', value: '0.81', why: 'Steady gains in education spending since 2041' },
+    ];
+    this.hotspots = [
+      { name: 'Astervale Transit Corridor', value: 71, note: '4th day of transit strike' },
+      { name: 'Northern Agrarian Belt', value: 54, note: 'Subsidy cut protests' },
+      { name: 'Port Callas', value: 29, note: 'Dockworker pay dispute, talks ongoing' },
+    ];
+
+    this.militaryStats = [
+      { label: 'Overall Readiness', value: '71%', why: 'Reserve call-up compensates for equipment backlog' },
+      { label: 'Active Personnel', value: '340k', why: 'Voluntary enlistment up 4% amid recruitment drive' },
+      { label: 'Modernization', value: '58%', why: 'Delayed by supply chain bottleneck on avionics' },
+    ];
+    this.branches = [
+      { name: 'Army', personnel: '210k', readiness: 74, note: 'Reserve units activated for eastern drills' },
+      { name: 'Navy', personnel: '48k', readiness: 61, note: 'Two frigates in extended maintenance' },
+      { name: 'Air Force', personnel: '52k', readiness: 69, note: 'New squadron declared IOC this month' },
+      { name: 'Cyber Command', personnel: '6k', readiness: 83, note: 'Recently expanded after Kesh intrusion attempt' },
+    ];
+    this.deployments = [
+      { name: 'Joint Exercise — Thurland', location: 'Shinkoto Strait', personnel: '1,200', status: 'Concluded' },
+      { name: 'Arctic Basing Rotation', location: 'Barrow Coast', personnel: '400', status: 'Ongoing' },
+      { name: 'Peacekeeping Contribution', location: 'Adrenne border', personnel: '180', status: 'Ongoing' },
+    ];
+    this.treaties = [
+      { name: 'Mutual Defense Pact', parties: 'Thurland · Barrow Coast · Norvask · Sundara Isles', status: 'Active since 2038' },
+      { name: 'Regional Trade Framework', parties: 'Kalidane · Meraux Union', status: 'Active — renegotiation in 2027' },
+      { name: 'Arctic Basing Agreement', parties: 'Barrow Coast', status: 'Renewed 3 days ago' },
+    ];
+
+    this.mapModesList = [
+      { id: 'political', label: 'Political' },
+      { id: 'economic', label: 'Economic' },
+      { id: 'military', label: 'Military' },
+      { id: 'trade', label: 'Trade' },
+      { id: 'resources', label: 'Resources' },
+      { id: 'climate', label: 'Climate' },
+      { id: 'election', label: 'Election' },
+    ];
+    this.tabsList = [
+      { id: 'economy', label: 'Economy' },
+      { id: 'politics', label: 'Politics' },
+      { id: 'society', label: 'Society' },
+      { id: 'military', label: 'Military' },
+      { id: 'diplomacy', label: 'Diplomacy' },
+    ];
+    this.feedFilterChipsList = [
+      { id: 'all', label: 'All' },
+      { id: 'economy', label: 'Economy' },
+      { id: 'trade', label: 'Trade' },
+      { id: 'politics', label: 'Politics' },
+      { id: 'diplomacy', label: 'Diplomacy' },
+      { id: 'military', label: 'Military' },
+      { id: 'unrest', label: 'Unrest' },
+      { id: 'climate', label: 'Climate' },
+    ];
+
+    this.ACCENTS = {
+      amber: { d: '#d99a45', l: '#b9791f' },
+      blue: { d: '#4c86e0', l: '#2f5fc4' },
+      teal: { d: '#3f9e8f', l: '#2c7d70' },
+    };
+
+    this.onGlobalKeyDown = this.onGlobalKeyDown.bind(this);
+  }
+
+  componentDidMount() {
+    window.addEventListener('keydown', this.onGlobalKeyDown);
+    this._timers.push(setTimeout(() => {
+      this.pushToast('warning', 'Steel export volume -12%', 'New tariff regime detected — see Trade feed for details');
+    }, 1800));
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this.onGlobalKeyDown);
+    this._timers.forEach(t => clearTimeout(t));
+  }
+
+  onGlobalKeyDown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      this.setState(s => ({ paletteOpen: !s.paletteOpen, paletteQuery: '', paletteIndex: 0 }));
+    } else if (e.key === 'Escape' && this.state.paletteOpen) {
+      this.setState({ paletteOpen: false });
+    }
+  }
+
+  hexToRgba(hex, a) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  themeVars(theme, accentKey) {
+    const acc = this.ACCENTS[accentKey] || this.ACCENTS.amber;
+    if (theme === 'dark') {
+      const accent = acc.d;
+      return `--bg-0:#07090c;--bg-1:#0e1116;--bg-2:#151920;--bg-2-t:rgba(21,25,32,0.9);--bg-3:#1b212a;--border:#262d3a;--border-soft:#1b212b;--grid-line:rgba(255,255,255,0.035);--text:#e7eaef;--text-dim:#8d95a5;--text-faint:#5a6170;--accent:${accent};--accent-dim:${this.hexToRgba(accent, 0.16)};--accent-ring:${this.hexToRgba(accent, 0.45)};--good:#6fa787;--good-bg:${this.hexToRgba('#6fa787', 0.14)};--warn:#c99a4a;--warn-bg:${this.hexToRgba('#c99a4a', 0.14)};--bad:#c1685c;--bad-bg:${this.hexToRgba('#c1685c', 0.14)};--info:#6f90b8;--info-bg:${this.hexToRgba('#6f90b8', 0.14)};--shadow:0 16px 40px rgba(0,0,0,0.5);--scrim:rgba(4,5,7,0.6);`;
+    }
+    const accent = acc.l;
+    return `--bg-0:#eef0f3;--bg-1:#f5f6f8;--bg-2:#ffffff;--bg-2-t:rgba(255,255,255,0.92);--bg-3:#eef0f4;--border:#dde1e8;--border-soft:#e7eaf0;--grid-line:rgba(20,25,35,0.05);--text:#191d24;--text-dim:#5b6272;--text-faint:#8991a1;--accent:${accent};--accent-dim:${this.hexToRgba(accent, 0.12)};--accent-ring:${this.hexToRgba(accent, 0.35)};--good:#3f8462;--good-bg:${this.hexToRgba('#3f8462', 0.1)};--warn:#9c7a2e;--warn-bg:${this.hexToRgba('#9c7a2e', 0.1)};--bad:#a8483a;--bad-bg:${this.hexToRgba('#a8483a', 0.1)};--info:#3f5f8a;--info-bg:${this.hexToRgba('#3f5f8a', 0.1)};--shadow:0 10px 28px rgba(20,25,35,0.12);--scrim:rgba(20,24,32,0.35);`;
+  }
+
+  sparkPoints(arr, w, h) {
+    const min = Math.min(...arr), max = Math.max(...arr), range = (max - min) || 1;
+    return arr.map((v, i) => `${(i / (arr.length - 1) * w).toFixed(1)},${(h - ((v - min) / range) * (h - 3) - 1.5).toFixed(1)}`).join(' ');
+  }
+
+  fmtSigned(n, suffix) {
+    const s = n > 0 ? '+' : '';
+    return `${s}${n}${suffix || ''}`;
+  }
+
+  sevTokens(sev) {
+    if (sev === 'critical') return { bg: 'var(--bad-bg)', fg: 'var(--bad)', label: 'CRIT' };
+    if (sev === 'warning') return { bg: 'var(--warn-bg)', fg: 'var(--warn)', label: 'WARN' };
+    if (sev === 'notice') return { bg: 'var(--good-bg)', fg: 'var(--good)', label: 'NOTE' };
+    return { bg: 'var(--info-bg)', fg: 'var(--info)', label: 'INFO' };
+  }
+
+  toggleTheme() { this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })); }
+  goDashboard() { this.setState({ screen: 'dashboard' }); }
+  selectCountry(id) { this.setState({ screen: 'country', selectedCountryId: id, countryTab: 'economy' }); }
+  setCountryTab(id) { this.setState({ countryTab: id }); }
+  setMapMode(id) { this.setState({ mapMode: id }); }
+  zoomIn() { this.setState(s => ({ mapZoom: Math.min(2, +(s.mapZoom + 0.15).toFixed(2)) })); }
+  zoomOut() { this.setState(s => ({ mapZoom: Math.max(0.7, +(s.mapZoom - 0.15).toFixed(2)) })); }
+  hoverCountry(id) { this.setState({ hoveredCountryId: id }); }
+  leaveCountry() { this.setState({ hoveredCountryId: null }); }
+  setFeedFilter(id) { this.setState({ feedFilter: id }); }
+  toggleExpandEvent(id) {
+    this.setState(s => {
+      const cur = s.expandedEventIds === 'all' ? {} : { ...s.expandedEventIds };
+      cur[id] = !cur[id];
+      return { expandedEventIds: cur };
+    });
+  }
+  closeMapPanel() { this.setState(s => ({ panelClosed: { ...s.panelClosed, map: true } })); }
+  reopenMap() { this.setState(s => ({ panelClosed: { ...s.panelClosed, map: false } })); }
+  closeFeedPanel() { this.setState(s => ({ panelClosed: { ...s.panelClosed, feed: true } })); }
+  reopenFeed() { this.setState(s => ({ panelClosed: { ...s.panelClosed, feed: false } })); }
+  toggleFeedDock() { this.setState(s => ({ feedDockSide: s.feedDockSide === 'right' ? 'left' : 'right' })); }
+  toggleOverlay() { this.setState(s => ({ overlayHidden: !s.overlayHidden })); }
+  sortByShare() { this.setState(s => ({ sectorSort: { key: 'gdpShare', dir: s.sectorSort.key === 'gdpShare' && s.sectorSort.dir === 'desc' ? 'asc' : 'desc' } })); }
+  sortByGrowth() { this.setState(s => ({ sectorSort: { key: 'growth', dir: s.sectorSort.key === 'growth' && s.sectorSort.dir === 'desc' ? 'asc' : 'desc' } })); }
+  sortByApproval() { this.setState(s => ({ ministerSort: { key: 'approval', dir: s.ministerSort.dir === 'desc' ? 'asc' : 'desc' } })); }
+  setTaxRate(field, value) {
+    this.setState(s => ({ taxRates: { ...s.taxRates, [field]: value } }));
+    this.pushToast('info', 'Projected revenue recalculated', `${field[0].toUpperCase() + field.slice(1)} rate updated to ${value}%`);
+  }
+  openPalette() { this.setState({ paletteOpen: true, paletteQuery: '', paletteIndex: 0 }); }
+  closePalette() { this.setState({ paletteOpen: false }); }
+  setPaletteQuery(e) { this.setState({ paletteQuery: e.target.value, paletteIndex: 0 }); }
+  toggleNotif() { this.setState(s => ({ notifOpen: !s.notifOpen, notifUnread: s.notifOpen ? s.notifUnread : 0 })); }
+  markAllRead() { this.setState({ notifUnread: 0 }); }
+  stopProp(e) { e.stopPropagation(); }
+
+  pushToast(sev, title, msg) {
+    const id = 't' + (this._toastSeq++);
+    this.setState(s => ({ toasts: [...s.toasts, { id, sev, title, msg }] }));
+    const timer = setTimeout(() => this.dismissToast(id), 6000);
+    this._timers.push(timer);
+  }
+  dismissToast(id) { this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })); }
+
+  getPaletteResultsRaw(query) {
+    const q = (query || '').toLowerCase();
+    const results = [];
+    this.countries.forEach(c => {
+      if (!q || c.name.toLowerCase().includes(q)) results.push({ tag: 'NATION', label: c.name, hint: c.region, action: () => this.selectCountry(c.id) });
+    });
+    ['Global Dashboard'].forEach(l => { if (!q || l.toLowerCase().includes(q)) results.push({ tag: 'SCREEN', label: l, hint: 'Home', action: () => this.goDashboard() }); });
+    this.tabsList.forEach(t => {
+      const label = `${t.label} — Velmoria`;
+      if (!q || label.toLowerCase().includes(q)) results.push({ tag: 'PANEL', label, hint: 'Country detail', action: () => this.setState({ screen: 'country', selectedCountryId: 'velmoria', countryTab: t.id }) });
+    });
+    const actions = [
+      { label: 'Toggle theme', hint: 'Appearance', action: () => this.toggleTheme() },
+      { label: 'Reset map zoom', hint: 'World Map', action: () => this.setState({ mapZoom: 1 }) },
+      { label: 'Open notifications', hint: 'Inbox', action: () => this.setState({ notifOpen: true }) },
+    ];
+    actions.forEach(a => { if (!q || a.label.toLowerCase().includes(q)) results.push({ tag: 'ACTION', label: a.label, hint: a.hint, action: a.action }); });
+    return results.slice(0, 9);
+  }
+
+  paletteKeyDown(e) {
+    const results = this.getPaletteResultsRaw(this.state.paletteQuery);
+    if (e.key === 'ArrowDown') { e.preventDefault(); this.setState(s => ({ paletteIndex: Math.min(results.length - 1, s.paletteIndex + 1) })); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState(s => ({ paletteIndex: Math.max(0, s.paletteIndex - 1) })); }
+    else if (e.key === 'Enter') { const r = results[this.state.paletteIndex]; if (r) { r.action(); this.setState({ paletteOpen: false }); } }
+    else if (e.key === 'Escape') { this.setState({ paletteOpen: false }); }
+  }
+
+  modeFill(c, mode) {
+    if (mode === 'political') {
+      if (c.govType === 'Military Junta') return 'var(--bad)';
+      if (c.govType === 'One-Party State') return 'var(--warn)';
+      if (c.govType.indexOf('Monarchy') >= 0) return 'var(--good)';
+      return 'var(--accent)';
+    }
+    if (mode === 'economic') return c.growth >= 3 ? 'var(--good)' : (c.growth >= 0 ? 'var(--info)' : 'var(--bad)');
+    if (mode === 'military') return c.readiness >= 75 ? 'var(--good)' : (c.readiness >= 50 ? 'var(--warn)' : 'var(--bad)');
+    if (mode === 'climate') return c.climateRisk <= 30 ? 'var(--good)' : (c.climateRisk <= 60 ? 'var(--warn)' : 'var(--bad)');
+    if (mode === 'resources') return c.resource === 'energy' ? 'var(--warn)' : (c.resource === 'mineral' ? 'var(--info)' : 'var(--good)');
+    if (mode === 'trade') return c.alliance === 'ally' ? 'var(--accent)' : (c.alliance === 'home' ? 'var(--accent)' : 'var(--text-faint)');
+    if (mode === 'election') return 'var(--accent)';
+    return 'var(--accent)';
+  }
+
+  renderVals() {
+    const s = this.state;
+    const theme = s.theme;
+    const accentKey = this.props.accentTheme || 'amber';
+    const density = this.props.density || 'comfortable';
+    const rootStyle = `${this.themeVars(theme, accentKey)}height:100vh;width:100%;display:flex;flex-direction:column;background:var(--bg-0);color:var(--text);font-family:'IBM Plex Sans',sans-serif;overflow:hidden;position:relative;`;
+
+    const home = this.countries.find(c => c.id === 'velmoria');
+    const selectedCountry = this.countries.find(c => c.id === s.selectedCountryId) || home;
+
+    // ---- top bar ----
+    const homeSwatchStyle = `width:16px;height:16px;border-radius:4px;background:var(--accent);`;
+    const notifItems = [
+      { dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--bad);margin-top:4px;', title: 'Steel export volume -12%', msg: 'New tariff regime detected', ts: '09:41' },
+      { dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--warn);margin-top:4px;', title: 'Coalition partner threatens walkout', msg: 'Agrarian Bloc unhappy with subsidy cuts', ts: '08:15' },
+      { dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--good);margin-top:4px;', title: 'Thurland proposes joint patrol pact', msg: 'Shared corridor tension easing', ts: 'Yesterday' },
+    ];
+
+    // ---- toasts ----
+    const toasts = s.toasts.map(t => {
+      const tk = this.sevTokens(t.sev);
+      return { id: t.id, title: t.title, msg: t.msg,
+        style: `display:flex;gap:9px;align-items:flex-start;background:var(--bg-2);border:1px solid var(--border);border-left:3px solid ${tk.fg};border-radius:8px;padding:10px 11px;box-shadow:var(--shadow);animation:toastIn 0.18s ease;`,
+        dotStyle: `width:7px;height:7px;border-radius:50%;background:${tk.fg};margin-top:4px;flex-shrink:0;`,
+        dismiss: () => this.dismissToast(t.id) };
+    });
+
+    // ---- dashboard stat tiles ----
+    const gdpSeries = [1.9, 2.0, 2.0, 1.9, 2.1, 2.0, 1.9, 1.8];
+    const approvalSeriesHome = this.approvalSeries.slice(-8);
+    const unrestSeries = [26, 28, 29, 31, 33, 35, 36, 38];
+    const readinessSeries = [66, 67, 67, 68, 69, 70, 70, 71];
+    const statTiles = [
+      { label: 'GDP Growth', value: '1.8%', deltaText: '-0.3pp WoW', deltaStyle: 'font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:var(--bad);', sparkPoints: this.sparkPoints(gdpSeries, 62, 18), sparkStroke: 'stroke:var(--bad);', why: 'Slowing on steel export drop following Kesh tariff retaliation' },
+      { label: 'Approval', value: '47%', deltaText: '-2pp WoW', deltaStyle: 'font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:var(--warn);', sparkPoints: this.sparkPoints(approvalSeriesHome, 62, 18), sparkStroke: 'stroke:var(--warn);', why: 'Coalition strain and transit strike weigh on approval' },
+      { label: 'Unrest Index', value: '38', deltaText: '+9 WoW', deltaStyle: 'font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:var(--bad);', sparkPoints: this.sparkPoints(unrestSeries, 62, 18), sparkStroke: 'stroke:var(--bad);', why: 'Transit strike entering day 4 in the capital' },
+      { label: 'Military Readiness', value: '71%', deltaText: '+3pp WoW', deltaStyle: 'font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:var(--good);', sparkPoints: this.sparkPoints(readinessSeries, 62, 18), sparkStroke: 'stroke:var(--good);', why: 'Reserve call-up offsets equipment backlog' },
+    ];
+
+    // ---- map ----
+    const mapModes = this.mapModesList.map(m => ({
+      id: m.id, label: m.label, select: () => this.setMapMode(m.id),
+      tabStyle: `padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer;${s.mapMode === m.id ? 'background:var(--accent-dim);color:var(--accent);font-weight:600;' : 'color:var(--text-dim);'}`,
+    }));
+    const mapCountries = this.countries.map(c => {
+      const fill = c.id === s.selectedCountryId ? 'var(--accent)' : this.modeFill(c, s.mapMode);
+      const size = 10 + Math.min(10, Math.round(Math.log2(c.gdp) - 6));
+      const isElection = s.mapMode === 'election' && c.electionDays !== null && c.electionDays <= 320;
+      return {
+        id: c.id, name: c.name, code: c.code, showLabel: true,
+        select: () => this.selectCountry(c.id), hover: () => this.hoverCountry(c.id),
+        nodeStyle: `position:absolute;left:${c.x}%;top:${c.y}%;width:${size}px;height:${size}px;transform:translate(-50%,-50%);border-radius:50%;background:${fill};border:1.5px solid var(--bg-0);cursor:pointer;display:flex;align-items:center;justify-content:center;${isElection ? 'animation:pulseRing 1.8s infinite;' : ''}${c.id === s.selectedCountryId ? 'box-shadow:0 0 0 3px var(--accent-dim);' : ''}`,
+        labelStyle: `position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:3px;font-size:9px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;white-space:nowrap;`,
+      };
+    });
+    const showTradeLines = s.mapMode === 'trade';
+    const tradeLines = showTradeLines ? this.countries.filter(c => c.alliance === 'ally').map(c => ({
+      x1: home.x, y1: home.y, x2: c.x, y2: c.y,
+      style: `stroke:var(--accent);stroke-width:0.3;opacity:0.5;`,
+    })) : [];
+    const legendByMode = {
+      political: [{ label: 'Democratic/Republic', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--accent);' }, { label: 'Monarchy', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--good);' }, { label: 'One-party / Junta', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--warn);' }],
+      economic: [{ label: 'Growth ≥3%', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--good);' }, { label: 'Growth 0–3%', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--info);' }, { label: 'Contracting', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--bad);' }],
+      military: [{ label: 'High readiness', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--good);' }, { label: 'Moderate', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--warn);' }, { label: 'Low', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--bad);' }],
+      trade: [{ label: 'Trade partner', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--accent);' }, { label: 'Minimal trade', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--text-faint);' }],
+      resources: [{ label: 'Energy', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--warn);' }, { label: 'Mineral', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--info);' }, { label: 'Agricultural', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--good);' }],
+      climate: [{ label: 'Low risk', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--good);' }, { label: 'Moderate', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--warn);' }, { label: 'High risk', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--bad);' }],
+      election: [{ label: 'Election within 12mo', dotStyle: 'width:7px;height:7px;border-radius:50%;background:var(--accent);' }],
+    };
+    const feedSide = s.feedDockSide;
+    const overlayColStyle = `position:absolute;top:24px;${feedSide === 'right' ? 'left:24px;right:392px;' : 'right:24px;left:392px;'}display:flex;flex-direction:column;gap:12px;z-index:10;`;
+    const feedPanelStyle = `position:absolute;top:24px;bottom:24px;${feedSide}:24px;width:360px;background:var(--bg-2-t);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0;overflow:hidden;z-index:10;`;
+    const feedRestoreStyle = `position:absolute;top:24px;${feedSide}:24px;z-index:10;display:flex;align-items:center;gap:10px;background:var(--bg-2-t);backdrop-filter:blur(10px);border:1px dashed var(--border);border-radius:8px;padding:8px 12px;color:var(--text-faint);font-size:12px;box-shadow:var(--shadow);`;
+    const hoveredC = this.countries.find(c => c.id === s.hoveredCountryId);
+    const hoveredCountry = hoveredC ? {
+      name: hoveredC.name, region: hoveredC.region, govType: hoveredC.govType,
+      gdpText: `$${hoveredC.gdp}B`, growthText: this.fmtSigned(hoveredC.growth, '%'),
+      approvalText: `${hoveredC.approval}%`, readinessText: `${hoveredC.readiness}%`,
+      tooltipStyle: `position:absolute;left:${hoveredC.x}%;top:${hoveredC.y}%;transform:translate(12px, -50%);background:var(--bg-2-t);border:1px solid var(--border);border-radius:8px;padding:9px 11px;z-index:15;pointer-events:none;box-shadow:var(--shadow);min-width:170px;`,
+    } : null;
+
+    // ---- feed ----
+    const expandedAll = s.expandedEventIds === 'all';
+    const feedFiltered = this.events.filter(e => s.feedFilter === 'all' || e.category === s.feedFilter);
+    const feedItems = feedFiltered.map(e => {
+      const tk = this.sevTokens(e.severity);
+      const expanded = expandedAll ? true : !!s.expandedEventIds[e.id];
+      const country = this.countries.find(c => c.id === e.country);
+      return {
+        id: e.id, title: e.title, why: e.why, ts: e.ts, categoryLabel: e.category[0].toUpperCase() + e.category.slice(1),
+        sevLabel: tk.label, badgeStyle: `font-size:9.5px;font-weight:700;letter-spacing:0.3px;padding:2px 6px;border-radius:4px;background:${tk.bg};color:${tk.fg};white-space:nowrap;margin-top:1px;`,
+        toggle: () => this.toggleExpandEvent(e.id), expanded, chevron: expanded ? '▲' : '▼',
+        chain: e.chain.map((text, i) => ({ n: `${i + 1}`, text })),
+        hasCountry: !!country, countryName: country ? country.name : '', jump: () => country && this.selectCountry(country.id),
+      };
+    });
+    const feedFilterChipsVM = this.feedFilterChipsList.map(fc => ({
+      id: fc.id, label: fc.label, select: () => this.setFeedFilter(fc.id),
+      style: `padding:3px 8px;border-radius:5px;font-size:10.5px;cursor:pointer;${s.feedFilter === fc.id ? 'background:var(--accent-dim);color:var(--accent);font-weight:600;' : 'color:var(--text-dim);background:var(--bg-1);'}`,
+    }));
+
+    // ---- country detail: header ----
+    const allianceTokens = { ally: this.sevTokens('notice'), rival: this.sevTokens('critical'), neutral: this.sevTokens('info'), home: { bg: 'var(--accent-dim)', fg: 'var(--accent)' } };
+    const at = allianceTokens[selectedCountry.alliance];
+    const country = {
+      name: selectedCountry.name, region: selectedCountry.region, govType: selectedCountry.govType, capital: selectedCountry.capital,
+      swatchStyle: `width:34px;height:34px;border-radius:8px;background:${this.modeFill(selectedCountry, 'political')};`,
+      allianceLabel: selectedCountry.alliance === 'home' ? 'HOME NATION' : selectedCountry.alliance.toUpperCase(),
+      allianceStyle: `font-size:10px;font-weight:700;letter-spacing:0.4px;padding:4px 9px;border-radius:5px;background:${at.bg};color:${at.fg};`,
+      headline: [
+        { label: 'GDP', value: `$${selectedCountry.gdp}B` },
+        { label: 'Approval', value: `${selectedCountry.approval}%` },
+        { label: 'Unrest', value: `${selectedCountry.unrest}` },
+        { label: 'Readiness', value: `${selectedCountry.readiness}%` },
+      ],
+    };
+    const tabsVM = this.tabsList.map(t => ({
+      id: t.id, label: t.label, select: () => this.setCountryTab(t.id),
+      style: `padding:7px 14px;border-radius:6px;font-size:12.5px;cursor:pointer;${s.countryTab === t.id ? 'background:var(--accent);color:var(--bg-0);font-weight:600;' : 'color:var(--text-dim);'}`,
+    }));
+
+    // ---- economy tab ----
+    const econStats = [
+      { label: 'GDP', value: `$${home.gdp}B`, deltaText: this.fmtSigned(home.growth, '%'), deltaStyle: `font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--bad);`, sparkPoints: this.sparkPoints(gdpSeries, 56, 16), sparkStroke: 'stroke:var(--bad);', why: 'Slowing on steel export drop following Kesh tariff retaliation' },
+      { label: 'Inflation', value: '3.1%', deltaText: '+0.0pp', deltaStyle: `font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--text-dim);`, sparkPoints: this.sparkPoints([3.0, 3.1, 3.2, 3.1, 3.0, 3.1, 3.1, 3.1], 56, 16), sparkStroke: 'stroke:var(--text-faint);', why: 'Central bank holds rate steady at 4.25%' },
+      { label: 'Trade Balance', value: '-$34B', deltaText: '-$12B MoM', deltaStyle: `font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--bad);`, sparkPoints: this.sparkPoints([-18, -20, -22, -24, -28, -30, -32, -34], 56, 16), sparkStroke: 'stroke:var(--bad);', why: 'Export volume falls on retaliatory tariffs' },
+      { label: 'Unemployment', value: '5.4%', deltaText: '+0.2pp', deltaStyle: `font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--warn);`, sparkPoints: this.sparkPoints([5.1, 5.1, 5.2, 5.2, 5.3, 5.3, 5.4, 5.4], 56, 16), sparkStroke: 'stroke:var(--warn);', why: 'Transit strike temporarily idles logistics workers' },
+    ];
+    const sectorsSorted = [...this.sectors].sort((a, b) => {
+      const k = s.sectorSort.key, dir = s.sectorSort.dir === 'desc' ? -1 : 1;
+      return (a[k] - b[k]) * dir;
+    });
+    const sectorsVM = sectorsSorted.map(sec => ({
+      name: sec.name, shareText: `${sec.gdpShare.toFixed(1)}%`, growthText: this.fmtSigned(sec.growth, '%'),
+      growthColor: `color:${sec.growth >= 0 ? 'var(--good)' : 'var(--bad)'};`, employText: `${sec.employ}k`, note: sec.note,
+    }));
+    const shareSortArrow = s.sectorSort.key === 'gdpShare' ? (s.sectorSort.dir === 'desc' ? '▼' : '▲') : '';
+    const growthSortArrow = s.sectorSort.key === 'growth' ? (s.sectorSort.dir === 'desc' ? '▼' : '▲') : '';
+    const budgetVM = this.budget.map(b => ({
+      label: b.label, pctText: `${b.pct}%`, deltaText: this.fmtSigned(b.delta, 'pp'),
+      deltaColor: `color:${b.delta >= 0 ? 'var(--good)' : 'var(--bad)'};`,
+      barStyle: `width:${b.pct * 4}%;height:100%;background:var(--accent);border-radius:3px;`,
+    }));
+    const budgetNote = 'Infrastructure +2.1pp — front-loaded ahead of election cycle; Welfare -1.5pp offset by targeted subsidy reform';
+    const taxSliders = [
+      { key: 'corporate', label: 'Corporate Tax', value: s.taxRates.corporate, valueText: `${s.taxRates.corporate}%`, onChange: (e) => this.setTaxRate('corporate', +e.target.value) },
+      { key: 'income', label: 'Income Tax', value: s.taxRates.income, valueText: `${s.taxRates.income}%`, onChange: (e) => this.setTaxRate('income', +e.target.value) },
+      { key: 'vat', label: 'VAT', value: s.taxRates.vat, valueText: `${s.taxRates.vat}%`, onChange: (e) => this.setTaxRate('vat', +e.target.value) },
+    ];
+    const baseRevenue = 480;
+    const projRevenue = Math.round(baseRevenue * (s.taxRates.corporate / 24) * 0.4 + baseRevenue * (s.taxRates.income / 32) * 0.45 + baseRevenue * (s.taxRates.vat / 18) * 0.15);
+    const projectedRevenueText = `Projected annual revenue: $${projRevenue}B at current rates`;
+
+    // ---- politics tab ----
+    const approvalPoints = this.sparkPoints(this.approvalSeries, 300, 80);
+    const ptsArr = approvalPoints.split(' ');
+    const approvalMarkers = this.approvalMarkerIdx.map(i => {
+      const [cx, cy] = ptsArr[i].split(',');
+      return { cx, cy };
+    });
+    const partiesVM = this.parties.map(p => ({ name: p.name, seats: p.seats, stance: p.stance, dotStyle: `width:9px;height:9px;border-radius:50%;background:${p.color};` }));
+    const totalSeats = this.parties.reduce((a, p) => a + p.seats, 0);
+    const projectedSeats = this.parties.map(p => ({ style: `width:${(p.seats / totalSeats) * 100}%;background:${p.color};` }));
+    const ministersSorted = [...this.ministers].sort((a, b) => (a.approval - b.approval) * (s.ministerSort.dir === 'desc' ? -1 : 1));
+    const ministerStatusTokens = { ok: this.sevTokens('notice'), watch: this.sevTokens('warning'), scandal: this.sevTokens('critical') };
+    const ministerStatusLabels = { ok: 'CLEAR', watch: 'WATCH', scandal: 'SCANDAL' };
+    const ministersVM = ministersSorted.map(m => {
+      const tk = ministerStatusTokens[m.status];
+      return { name: m.name, portfolio: m.portfolio, party: m.party, approvalText: `${m.approval}%`,
+        statusLabel: ministerStatusLabels[m.status],
+        statusStyle: `font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:4px;background:${tk.bg};color:${tk.fg};width:fit-content;` };
+    });
+    const approvalSortArrow = s.ministerSort.dir === 'desc' ? '▼' : '▲';
+    const corruptionVM = this.corruption.map(cf => {
+      const tk = this.sevTokens(cf.severity);
+      return { title: cf.title, desc: cf.desc, sevLabel: tk.label, badgeStyle: `font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;background:${tk.bg};color:${tk.fg};margin-top:1px;` };
+    });
+
+    // ---- society tab ----
+    const hotspotsVM = this.hotspots.map(h => ({
+      name: h.name, note: h.note, value: h.value,
+      style: `font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:${h.value >= 60 ? 'var(--bad)' : (h.value >= 35 ? 'var(--warn)' : 'var(--good)')};`,
+    }));
+
+    // ---- military tab ----
+    const branchesVM = this.branches.map(b => ({
+      name: b.name, personnel: b.personnel, readinessText: `${b.readiness}%`, note: b.note,
+      readinessColor: `color:${b.readiness >= 75 ? 'var(--good)' : (b.readiness >= 50 ? 'var(--warn)' : 'var(--bad)')};`,
+    }));
+    const deploymentStatusTokens = { Ongoing: this.sevTokens('notice'), Concluded: this.sevTokens('info') };
+    const deploymentsVM = this.deployments.map(d => {
+      const tk = deploymentStatusTokens[d.status] || this.sevTokens('info');
+      return { name: d.name, location: d.location, personnel: d.personnel, status: d.status, statusStyle: `font-size:11px;font-weight:600;color:${tk.fg};` };
+    });
+
+    // ---- diplomacy tab ----
+    const trendTokens = { improving: { c: 'var(--good)', arrow: '▲ Improving' }, worsening: { c: 'var(--bad)', arrow: '▼ Worsening' }, stable: { c: 'var(--text-dim)', arrow: '– Stable' } };
+    const relationsVM = this.countries.filter(c => c.id !== 'velmoria').map(c => {
+      const at2 = allianceTokens[c.alliance];
+      const tt = trendTokens[c.trend];
+      return {
+        name: c.name, statusLabel: c.alliance.toUpperCase(),
+        statusStyle: `font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:4px;background:${at2.bg};color:${at2.fg};width:fit-content;`,
+        trendLabel: tt.arrow, trendColor: `color:${tt.c};font-size:11.5px;`, open: () => this.selectCountry(c.id),
+      };
+    });
+
+    return {
+      rootStyle, themeIcon: theme === 'dark' ? '\u263D' : '\u2600',
+      toggleTheme: () => this.toggleTheme(),
+      screen: s.screen, isDashboard: s.screen === 'dashboard', isCountry: s.screen === 'country',
+      goDashboard: () => this.goDashboard(), back: () => this.goDashboard(),
+      simDate: '14 MAR 2043 · 09:41 UTC',
+      homeName: home.name, homeSwatchStyle,
+      notifOpen: s.notifOpen, toggleNotif: () => this.toggleNotif(), notifUnread: s.notifUnread, notifItems, markAllRead: () => this.markAllRead(),
+      paletteOpen: s.paletteOpen, openPalette: () => this.openPalette(), closePalette: () => this.closePalette(),
+      paletteQuery: s.paletteQuery, setPaletteQuery: (e) => this.setPaletteQuery(e), paletteKeyDown: (e) => this.paletteKeyDown(e),
+      stopProp: (e) => this.stopProp(e),
+      paletteResults: this.getPaletteResultsRaw(s.paletteQuery).map((r, i) => ({
+        label: r.label, hint: r.hint, tag: r.tag,
+        select: () => { r.action(); this.setState({ paletteOpen: false }); },
+        style: `display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;cursor:pointer;${i === s.paletteIndex ? 'background:var(--bg-1);' : ''}`,
+        tagStyle: `font-size:9px;font-weight:700;color:var(--text-faint);background:var(--bg-1);border:1px solid var(--border);border-radius:4px;padding:2px 6px;width:52px;text-align:center;`,
+      })),
+      toasts,
+      statTiles,
+      mapModes, mapMode: s.mapMode, mapZoomPct: `${Math.round(s.mapZoom * 100)}%`,
+      zoomIn: () => this.zoomIn(), zoomOut: () => this.zoomOut(),
+      mapScaleStyle: `position:absolute;inset:0;transform:scale(${s.mapZoom});transform-origin:center center;transition:transform 0.15s ease;`,
+      mapCountries, hoveredCountry, showTradeLines, tradeLines,
+      mapLegend: legendByMode[s.mapMode] || [],
+      overlayVisible: !s.overlayHidden, overlayHidden: s.overlayHidden, toggleOverlay: () => this.toggleOverlay(),
+      overlayColStyle, feedPanelStyle, feedRestoreStyle,
+      feedPanelOpen: !s.panelClosed.feed, feedPanelClosed: !!s.panelClosed.feed,
+      closeFeedPanel: () => this.closeFeedPanel(), reopenFeed: () => this.reopenFeed(),
+      toggleFeedDock: () => this.toggleFeedDock(),
+      feedItems, feedFilterChipsVM, leaveCountry: () => this.leaveCountry(),
+      country, tabsVM,
+      isEconomy: s.countryTab === 'economy', isPolitics: s.countryTab === 'politics', isSociety: s.countryTab === 'society', isMilitary: s.countryTab === 'military', isDiplomacy: s.countryTab === 'diplomacy',
+      econStats, sectorsVM, shareSortArrow, growthSortArrow, sortByShare: () => this.sortByShare(), sortByGrowth: () => this.sortByGrowth(),
+      budgetVM, budgetNote, taxSliders, projectedRevenueText,
+      approvalNow: `${this.approvalSeries[this.approvalSeries.length - 1]}%`, approvalPoints, approvalMarkers,
+      approvalWhy: 'Coalition strain and transit strike weigh on approval; central bank hold offered modest stabilization',
+      electionDaysText: `${home.electionDays} days`, projectedSeats,
+      ministersVM, approvalSortArrow, sortByApproval: () => this.sortByApproval(),
+      partiesVM, corruptionVM,
+      societyStats: this.societyStats, hotspotsVM,
+      militaryStats: this.militaryStats, branchesVM, deploymentsVM,
+      relationsVM, treatiesVM: this.treaties.map(t => ({ name: t.name, parties: t.parties, status: t.status })),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

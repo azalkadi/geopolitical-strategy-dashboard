@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:store.steampowered.com)",
+      "WebFetch(domain:www.geo-political-simulator-5.com)",
+      "WebFetch(domain:steamcommunity.com)",
+      "WebFetch(domain:steambase.io)",
+      "WebFetch(domain:www.power-and-revolution.com)",
+      "Bash(mkdir -p \"design_import\")",
+      "Bash(unzip -o \"# Geopolitical Strategy Dashboard.zip\" -d \"design_import\")"
+    ]
+  }
+}
