@@ -24,23 +24,38 @@ namespace Meridian.Geo
 
         public static GeoWorld Load()
         {
+            // Every dataset loads independently: a parse failure in any one of them costs that
+            // single layer (logged loudly, empty list returned), never the whole world. Before
+            // this guard existed, a single intermittent InvalidCastException while parsing the
+            // railways file aborted MapRenderer.Start entirely — no map, no UI, just a black
+            // screen with the only clue buried in Player.log.
             var world = new GeoWorld();
-            world.Countries = LoadCountries(Path.Combine(DataDir, "ne_10m_admin_0_countries.geojson"));
-            world.Provinces = LoadProvinces(Path.Combine(DataDir, "ne_10m_admin_1_states_provinces.geojson"));
-            world.Cities = LoadCities(Path.Combine(DataDir, "ne_10m_populated_places.geojson"));
-            world.Ports = LoadPoints(Path.Combine(DataDir, "ne_10m_ports.geojson"), "name", "");
-            world.Airports = LoadPoints(Path.Combine(DataDir, "ne_10m_airports.geojson"), "name", "iata_code");
+            world.Countries = SafeLoad("countries", () => LoadCountries(Path.Combine(DataDir, "ne_10m_admin_0_countries.geojson")));
+            world.Provinces = SafeLoad("provinces", () => LoadProvinces(Path.Combine(DataDir, "ne_10m_admin_1_states_provinces.geojson")));
+            world.Cities = SafeLoad("cities", () => LoadCities(Path.Combine(DataDir, "ne_10m_populated_places.geojson")));
+            world.Ports = SafeLoad("ports", () => LoadPoints(Path.Combine(DataDir, "ne_10m_ports.geojson"), "name", ""));
+            world.Airports = SafeLoad("airports", () => LoadPoints(Path.Combine(DataDir, "ne_10m_airports.geojson"), "name", "iata_code"));
             // Major roads/railways (Natural Earth 10m, filtered to the world-scale subset —
             // full detail is ~56k/25k features and not useful at country/continent zoom) and
             // hand-curated air bases (filtered from the airports set by its own "military" type
             // tag), oil ports, and nuclear plants (no public bundled dataset for either, so a
             // real-but-not-exhaustive list of major, well-known facilities).
-            world.Roads = LoadLines(Path.Combine(DataDir, "ne_10m_roads_major.geojson"), "name");
-            world.Railways = LoadLines(Path.Combine(DataDir, "ne_10m_railroads_major.geojson"), "name");
-            world.AirBases = LoadPoints(Path.Combine(DataDir, "ne_10m_airbases_military.geojson"), "name", "");
-            world.OilPorts = LoadPoints(Path.Combine(DataDir, "ne_10m_oilports.geojson"), "name", "");
-            world.NuclearPlants = LoadPoints(Path.Combine(DataDir, "ne_10m_nuclearplants.geojson"), "name", "");
+            world.Roads = SafeLoad("roads", () => LoadLines(Path.Combine(DataDir, "ne_10m_roads_major.geojson"), "name"));
+            world.Railways = SafeLoad("railways", () => LoadLines(Path.Combine(DataDir, "ne_10m_railroads_major.geojson"), "name"));
+            world.AirBases = SafeLoad("air bases", () => LoadPoints(Path.Combine(DataDir, "ne_10m_airbases_military.geojson"), "name", ""));
+            world.OilPorts = SafeLoad("oil ports", () => LoadPoints(Path.Combine(DataDir, "ne_10m_oilports.geojson"), "name", ""));
+            world.NuclearPlants = SafeLoad("nuclear plants", () => LoadPoints(Path.Combine(DataDir, "ne_10m_nuclearplants.geojson"), "name", ""));
             return world;
+        }
+
+        static List<T> SafeLoad<T>(string what, System.Func<List<T>> loader)
+        {
+            try { return loader(); }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[geo] {what} failed to load ({e.GetType().Name}: {e.Message}) — continuing without this layer");
+                return new List<T>();
+            }
         }
 
         // --- Countries -----------------------------------------------------------------
@@ -162,25 +177,32 @@ namespace Meridian.Geo
             if (!File.Exists(path)) { Debug.LogWarning($"[geo] missing {path}"); return outList; }
 
             var root = JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
+            int skipped = 0;
             foreach (var f in root["features"])
             {
-                var props = f["properties"];
-                var geom = f["geometry"];
-                string gtype = geom?["type"]?.ToString() ?? "";
-                var coords = geom?["coordinates"];
-                if (coords == null) continue;
+                // Per-feature guard: one malformed feature costs itself, not the whole file.
+                try
+                {
+                    var props = f["properties"];
+                    var geom = f["geometry"];
+                    string gtype = geom?["type"]?.ToString() ?? "";
+                    var coords = geom?["coordinates"];
+                    if (coords == null) continue;
 
-                var lines = new List<List<Vector2>>();
-                if (gtype == "LineString")
-                    lines.Add(ParseLineCoords(coords));
-                else if (gtype == "MultiLineString")
-                    foreach (var line in coords)
-                        lines.Add(ParseLineCoords(line));
-                else
-                    continue;
+                    var lines = new List<List<Vector2>>();
+                    if (gtype == "LineString")
+                        lines.Add(ParseLineCoords(coords));
+                    else if (gtype == "MultiLineString")
+                        foreach (var line in coords)
+                            lines.Add(ParseLineCoords(line));
+                    else
+                        continue;
 
-                outList.Add(new LineFeature { Name = PropStr(props, nameKey), Lines = lines });
+                    outList.Add(new LineFeature { Name = PropStr(props, nameKey), Lines = lines });
+                }
+                catch (System.Exception) { skipped++; }
             }
+            if (skipped > 0) Debug.LogWarning($"[geo] {Path.GetFileName(path)}: skipped {skipped} unparseable line feature(s)");
             return outList;
         }
 
@@ -189,11 +211,34 @@ namespace Meridian.Geo
             var pts = new List<Vector2>();
             foreach (var pt in coords)
             {
-                float lon = (float)(pt[0]?.Value<double>() ?? 0.0);
-                float lat = (float)(pt[1]?.Value<double>() ?? 0.0);
+                if (!TryReadLonLat(pt, out float lon, out float lat)) continue;
                 pts.Add(GeoMath.LonLatToMercator(lon, lat));
             }
             return pts;
+        }
+
+        // Type-checked coordinate extraction. The naive `pt[0].Value<double>()` path throws
+        // InvalidCastException from deep inside Newtonsoft if the token isn't a plain numeric
+        // JValue — observed intermittently in a built player on real (verified-clean) data, so
+        // never trust the fast path: verify shape, convert defensively, skip on any failure
+        // instead of letting one bad point abort a whole dataset.
+        static bool TryReadLonLat(JToken pt, out float lon, out float lat)
+        {
+            lon = 0f; lat = 0f;
+            if (pt is not JArray arr || arr.Count < 2) return false;
+            return TryTokenToFloat(arr[0], out lon) && TryTokenToFloat(arr[1], out lat);
+        }
+
+        static bool TryTokenToFloat(JToken t, out float result)
+        {
+            result = 0f;
+            if (t is not JValue v || v.Value == null) return false;
+            try
+            {
+                result = (float)System.Convert.ToDouble(v.Value, System.Globalization.CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch { return false; }
         }
 
         // --- Geometry -> mesh (port of build_mesh_from_geometry) ------------------------
@@ -240,8 +285,7 @@ namespace Meridian.Geo
                     if (ri > 0) holeIndices.Add(flat.Count / 2);
                     foreach (var pt in ringVal)
                     {
-                        float lon = (float)(pt[0]?.Value<double>() ?? 0.0);
-                        float lat = (float)(pt[1]?.Value<double>() ?? 0.0);
+                        if (!TryReadLonLat(pt, out float lon, out float lat)) continue;
                         // Reproject to Mercator BEFORE triangulating, not after — Earcut needs
                         // to operate on the actual final planar shape, and a nonlinear warp
                         // applied post-triangulation could in principle disagree with the
@@ -289,9 +333,7 @@ namespace Meridian.Geo
         {
             pos = Vector2.zero;
             var coords = geom?["coordinates"];
-            if (coords == null || coords.Type != JTokenType.Array || coords.Count() < 2) return false;
-            float lon = (float)coords[0].Value<double>();
-            float lat = (float)coords[1].Value<double>();
+            if (!TryReadLonLat(coords, out float lon, out float lat)) return false;
             pos = GeoMath.LonLatToMercator(lon, lat);
             return true;
         }
