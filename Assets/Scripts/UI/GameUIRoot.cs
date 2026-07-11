@@ -61,6 +61,7 @@ namespace Meridian.UI
         int builtForSelected = -2;
         NationCategory builtForCategory = (NationCategory)(-1);
         string builtForTopic = "__unbuilt__";
+        bool builtForPanelOpen = false;
         readonly List<SliderBinding> activeSliders = new();
 
         // --- event toasts (AI policy changes / threshold-crossing events, surfaced live) ---
@@ -130,6 +131,7 @@ namespace Meridian.UI
             topBarRoot = bar;
 
             var title = MakeLabel("MERIDIAN", 14, GameTheme.Accent, bold: true);
+            title.style.letterSpacing = 2f;
             title.style.marginRight = 12;
             bar.Add(title);
 
@@ -176,17 +178,24 @@ namespace Meridian.UI
 
             topStatsRow = new VisualElement();
             topStatsRow.style.flexDirection = FlexDirection.Row;
+            topStatsRow.style.alignItems = Align.Center;
             topStatsRow.style.display = DisplayStyle.None;
             bar.Add(topStatsRow);
 
+            // Single-line "LABEL value" pairs, not stacked two-line tiles — every element in this
+            // bar (day counter, badges, these stats) is then one text line tall, so Align.Center
+            // on the row puts them all on the same visual baseline instead of the stat tiles
+            // drifting off-center against their taller stacked neighbors.
             string[] statNames = { "GROWTH", "UNEMP.", "INFLATION", "TREASURY" };
             topStatLabels = new Label[statNames.Length];
             for (int i = 0; i < statNames.Length; i++)
             {
                 var tile = new VisualElement();
-                tile.style.width = 84;
-                tile.style.marginLeft = 10;
-                var head = MakeLabel(statNames[i], 9, GameTheme.TextDim);
+                tile.style.flexDirection = FlexDirection.Row;
+                tile.style.alignItems = Align.Center;
+                tile.style.marginLeft = 14;
+                var head = MakeLabel(statNames[i] + ":", 10, GameTheme.TextDim);
+                head.style.marginRight = 4;
                 var val = MakeLabel("—", 13, GameTheme.TextPrimary, bold: true);
                 tile.Add(head);
                 tile.Add(val);
@@ -199,13 +208,14 @@ namespace Meridian.UI
 
         void BuildMinistryBar()
         {
+            // No panel background — just the row of nameplate buttons floating directly over the
+            // map/satellite view, each button carrying its own solid color. The bar itself is
+            // Ignore-picking and paints nothing, so the map underneath (including the gaps
+            // between buttons) stays fully visible and clickable.
             var bar = new VisualElement();
-            bar.pickingMode = PickingMode.Position;
+            bar.pickingMode = PickingMode.Ignore;
             bar.style.position = Position.Absolute;
             bar.style.left = 0; bar.style.right = 0; bar.style.bottom = 0; bar.style.height = 42;
-            bar.style.backgroundColor = new StyleColor(GameTheme.BgBar);
-            bar.style.borderTopWidth = 1;
-            bar.style.borderTopColor = new StyleColor(GameTheme.Border);
             bar.style.flexDirection = FlexDirection.Row;
             bar.style.justifyContent = Justify.Center;
             bar.style.alignItems = Align.Center;
@@ -214,7 +224,12 @@ namespace Meridian.UI
 
             ministryButtons = new VisualElement[Categories.Length];
             dropdownLayer = new VisualElement();
-            dropdownLayer.pickingMode = PickingMode.Position;
+            // Ignore, not Position: this layer spans the whole screen so its popup dropdowns can
+            // render anywhere, but as an empty container it must never itself be a hit target —
+            // it sat on top of the top bar and ministry bar in z-order and was silently swallowing
+            // every click meant for the buttons beneath it. Ignore lets those clicks pass through;
+            // the popup `dd` VisualElement added as its child still keeps its own Position picking.
+            dropdownLayer.pickingMode = PickingMode.Ignore;
             dropdownLayer.style.position = Position.Absolute;
             dropdownLayer.style.left = 0; dropdownLayer.style.right = 0; dropdownLayer.style.top = 0; dropdownLayer.style.bottom = 0;
             root.Add(dropdownLayer); // added after bar so dropdowns render on top
@@ -222,8 +237,9 @@ namespace Meridian.UI
             for (int i = 0; i < Categories.Length; i++)
             {
                 var cat = Categories[i];
-                var btn = MakeButton(cat.Label(), 13, GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextDim,
-                    () => { UIState.ActiveCategory = cat; UIState.ActiveTopic = null; });
+                var catColor = cat.Accent();
+                var btn = MakeButton(cat.Label(), 13, GameTheme.Muted(catColor), GameTheme.Muted(catColor, 0.4f), GameTheme.TextPrimary,
+                    () => { UIState.ActiveCategory = cat; UIState.ActiveTopic = null; UIState.PanelOpen = true; });
                 btn.style.width = 108;
                 btn.style.height = 32;
                 btn.style.marginLeft = 3; btn.style.marginRight = 3;
@@ -275,8 +291,8 @@ namespace Meridian.UI
             dd.style.left = left;
             dd.style.bottom = 46; // just above the ministry bar
             dd.style.backgroundColor = new StyleColor(GameTheme.BgDropdown);
-            dd.style.borderTopLeftRadius = 8; dd.style.borderTopRightRadius = 8;
-            dd.style.borderBottomLeftRadius = 8; dd.style.borderBottomRightRadius = 8;
+            dd.style.borderTopLeftRadius = 6; dd.style.borderTopRightRadius = 6;
+            dd.style.borderBottomLeftRadius = 6; dd.style.borderBottomRightRadius = 6;
             dd.style.paddingTop = 6; dd.style.paddingBottom = 6; dd.style.paddingLeft = 4; dd.style.paddingRight = 4;
             dd.RegisterCallback<PointerEnterEvent>(_ => dropdownPinned = true);
             dd.RegisterCallback<PointerLeaveEvent>(_ => HideDropdownSoon());
@@ -285,7 +301,7 @@ namespace Meridian.UI
             {
                 var capturedTopic = topic;
                 var row = MakeButton(topic, 12, GameTheme.BgDropdown, GameTheme.BgButtonHover, GameTheme.TextPrimary,
-                    () => { UIState.ActiveCategory = cat; UIState.ActiveTopic = capturedTopic; }, align: TextAnchor.MiddleLeft);
+                    () => { UIState.ActiveCategory = cat; UIState.ActiveTopic = capturedTopic; UIState.PanelOpen = true; }, align: TextAnchor.MiddleLeft);
                 row.style.height = 24;
                 row.style.marginBottom = 2;
                 row.style.paddingLeft = 8;
@@ -315,8 +331,8 @@ namespace Meridian.UI
             shadow.style.right = 6; shadow.style.top = 48; shadow.style.bottom = 44;
             shadow.style.width = 330;
             shadow.style.backgroundColor = new StyleColor(new Color(0f, 0f, 0f, 0.35f));
-            shadow.style.borderTopLeftRadius = 10; shadow.style.borderTopRightRadius = 10;
-            shadow.style.borderBottomLeftRadius = 10; shadow.style.borderBottomRightRadius = 10;
+            shadow.style.borderTopLeftRadius = 6; shadow.style.borderTopRightRadius = 6;
+            shadow.style.borderBottomLeftRadius = 6; shadow.style.borderBottomRightRadius = 6;
             root.Add(shadow);
             sidePanelShadow = shadow;
 
@@ -325,19 +341,38 @@ namespace Meridian.UI
             sidePanel.style.right = 10; sidePanel.style.top = 44; sidePanel.style.bottom = 48;
             sidePanel.style.width = 330;
             sidePanel.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
-            sidePanel.style.borderTopLeftRadius = 10; sidePanel.style.borderTopRightRadius = 10;
-            sidePanel.style.borderBottomLeftRadius = 10; sidePanel.style.borderBottomRightRadius = 10;
+            sidePanel.style.borderTopLeftRadius = 6; sidePanel.style.borderTopRightRadius = 6;
+            sidePanel.style.borderBottomLeftRadius = 6; sidePanel.style.borderBottomRightRadius = 6;
             sidePanel.style.borderLeftWidth = 3;
             sidePanel.style.borderLeftColor = new StyleColor(GameTheme.Accent);
+            sidePanel.style.borderTopWidth = 1; sidePanel.style.borderRightWidth = 1; sidePanel.style.borderBottomWidth = 1;
+            sidePanel.style.borderTopColor = new StyleColor(GameTheme.Border);
+            sidePanel.style.borderRightColor = new StyleColor(GameTheme.Border);
+            sidePanel.style.borderBottomColor = new StyleColor(GameTheme.Border);
             sidePanel.style.paddingLeft = 14; sidePanel.style.paddingRight = 14;
             sidePanel.style.paddingTop = 12; sidePanel.style.paddingBottom = 12;
             sidePanel.style.display = DisplayStyle.None;
+            sidePanel.style.transitionProperty = new List<StylePropertyName> { new StylePropertyName("opacity") };
+            sidePanel.style.transitionDuration = new List<TimeValue> { new TimeValue(140, TimeUnit.Millisecond) };
             root.Add(sidePanel);
 
+            var headerRow = new VisualElement();
+            headerRow.style.flexDirection = FlexDirection.Row;
+            headerRow.style.alignItems = Align.Center;
             panelTitle = MakeLabel("", 16, GameTheme.TextPrimary, bold: true);
+            headerRow.Add(panelTitle);
+            var titleSpacer = new VisualElement();
+            titleSpacer.style.flexGrow = 1;
+            headerRow.Add(titleSpacer);
+            // Explicit close control — the panel only opens when a ministry is chosen, and this
+            // is how you dismiss it again without having to hunt for empty map to click.
+            var closeBtn = MakeButton("✕", 12, GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextDim, () => UIState.PanelOpen = false);
+            closeBtn.style.width = 22; closeBtn.style.height = 22;
+            headerRow.Add(closeBtn);
+            sidePanel.Add(headerRow);
+
             panelSubtitle = MakeLabel("", 11, GameTheme.TextDim);
             panelSubtitle.style.marginBottom = 8;
-            sidePanel.Add(panelTitle);
             sidePanel.Add(panelSubtitle);
 
             panelBody = new VisualElement();
@@ -350,7 +385,7 @@ namespace Meridian.UI
             panelBody.Clear();
 
             int sel = interaction.Selected;
-            if (map.World == null || sel < 0 || sel >= map.World.Countries.Count)
+            if (map.World == null || sel < 0 || sel >= map.World.Countries.Count || !UIState.PanelOpen)
             {
                 sidePanel.style.display = DisplayStyle.None;
                 sidePanelShadow.style.display = DisplayStyle.None;
@@ -358,6 +393,13 @@ namespace Meridian.UI
             }
             sidePanel.style.display = DisplayStyle.Flex;
             sidePanelShadow.style.display = DisplayStyle.Flex;
+            // NOTE: this used to pop-in via a `scale` transform on sidePanel itself. Runtime UI
+            // Toolkit panel picking does not reliably re-project pointer coordinates through an
+            // ancestor's transform, so a scaled *container* left every nested button/slider/field
+            // hit-testing against a stale, unscaled rect — the whole panel silently stopped
+            // accepting input the first time this ran. Opacity is transform-free and safe here.
+            sidePanel.style.opacity = 0.4f;
+            sidePanel.schedule.Execute(() => sidePanel.style.opacity = 1f).ExecuteLater(10);
             // Panel's accent edge matches the active ministry's color — reinforces which
             // domain you're looking at even before reading a single label.
             sidePanel.style.borderLeftColor = new StyleColor(UIState.ActiveCategory.Accent());
@@ -642,11 +684,13 @@ namespace Meridian.UI
 
             var thumb = new VisualElement();
             thumb.style.position = Position.Absolute;
-            thumb.style.width = 12; thumb.style.height = 12;
-            thumb.style.top = -3;
+            thumb.style.width = 18; thumb.style.height = 18;
+            thumb.style.top = -6;
             thumb.style.backgroundColor = new StyleColor(GameTheme.Accent);
-            thumb.style.borderTopLeftRadius = 6; thumb.style.borderTopRightRadius = 6;
-            thumb.style.borderBottomLeftRadius = 6; thumb.style.borderBottomRightRadius = 6;
+            thumb.style.borderTopLeftRadius = 9; thumb.style.borderTopRightRadius = 9;
+            thumb.style.borderBottomLeftRadius = 9; thumb.style.borderBottomRightRadius = 9;
+            thumb.style.borderBottomWidth = 3;
+            thumb.style.borderBottomColor = new StyleColor(GameTheme.Shade(GameTheme.Accent));
             track.Add(thumb);
 
             var valueLabel = MakeLabel($"{get():0.0}", 11, GameTheme.Accent, bold: true);
@@ -708,7 +752,7 @@ namespace Meridian.UI
         static void PositionThumb(VisualElement thumb, float t)
         {
             thumb.style.left = new Length(Mathf.Clamp01(t) * 100f, LengthUnit.Percent);
-            thumb.style.marginLeft = -6; // center the 12px thumb on the percentage point
+            thumb.style.marginLeft = -9; // center the 18px thumb on the percentage point
         }
 
         // ============================== REFRESH ==============================
@@ -743,10 +787,18 @@ namespace Meridian.UI
 
             var title = MakeLabel("MERIDIAN", 40, GameTheme.Accent, bold: true);
             title.style.unityTextAlign = TextAnchor.MiddleCenter;
+            title.style.letterSpacing = 6f;
             startScreen.Add(title);
 
-            var subtitle = MakeLabel("Choose a nation to govern", 15, GameTheme.TextDim);
+            var rule = new VisualElement();
+            rule.style.width = 120; rule.style.height = 1;
+            rule.style.marginTop = 8; rule.style.marginBottom = 8;
+            rule.style.backgroundColor = new StyleColor(GameTheme.Accent);
+            startScreen.Add(rule);
+
+            var subtitle = MakeLabel("SELECT A MEMBER STATE TO GOVERN", 12, GameTheme.TextDim);
             subtitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+            subtitle.style.letterSpacing = 1.5f;
             subtitle.style.marginTop = 4; subtitle.style.marginBottom = 18;
             startScreen.Add(subtitle);
 
@@ -754,8 +806,13 @@ namespace Meridian.UI
             listBox.style.width = 420;
             listBox.style.flexGrow = 1;
             listBox.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
-            listBox.style.borderTopLeftRadius = 10; listBox.style.borderTopRightRadius = 10;
-            listBox.style.borderBottomLeftRadius = 10; listBox.style.borderBottomRightRadius = 10;
+            listBox.style.borderTopLeftRadius = 8; listBox.style.borderTopRightRadius = 8;
+            listBox.style.borderBottomLeftRadius = 8; listBox.style.borderBottomRightRadius = 8;
+            listBox.style.borderTopWidth = 1; listBox.style.borderLeftWidth = 1; listBox.style.borderRightWidth = 1; listBox.style.borderBottomWidth = 1;
+            listBox.style.borderTopColor = new StyleColor(GameTheme.Border);
+            listBox.style.borderLeftColor = new StyleColor(GameTheme.Border);
+            listBox.style.borderRightColor = new StyleColor(GameTheme.Border);
+            listBox.style.borderBottomColor = new StyleColor(GameTheme.Border);
             listBox.style.paddingTop = 8; listBox.style.paddingBottom = 8;
             listBox.style.paddingLeft = 8; listBox.style.paddingRight = 8;
             startScreen.Add(listBox);
@@ -795,6 +852,9 @@ namespace Meridian.UI
             PlayerState.Begin(countryIndex, countryName, interaction.SimDay);
             interaction.SelectCountry(countryIndex);
             UIState.ActiveCategory = NationCategory.Economy;
+            // Closed by default — the side panel is opt-in via the ministry bar, not forced open
+            // just because a nation (even your own) is selected.
+            UIState.PanelOpen = false;
             startScreen.style.display = DisplayStyle.None;
         }
 
@@ -815,8 +875,8 @@ namespace Meridian.UI
             var box = new VisualElement();
             box.style.width = 440;
             box.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
-            box.style.borderTopLeftRadius = 12; box.style.borderTopRightRadius = 12;
-            box.style.borderBottomLeftRadius = 12; box.style.borderBottomRightRadius = 12;
+            box.style.borderTopLeftRadius = 8; box.style.borderTopRightRadius = 8;
+            box.style.borderBottomLeftRadius = 8; box.style.borderBottomRightRadius = 8;
             box.style.borderLeftWidth = 3; box.style.borderLeftColor = new StyleColor(GameTheme.Negative);
             box.style.paddingTop = 24; box.style.paddingBottom = 24; box.style.paddingLeft = 28; box.style.paddingRight = 28;
             gameOverScreen.Add(box);
@@ -917,6 +977,28 @@ namespace Meridian.UI
             // loading (a few seconds after boot), and keep it visible until a nation is chosen.
             if (!startScreenPopulated && map.World != null)
                 PopulateStartScreen();
+
+            // Dev-only: MERIDIAN_AUTOSTART=1 skips the start screen and begins governing the
+            // named country (or the first alphabetically) immediately, at max speed. Exists so
+            // headless/log-only testing can actually exercise the live sim loop — normal play
+            // is completely unaffected since the env var is never set outside a debug launch.
+            if (PlayerState.State == GameState.NotStarted && map.World != null && map.World.Countries.Count > 0)
+            {
+                string autostart = System.Environment.GetEnvironmentVariable("MERIDIAN_AUTOSTART");
+                if (autostart != null)
+                {
+                    int idx = 0;
+                    if (autostart.Length > 1)
+                    {
+                        int found = map.World.Countries.FindIndex(c => c.Name.Equals(autostart, System.StringComparison.OrdinalIgnoreCase));
+                        if (found >= 0) idx = found;
+                    }
+                    BeginGame(idx, map.World.Countries[idx].Name);
+                    interaction.daysPerSecond = 10f;
+                    Debug.Log($"[diag] MERIDIAN_AUTOSTART engaged: governing {map.World.Countries[idx].Name}");
+                }
+            }
+
             startScreen.style.display = PlayerState.State == GameState.NotStarted ? DisplayStyle.Flex : DisplayStyle.None;
 
             // Game-over screen: sync its text every tick while shown (cheap, and avoids a
@@ -959,22 +1041,23 @@ namespace Meridian.UI
             foreach (var kv in speedButtons)
             {
                 bool active = Mathf.Approximately(interaction.daysPerSecond, kv.Key);
-                kv.Value.style.backgroundColor = new StyleColor(active ? GameTheme.BgButtonActive : GameTheme.BgButton);
+                SetButtonColor(kv.Value, active ? GameTheme.BgButtonActive : GameTheme.BgButton);
                 (kv.Value.userData as Label).style.color = active ? GameTheme.Accent : GameTheme.TextDim;
             }
 
             foreach (var kv in mapModeButtons)
             {
                 bool active = map.CurrentMode == kv.Key;
-                kv.Value.style.backgroundColor = new StyleColor(active ? GameTheme.BgButtonActive : GameTheme.BgButton);
+                SetButtonColor(kv.Value, active ? GameTheme.BgButtonActive : GameTheme.BgButton);
                 (kv.Value.userData as Label).style.color = active ? GameTheme.Accent : GameTheme.TextDim;
             }
 
             for (int i = 0; i < ministryButtons.Length; i++)
             {
                 bool active = UIState.ActiveCategory == Categories[i];
-                ministryButtons[i].style.backgroundColor = new StyleColor(active ? GameTheme.BgButtonActive : GameTheme.BgButton);
-                (ministryButtons[i].userData as Label).style.color = active ? Categories[i].Accent() : GameTheme.TextDim;
+                var catColor = Categories[i].Accent();
+                SetButtonColor(ministryButtons[i], active ? catColor : GameTheme.Muted(catColor));
+                (ministryButtons[i].userData as Label).style.color = GameTheme.TextPrimary;
                 ministryButtons[i].Q("underline").style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
             }
 
@@ -999,11 +1082,12 @@ namespace Meridian.UI
                 topStatsRow.style.display = DisplayStyle.None;
             }
 
-            if (sel != builtForSelected || UIState.ActiveCategory != builtForCategory || UIState.ActiveTopic != builtForTopic)
+            if (sel != builtForSelected || UIState.ActiveCategory != builtForCategory || UIState.ActiveTopic != builtForTopic || UIState.PanelOpen != builtForPanelOpen)
             {
                 builtForSelected = sel;
                 builtForCategory = UIState.ActiveCategory;
                 builtForTopic = UIState.ActiveTopic;
+                builtForPanelOpen = UIState.PanelOpen;
                 RebuildSidePanel();
             }
             else
@@ -1061,31 +1145,62 @@ namespace Meridian.UI
             return l;
         }
 
+        // "Nameplate button": squared-off corners with a thin gold bottom rim (like the engraved
+        // nameplates on a committee-room desk), and a restrained hover/press response — a slight
+        // brightness lift and a hairline scale nudge, not a bouncy candy pop. This is the single
+        // shared factory behind every clickable element in the game, so the whole interface picks
+        // up the institutional feel at once. Returns the button itself (not a wrapper) — callers
+        // already rely on recoloring and re-parenting (e.g. the active-tab underline) whatever
+        // this returns directly.
         static VisualElement MakeButton(string text, int fontSize, Color bg, Color hoverBg, Color textColor, Action onClick, TextAnchor align = TextAnchor.MiddleCenter)
         {
             var btn = new VisualElement();
             btn.style.backgroundColor = new StyleColor(bg);
-            btn.style.borderTopLeftRadius = 6; btn.style.borderTopRightRadius = 6;
-            btn.style.borderBottomLeftRadius = 6; btn.style.borderBottomRightRadius = 6;
+            btn.style.borderTopLeftRadius = 3; btn.style.borderTopRightRadius = 3;
+            btn.style.borderBottomLeftRadius = 3; btn.style.borderBottomRightRadius = 3;
+            btn.style.borderBottomWidth = 2;
+            btn.style.borderBottomColor = new StyleColor(GameTheme.Accent);
             btn.style.justifyContent = align == TextAnchor.MiddleLeft ? Justify.FlexStart : Justify.Center;
             btn.style.alignItems = Align.Center;
             btn.style.flexDirection = FlexDirection.Row;
-            if (align == TextAnchor.MiddleLeft) btn.style.paddingLeft = 6;
-            // Smooth color fade on hover/active instead of an instant snap — cheap way to make
-            // the interface feel responsive rather than static.
-            btn.style.transitionProperty = new List<StylePropertyName> { new StylePropertyName("background-color") };
-            btn.style.transitionDuration = new List<TimeValue> { new TimeValue(120, TimeUnit.Millisecond) };
+            if (align == TextAnchor.MiddleLeft) btn.style.paddingLeft = 8;
+            // Smooth color fade + a small, restrained scale nudge on hover/press — a lift, not a bounce.
+            btn.style.transitionProperty = new List<StylePropertyName>
+                { new StylePropertyName("background-color"), new StylePropertyName("border-bottom-color"), new StylePropertyName("scale") };
+            btn.style.transitionDuration = new List<TimeValue>
+                { new TimeValue(120, TimeUnit.Millisecond), new TimeValue(120, TimeUnit.Millisecond), new TimeValue(90, TimeUnit.Millisecond) };
 
             var label = MakeLabel(text, fontSize, textColor);
             label.style.unityTextAlign = align;
+            label.style.letterSpacing = 0.4f;
             label.pickingMode = PickingMode.Ignore;
             btn.Add(label);
             btn.userData = label; // Refresh() reads this back to recolor text on active/hover state
 
-            btn.RegisterCallback<PointerEnterEvent>(_ => btn.style.backgroundColor = new StyleColor(hoverBg));
-            btn.RegisterCallback<PointerLeaveEvent>(_ => btn.style.backgroundColor = new StyleColor(bg));
+            btn.RegisterCallback<PointerEnterEvent>(_ =>
+            {
+                SetButtonColor(btn, hoverBg);
+                btn.style.scale = new StyleScale(new Scale(new Vector3(1.015f, 1.015f, 1f)));
+            });
+            btn.RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                SetButtonColor(btn, bg);
+                btn.style.scale = new StyleScale(new Scale(Vector3.one));
+            });
+            btn.RegisterCallback<PointerDownEvent>(_ =>
+                btn.style.scale = new StyleScale(new Scale(new Vector3(0.98f, 0.98f, 1f))));
+            btn.RegisterCallback<PointerUpEvent>(_ =>
+                btn.style.scale = new StyleScale(new Scale(new Vector3(1.015f, 1.015f, 1f))));
             btn.RegisterCallback<ClickEvent>(_ => onClick());
             return btn;
+        }
+
+        // Sets the fill only — the thin gold bottom rim is a constant nameplate-trim accent
+        // (set once in MakeButton), not a shade of the fill, so it stays a steady gold line
+        // across every state (default/hover/active/muted) instead of shifting with the button color.
+        static void SetButtonColor(VisualElement btn, Color c)
+        {
+            btn.style.backgroundColor = new StyleColor(c);
         }
     }
 }

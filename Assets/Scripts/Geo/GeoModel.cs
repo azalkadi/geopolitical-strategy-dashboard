@@ -4,9 +4,12 @@ using UnityEngine;
 namespace Meridian.Geo
 {
     // Faithful C# port of crates/ui_dashboard/src/geo/ from the original Rust/Bevy build.
-    // Longitude/latitude are stored as Vector2 (x = lon, y = lat) so Unity's vector math and
-    // Mesh APIs apply directly. Everything here is plain data loaded once at startup by
-    // GeoJsonLoader; MapRenderer turns it into Unity meshes.
+    // Positions are stored as Vector2 (x, y) so Unity's vector math and Mesh APIs apply
+    // directly. GeoJsonLoader reprojects every raw lon/lat pair through GeoMath.LonLatToMercator
+    // as it parses, so by the time anything here is populated, x/y is Web Mercator space (in
+    // degrees-normalized units, NOT raw longitude/latitude) — this is what lets live map tiles
+    // (also Web Mercator) line up with country borders, cities, roads, etc. MapRenderer turns
+    // it all into Unity meshes.
 
     public enum CityTier { Town, City, MajorCity, Megacity }
 
@@ -89,11 +92,19 @@ namespace Meridian.Geo
         public CityTier Tier;
     }
 
-    public class PointFeature // ports, airports
+    public class PointFeature // ports, airports, air bases, oil ports, nuclear plants
     {
         public string Name = "";
         public string Code = "";
         public Vector2 Pos;
+    }
+
+    // Roads and railways — open polylines (not closed rings like country/province outlines).
+    // A single feature can be a MultiLineString, hence a list of separate line segments.
+    public class LineFeature
+    {
+        public string Name = "";
+        public List<List<Vector2>> Lines = new();
     }
 
     public class GeoWorld
@@ -103,10 +114,41 @@ namespace Meridian.Geo
         public List<City> Cities = new();
         public List<PointFeature> Ports = new();
         public List<PointFeature> Airports = new();
+        public List<LineFeature> Roads = new();
+        public List<LineFeature> Railways = new();
+        public List<PointFeature> AirBases = new();
+        public List<PointFeature> OilPorts = new();
+        public List<PointFeature> NuclearPlants = new();
     }
 
     public static class GeoMath
     {
+        // Standard Web Mercator's polar cutoff — chosen (by every real map tile scheme) so
+        // that the projected Y range at this latitude exactly matches the X range at the
+        // longitude extremes, making the tile grid square (2^z by 2^z tiles per zoom level).
+        public const float MaxMercatorLatitude = 85.05112878f;
+
+        // "Degrees-normalized" Web Mercator: x = lon unchanged, y follows the standard Mercator
+        // curve but scaled so it lands in the same numeric range as longitude (±180 at
+        // MaxMercatorLatitude) instead of real-world meters. Everything in this project — country/
+        // province polygons, cities, roads, camera zoom, the satellite basemap — uses this same
+        // space, which is what makes live map tiles (also Web Mercator) line up with all of it.
+        public static Vector2 LonLatToMercator(float lon, float lat)
+        {
+            float clamped = Mathf.Clamp(lat, -MaxMercatorLatitude, MaxMercatorLatitude);
+            float latRad = clamped * Mathf.Deg2Rad;
+            float y = Mathf.Log(Mathf.Tan(Mathf.PI / 4f + latRad / 2f)) * Mathf.Rad2Deg;
+            return new Vector2(lon, y);
+        }
+
+        // Inverse of LonLatToMercator — used to compute a map tile's lon/lat corners from its
+        // z/x/y index before reprojecting those corners into this same Mercator space.
+        public static Vector2 MercatorToLonLat(float x, float y)
+        {
+            float latRad = 2f * Mathf.Atan(Mathf.Exp(y * Mathf.Deg2Rad)) - Mathf.PI / 2f;
+            return new Vector2(x, latRad * Mathf.Rad2Deg);
+        }
+
         // Ray-casting point-in-polygon test against a single ring (port of point_in_ring).
         public static bool PointInRing(Vector2 pt, List<Vector2> ring)
         {

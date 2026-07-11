@@ -37,6 +37,14 @@ public static class HeadlessBuild
         EnsureShaderAlwaysIncluded("Meridian/UnlitTexture");
         EnsurePanelSettingsAsset.Ensure();
 
+        // Launch windowed by default, not fullscreen — a resizable window at a sane default
+        // size instead of taking over the whole monitor the moment the exe opens.
+        PlayerSettings.defaultIsFullScreen = false;
+        PlayerSettings.defaultScreenWidth = 1280;
+        PlayerSettings.defaultScreenHeight = 800;
+        PlayerSettings.resizableWindow = true;
+        PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+
         string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
         if (scenes.Length == 0)
         {

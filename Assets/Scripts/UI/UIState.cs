@@ -11,5 +11,11 @@ namespace Meridian.UI
         // panel can jump straight to that focused sub-view instead of the whole category mixed
         // together.
         public static string ActiveTopic = null;
+
+        // The side panel is opt-in: selecting a country on the map alone does NOT show it. It
+        // only opens when the player deliberately picks a ministry (or a topic from its hover
+        // dropdown), and stays closed otherwise so the map/satellite view isn't permanently
+        // covered by a panel the player didn't ask to see.
+        public static bool PanelOpen = false;
     }
 }

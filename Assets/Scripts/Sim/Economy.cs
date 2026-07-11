@@ -117,9 +117,17 @@ namespace Meridian.Sim
             Gdp *= 1.0 + GrowthRate / 100.0 / 365.0;
             if (Gdp < 0.01) Gdp = 0.01;
 
-            Unemployment = Clampf(Unemployment + (2.0f - GrowthRate) * 0.01f, 2.0f, 35.0f);
+            // Unemployment/inflation must equilibrate around THIS country's own trend growth
+            // (baseGrowthTarget), not a universal constant — baseGrowthTarget ranges from 1.2%
+            // (rich countries) to 4.5% (poor ones) depending on GDP-per-capita tier (see Seed).
+            // A hardcoded "2.0" reference here was a real bug: any country whose trend growth
+            // sits below 2.0 (i.e. every high-income country, the ones players are most likely
+            // to pick) had unemployment rise every single day with no equilibrium, forever,
+            // regardless of tax policy — confirmed by 660 days of observed play where a rich
+            // nation's unemployment climbed 7.0% to 11.1% with no sign of leveling off.
+            Unemployment = Clampf(Unemployment + (baseGrowthTarget - GrowthRate) * 0.01f, 2.0f, 35.0f);
             Inflation = Clampf(
-                Inflation + (GrowthRate - 2.0f) * 0.005f - (InterestRate - 4.0f) * 0.03f + Noise() * 0.02f,
+                Inflation + (GrowthRate - baseGrowthTarget) * 0.005f - (InterestRate - 4.0f) * 0.03f + Noise() * 0.02f,
                 -3.0f, 40.0f);
 
             Treasury += Gdp * effectiveTax / 100.0 / 365.0 - Gdp * 0.20 / 365.0;

@@ -58,7 +58,21 @@ namespace Meridian.Map
                 map.Economy.TickAll();
                 map.National?.TickAll(map.Economy);
                 CheckElection(simDay);
+                LogEconomyDiagnostic();
             }
+        }
+
+        // Dev-only: periodic snapshot of the player's own economy so extended play can be
+        // observed via Player.log even without driving the UI (used to sanity-check that the
+        // sim actually feels dynamic over months/years of play, not just at a single instant).
+        long nextDiagDay;
+        void LogEconomyDiagnostic()
+        {
+            if (PlayerState.State != GameState.Playing || PlayerState.CountryIndex < 0) return;
+            if (simDay < nextDiagDay) return;
+            nextDiagDay = simDay + 30;
+            var e = map.Economy.States[PlayerState.CountryIndex];
+            Debug.Log($"[econdiag] day {simDay}: GDP=${e.Gdp:n1}B growth={e.GrowthRate:0.00}% unemp={e.Unemployment:0.00}% inflation={e.Inflation:0.00}% treasury=${e.Treasury:n1}B taxes=[income={e.TaxIncome:0.0} corp={e.TaxCorporate:0.0} vat={e.TaxVat:0.0} tariff={e.TaxTariff:0.0} custom={e.CustomTaxes.Count}] effTax={e.EffectiveTaxRate():0.0}%");
         }
 
         // Approval-rating-based term/election mechanic — the same ApprovalRating already shown

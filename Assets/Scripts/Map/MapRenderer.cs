@@ -32,6 +32,12 @@ namespace Meridian.Map
         [Tooltip("Province border line color (subtler than country borders).")]
         public Color provinceColor = new Color(1f, 1f, 1f, 0.28f);
 
+        [Tooltip("Major road line color.")]
+        public Color roadColor = new Color(0.88f, 0.78f, 0.45f, 0.55f);
+
+        [Tooltip("Railway line color.")]
+        public Color railwayColor = new Color(0.55f, 0.22f, 0.18f, 0.7f);
+
         public GeoWorld World { get; private set; }
         public EconomySystem Economy { get; private set; }
         public NationalSystem National { get; private set; }
@@ -39,6 +45,13 @@ namespace Meridian.Map
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
         public GameObject[] CityTierRoots { get; private set; } // indexed by (int)CityTier
+        public GameObject AirportsRoot { get; private set; }
+        public GameObject PortsRoot { get; private set; }
+        public GameObject RoadsRoot { get; private set; }
+        public GameObject RailwaysRoot { get; private set; }
+        public GameObject AirBasesRoot { get; private set; }
+        public GameObject OilPortsRoot { get; private set; }
+        public GameObject NuclearPlantsRoot { get; private set; }
 
         public MapMode CurrentMode { get; private set; } = MapMode.Political;
 
@@ -49,6 +62,8 @@ namespace Meridian.Map
         const float FillZ = 0f;
         const float BorderZ = -0.1f;
         const float ProvinceZ = -0.05f;
+        const float RoadZ = -0.11f;
+        const float RailZ = -0.12f;
         const float CityZ = -0.2f;
         const float SatelliteZ = 0.05f; // behind fills, so hiding fills reveals it
 
@@ -106,11 +121,20 @@ namespace Meridian.Map
             BuildProvinceBorders();
             BuildCityMarkers();
             BuildSatelliteQuad();
+            BuildInfrastructureMarkers();
+            BuildRoadsAndRailways();
+
+            // Satellite imagery is the default view — the flat political fills are a toggle,
+            // not the base map — but only if the basemap actually loaded; otherwise stay on
+            // Political so the world isn't just an empty ocean-colored void.
+            SetMode(satelliteGo != null ? MapMode.Satellite : MapMode.Political);
         }
 
-        // Loads the satellite basemap (StreamingAssets/basemap/satellite.jpg) onto a single quad
-        // spanning the same lon/lat space as the country meshes. Starts hidden; SetMode reveals
-        // it and hides the flat country fills (they're opaque, so both can't show at once).
+        // Loads the satellite basemap (StreamingAssets/basemap/satellite.jpg) — the always-
+        // available offline backdrop, replaced by live-streamed tiles (SatelliteTileLoader)
+        // once zoomed in close enough for them to add real detail. Starts hidden; SetMode
+        // reveals it and hides the flat country fills (they're opaque, so both can't show at
+        // once).
         void BuildSatelliteQuad()
         {
             string path = Path.Combine(Application.streamingAssetsPath, "basemap", "satellite.jpg");
@@ -128,21 +152,56 @@ namespace Meridian.Map
             }
 
             byte[] bytes = File.ReadAllBytes(path);
-            var tex = new Texture2D(2, 2, TextureFormat.RGB24, false);
+            // mipChain=true + Trilinear: at world-view zoom the whole 21600px-wide texture is
+            // massively minified (without mips that aliases/shimmers); at max zoom-in it's still
+            // being magnified (a single flat texture has a hard detail ceiling), so Trilinear
+            // gives the smoothest possible interpolation in both directions.
+            var tex = new Texture2D(2, 2, TextureFormat.RGB24, true);
             tex.LoadImage(bytes); // auto-sizes the texture to the source image
+            // If the source image exceeds SystemInfo.maxTextureSize, Unity silently swaps in an
+            // 8x8 placeholder and only logs a native-side warning (easy to miss) — this happened
+            // once already (a 21600px-wide basemap on a 16384-max device rendered as solid
+            // black with zero managed-side error). Fail loudly instead.
+            if (tex.width <= 64 || tex.height <= 64)
+                Debug.LogError($"[map] satellite basemap loaded as {tex.width}x{tex.height} — almost certainly exceeded SystemInfo.maxTextureSize ({SystemInfo.maxTextureSize}) and fell back to a placeholder. Re-export the basemap at or below that size.");
             tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Trilinear;
+            tex.anisoLevel = 9;
             var mat = new Material(shader) { mainTexture = tex };
 
+            // The source image is a plain equirectangular (linear-in-latitude) photo — a single
+            // flat quad would place it at the wrong Y everywhere except the equator now that
+            // world space is Mercator-projected. Longitude still maps 1:1 to X in both
+            // projections, so only latitude/Y needs subdividing: one thin horizontal strip per
+            // row, each row positioned at its correctly Mercator-warped Y while sampling the UV
+            // row a plain linear latitude mapping gives (the image's own pixels are never
+            // resampled/warped, only where each row of them is placed in world space).
             var mesh = new Mesh { name = "SatelliteQuad" };
-            mesh.vertices = new[]
+            const int rows = 128;
+            var verts = new List<Vector3>(2 * (rows + 1));
+            var uvs = new List<Vector2>(2 * (rows + 1));
+            var tris = new List<int>(6 * rows);
+            for (int i = 0; i <= rows; i++)
             {
-                new Vector3(-180f, -90f, SatelliteZ),
-                new Vector3(180f, -90f, SatelliteZ),
-                new Vector3(180f, 90f, SatelliteZ),
-                new Vector3(-180f, 90f, SatelliteZ),
-            };
-            mesh.uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) };
-            mesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
+                float t = (float)i / rows;
+                float lat = Mathf.Lerp(-GeoMath.MaxMercatorLatitude, GeoMath.MaxMercatorLatitude, t);
+                float y = GeoMath.LonLatToMercator(0f, lat).y;
+                float v = (lat + 90f) / 180f; // source image's own linear-in-latitude V
+                verts.Add(new Vector3(-180f, y, SatelliteZ));
+                verts.Add(new Vector3(180f, y, SatelliteZ));
+                uvs.Add(new Vector2(0f, v));
+                uvs.Add(new Vector2(1f, v));
+                if (i > 0)
+                {
+                    int b = (i - 1) * 2; // this row's base index
+                    int n = i * 2;       // next row's base index
+                    tris.Add(b); tris.Add(n + 1); tris.Add(b + 1);
+                    tris.Add(b); tris.Add(n); tris.Add(n + 1);
+                }
+            }
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
             mesh.RecalculateBounds();
 
             satelliteGo = new GameObject("SatelliteBasemap");
@@ -261,6 +320,126 @@ namespace Meridian.Map
                 root.SetActive((CityTier)t == CityTier.Megacity);
             }
             Debug.Log("[map] built city markers");
+        }
+
+        // Airports and seaports — the ne_10m_airports / ne_10m_ports Natural Earth datasets were
+        // already being loaded into World.Airports / World.Ports by GeoJsonLoader but never
+        // actually rendered. One marker set each (no LOD tiers like cities; MapLayers gates the
+        // whole set behind a single zoom threshold instead), built the same constant-screen-size
+        // dot way as city markers so they read at a consistent size at any zoom level.
+        void BuildInfrastructureMarkers()
+        {
+            var dotShader = Shader.Find("Meridian/ScreenDot");
+            if (dotShader == null)
+            {
+                Debug.LogWarning("[map] ScreenDot shader not found; skipping airport/port markers");
+                return;
+            }
+
+            AirportsRoot = BuildPointMarkerSet("Airports", World.Airports, new Color(0.45f, 0.85f, 1f, 0.95f), 3.5f, dotShader);
+            PortsRoot = BuildPointMarkerSet("Ports", World.Ports, new Color(1f, 0.70f, 0.25f, 0.95f), 3.5f, dotShader);
+            // Military air bases (olive, distinct from civil airports' cyan), oil ports
+            // (industrial orange), nuclear plants (radiation yellow-green, slightly bigger so
+            // a handful of high-value targets still read clearly at a glance).
+            AirBasesRoot = BuildPointMarkerSet("AirBases", World.AirBases, new Color(0.55f, 0.62f, 0.32f, 1f), 3.5f, dotShader);
+            OilPortsRoot = BuildPointMarkerSet("OilPorts", World.OilPorts, new Color(0.92f, 0.46f, 0.10f, 1f), 4f, dotShader);
+            NuclearPlantsRoot = BuildPointMarkerSet("NuclearPlants", World.NuclearPlants, new Color(0.85f, 0.95f, 0.15f, 1f), 4.5f, dotShader);
+            Debug.Log($"[map] built {World.Airports.Count} airport markers, {World.Ports.Count} port markers, " +
+                      $"{World.AirBases.Count} air base markers, {World.OilPorts.Count} oil port markers, {World.NuclearPlants.Count} nuclear plant markers");
+        }
+
+        // Roads and railways as open-polyline line meshes (not closed rings — reuses the same
+        // vertex-color line-list approach as country/province borders, but built as a single
+        // combined mesh per layer since there are thousands of separate line segments).
+        void BuildRoadsAndRailways()
+        {
+            RoadsRoot = BuildLineFeaturesRoot("Roads", World.Roads, roadColor, RoadZ);
+            RailwaysRoot = BuildLineFeaturesRoot("Railways", World.Railways, railwayColor, RailZ);
+            Debug.Log($"[map] built {World.Roads.Count} road features, {World.Railways.Count} railway features");
+        }
+
+        GameObject BuildLineFeaturesRoot(string rootName, List<LineFeature> features, Color color, float z)
+        {
+            var root = new GameObject(rootName);
+            root.transform.SetParent(transform, false);
+            root.SetActive(false); // MapLayers reveals this once zoomed in enough
+
+            var verts = new List<Vector3>();
+            var idx = new List<int>();
+            foreach (var feat in features)
+            {
+                foreach (var line in feat.Lines)
+                {
+                    if (line.Count < 2) continue;
+                    int baseIdx = verts.Count;
+                    foreach (var pt in line) verts.Add(new Vector3(pt.x, pt.y, z));
+                    for (int i = 0; i + 1 < line.Count; i++)
+                    {
+                        idx.Add(baseIdx + i);
+                        idx.Add(baseIdx + i + 1);
+                    }
+                }
+            }
+            if (verts.Count == 0) return root;
+
+            var mesh = new Mesh { name = rootName };
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            var colors = new Color[verts.Count];
+            for (int i = 0; i < colors.Length; i++) colors[i] = color;
+            mesh.SetVertices(verts);
+            mesh.colors = colors;
+            mesh.SetIndices(idx.ToArray(), MeshTopology.Lines, 0);
+            mesh.RecalculateBounds();
+
+            root.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = root.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = borderMaterial;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+            return root;
+        }
+
+        GameObject BuildPointMarkerSet(string name, List<PointFeature> points, Color color, float pixelRadius, Shader dotShader)
+        {
+            var root = new GameObject(name);
+            root.transform.SetParent(transform, false);
+            root.SetActive(false); // MapLayers reveals this once zoomed in enough
+            if (points.Count == 0) return root;
+
+            var verts = new List<Vector3>(points.Count * 4);
+            var cols = new List<Color>(points.Count * 4);
+            var uvs = new List<Vector2>(points.Count * 4);
+            var tris = new List<int>(points.Count * 6);
+            foreach (var p in points)
+            {
+                int b = verts.Count;
+                var center = new Vector3(p.Pos.x, p.Pos.y, CityZ);
+                verts.Add(center); verts.Add(center); verts.Add(center); verts.Add(center);
+                uvs.Add(new Vector2(0, 0)); uvs.Add(new Vector2(1, 0));
+                uvs.Add(new Vector2(1, 1)); uvs.Add(new Vector2(0, 1));
+                cols.Add(color); cols.Add(color); cols.Add(color); cols.Add(color);
+                tris.Add(b); tris.Add(b + 2); tris.Add(b + 1);
+                tris.Add(b); tris.Add(b + 3); tris.Add(b + 2);
+            }
+
+            var mesh = new Mesh { name = name };
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.SetVertices(verts);
+            mesh.SetColors(cols);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            var b2 = mesh.bounds;
+            b2.Expand(5f);
+            mesh.bounds = b2;
+
+            root.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = root.AddComponent<MeshRenderer>();
+            var dotMat = new Material(dotShader) { name = $"Dot_{name}" };
+            dotMat.SetFloat("_PixelRadius", pixelRadius);
+            mr.sharedMaterial = dotMat;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+            return root;
         }
 
         // Builds a line-list mesh GameObject from a set of lon/lat rings, parented under `parent`.

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEngine;
 using Newtonsoft.Json.Linq;
 
@@ -12,6 +13,11 @@ namespace Meridian.Geo
     //
     // The Rust build embedded the GeoJSON with include_str! and parsed with serde_json; here
     // the files are read from StreamingAssets at runtime and parsed with Newtonsoft.
+    //
+    // Every raw [lon, lat] pair read from these files is reprojected through
+    // GeoMath.LonLatToMercator the moment it's parsed (see TryPointCoords, ParseLineCoords,
+    // BuildMeshFromGeometry) — GeoWorld never stores raw lon/lat, only Mercator-projected
+    // positions, so this is the ONLY place that projection choice lives.
     public static class GeoJsonLoader
     {
         static string DataDir => Path.Combine(Application.streamingAssetsPath, "worlddata");
@@ -24,6 +30,16 @@ namespace Meridian.Geo
             world.Cities = LoadCities(Path.Combine(DataDir, "ne_10m_populated_places.geojson"));
             world.Ports = LoadPoints(Path.Combine(DataDir, "ne_10m_ports.geojson"), "name", "");
             world.Airports = LoadPoints(Path.Combine(DataDir, "ne_10m_airports.geojson"), "name", "iata_code");
+            // Major roads/railways (Natural Earth 10m, filtered to the world-scale subset —
+            // full detail is ~56k/25k features and not useful at country/continent zoom) and
+            // hand-curated air bases (filtered from the airports set by its own "military" type
+            // tag), oil ports, and nuclear plants (no public bundled dataset for either, so a
+            // real-but-not-exhaustive list of major, well-known facilities).
+            world.Roads = LoadLines(Path.Combine(DataDir, "ne_10m_roads_major.geojson"), "name");
+            world.Railways = LoadLines(Path.Combine(DataDir, "ne_10m_railroads_major.geojson"), "name");
+            world.AirBases = LoadPoints(Path.Combine(DataDir, "ne_10m_airbases_military.geojson"), "name", "");
+            world.OilPorts = LoadPoints(Path.Combine(DataDir, "ne_10m_oilports.geojson"), "name", "");
+            world.NuclearPlants = LoadPoints(Path.Combine(DataDir, "ne_10m_nuclearplants.geojson"), "name", "");
             return world;
         }
 
@@ -34,7 +50,7 @@ namespace Meridian.Geo
             var outList = new List<Country>();
             if (!File.Exists(path)) { Debug.LogError($"[geo] missing {path}"); return outList; }
 
-            var root = JObject.Parse(File.ReadAllText(path));
+            var root = JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
             foreach (var f in root["features"])
             {
                 var props = f["properties"];
@@ -68,7 +84,7 @@ namespace Meridian.Geo
             var outList = new List<Province>();
             if (!File.Exists(path)) { Debug.LogWarning($"[geo] missing {path}"); return outList; }
 
-            var root = JObject.Parse(File.ReadAllText(path));
+            var root = JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
             foreach (var f in root["features"])
             {
                 var props = f["properties"];
@@ -97,7 +113,7 @@ namespace Meridian.Geo
             var outList = new List<City>();
             if (!File.Exists(path)) { Debug.LogWarning($"[geo] missing {path}"); return outList; }
 
-            var root = JObject.Parse(File.ReadAllText(path));
+            var root = JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
             foreach (var f in root["features"])
             {
                 var props = f["properties"];
@@ -123,7 +139,7 @@ namespace Meridian.Geo
             var outList = new List<PointFeature>();
             if (!File.Exists(path)) { Debug.LogWarning($"[geo] missing {path}"); return outList; }
 
-            var root = JObject.Parse(File.ReadAllText(path));
+            var root = JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
             foreach (var f in root["features"])
             {
                 var props = f["properties"];
@@ -136,6 +152,48 @@ namespace Meridian.Geo
                 });
             }
             return outList;
+        }
+
+        // --- Line features (roads, railways) --------------------------------------------
+
+        public static List<LineFeature> LoadLines(string path, string nameKey)
+        {
+            var outList = new List<LineFeature>();
+            if (!File.Exists(path)) { Debug.LogWarning($"[geo] missing {path}"); return outList; }
+
+            var root = JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
+            foreach (var f in root["features"])
+            {
+                var props = f["properties"];
+                var geom = f["geometry"];
+                string gtype = geom?["type"]?.ToString() ?? "";
+                var coords = geom?["coordinates"];
+                if (coords == null) continue;
+
+                var lines = new List<List<Vector2>>();
+                if (gtype == "LineString")
+                    lines.Add(ParseLineCoords(coords));
+                else if (gtype == "MultiLineString")
+                    foreach (var line in coords)
+                        lines.Add(ParseLineCoords(line));
+                else
+                    continue;
+
+                outList.Add(new LineFeature { Name = PropStr(props, nameKey), Lines = lines });
+            }
+            return outList;
+        }
+
+        static List<Vector2> ParseLineCoords(JToken coords)
+        {
+            var pts = new List<Vector2>();
+            foreach (var pt in coords)
+            {
+                float lon = (float)(pt[0]?.Value<double>() ?? 0.0);
+                float lat = (float)(pt[1]?.Value<double>() ?? 0.0);
+                pts.Add(GeoMath.LonLatToMercator(lon, lat));
+            }
+            return pts;
         }
 
         // --- Geometry -> mesh (port of build_mesh_from_geometry) ------------------------
@@ -184,14 +242,19 @@ namespace Meridian.Geo
                     {
                         float lon = (float)(pt[0]?.Value<double>() ?? 0.0);
                         float lat = (float)(pt[1]?.Value<double>() ?? 0.0);
-                        flat.Add(lon);
-                        flat.Add(lat);
-                        ringPts.Add(new Vector2(lon, lat));
-                        bboxMin.x = Mathf.Min(bboxMin.x, lon);
-                        bboxMin.y = Mathf.Min(bboxMin.y, lat);
-                        bboxMax.x = Mathf.Max(bboxMax.x, lon);
-                        bboxMax.y = Mathf.Max(bboxMax.y, lat);
-                        cx += lon; cy += lat; cn += 1;
+                        // Reproject to Mercator BEFORE triangulating, not after — Earcut needs
+                        // to operate on the actual final planar shape, and a nonlinear warp
+                        // applied post-triangulation could in principle disagree with the
+                        // ear-clipping decisions made in raw lon/lat space.
+                        Vector2 m = GeoMath.LonLatToMercator(lon, lat);
+                        flat.Add(m.x);
+                        flat.Add(m.y);
+                        ringPts.Add(m);
+                        bboxMin.x = Mathf.Min(bboxMin.x, m.x);
+                        bboxMin.y = Mathf.Min(bboxMin.y, m.y);
+                        bboxMax.x = Mathf.Max(bboxMax.x, m.x);
+                        bboxMax.y = Mathf.Max(bboxMax.y, m.y);
+                        cx += m.x; cy += m.y; cn += 1;
                     }
                     if (ri == 0) outerRings.Add(new List<Vector2>(ringPts));
                     outlineRings.Add(ringPts);
@@ -227,7 +290,9 @@ namespace Meridian.Geo
             pos = Vector2.zero;
             var coords = geom?["coordinates"];
             if (coords == null || coords.Type != JTokenType.Array || coords.Count() < 2) return false;
-            pos = new Vector2((float)coords[0].Value<double>(), (float)coords[1].Value<double>());
+            float lon = (float)coords[0].Value<double>();
+            float lat = (float)coords[1].Value<double>();
+            pos = GeoMath.LonLatToMercator(lon, lat);
             return true;
         }
     }

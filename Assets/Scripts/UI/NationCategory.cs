@@ -39,17 +39,18 @@ namespace Meridian.UI
         // Distinct accent color per category so the active ministry tab, its side-panel
         // border, and section headers all visually "belong" to that ministry — a standard
         // strategy-dashboard pattern for letting players distinguish domains at a glance
-        // without reading labels every time.
+        // without reading labels every time. Muted, flag/institution-inspired hues (not neon
+        // candy tones) so the palette reads as diplomatic rather than a toy.
         public static Color Accent(this NationCategory c) => c switch
         {
-            NationCategory.Economy => new Color(1.00f, 0.78f, 0.25f),   // gold
-            NationCategory.Budget => new Color(0.35f, 0.85f, 0.75f),    // teal
-            NationCategory.Trade => new Color(0.40f, 0.65f, 0.95f),     // blue
-            NationCategory.Politics => new Color(0.65f, 0.50f, 0.90f),  // purple
-            NationCategory.Diplomacy => new Color(0.35f, 0.80f, 0.90f), // cyan
-            NationCategory.Military => new Color(0.90f, 0.35f, 0.35f),  // red
-            NationCategory.Society => new Color(0.55f, 0.85f, 0.50f),   // green
-            NationCategory.Technology => new Color(0.90f, 0.45f, 0.75f),// magenta
+            NationCategory.Economy => new Color(0.80f, 0.66f, 0.34f),    // gold (treasury/seal)
+            NationCategory.Budget => new Color(0.36f, 0.68f, 0.58f),     // muted emerald
+            NationCategory.Trade => new Color(0.30f, 0.52f, 0.78f),      // UN blue
+            NationCategory.Politics => new Color(0.56f, 0.42f, 0.68f),   // muted royal purple
+            NationCategory.Diplomacy => new Color(0.34f, 0.70f, 0.76f),  // steel cyan
+            NationCategory.Military => new Color(0.70f, 0.32f, 0.30f),   // muted crimson
+            NationCategory.Society => new Color(0.52f, 0.62f, 0.34f),    // olive/laurel green
+            NationCategory.Technology => new Color(0.50f, 0.54f, 0.66f), // slate blue-gray
             _ => Color.white,
         };
     }

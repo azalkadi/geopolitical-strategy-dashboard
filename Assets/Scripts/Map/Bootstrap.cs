@@ -26,17 +26,20 @@ namespace Meridian.Map
             }
             var cam = camGo.GetComponent<Camera>();
             cam.orthographic = true;
-            cam.orthographicSize = 90f;
+            cam.orthographicSize = 180f; // MapCameraController.Awake() re-sets this anyway; kept in sync for clarity
             cam.transform.position = new Vector3(10f, 20f, -10f);
             cam.clearFlags = CameraClearFlags.SolidColor;
             if (camGo.GetComponent<MapCameraController>() == null)
                 camGo.AddComponent<MapCameraController>();
 
-            // Map + interaction (economy tick, click-to-select, readout) + zoom-gated layers
+            // Map + interaction (economy tick, click-to-select, readout) + zoom-gated layers +
+            // live satellite tile streaming (kicks in once zoomed in close, on top of the
+            // always-available offline basemap).
             var mapGo = new GameObject("MapRenderer");
             mapGo.AddComponent<MapRenderer>();
             mapGo.AddComponent<MapInteraction>();
             mapGo.AddComponent<MapLayers>();
+            mapGo.AddComponent<SatelliteTileLoader>();
 
             // Game UI (UI Toolkit): top bar, bottom ministry bar, selected-country panel.
             var uiGo = new GameObject("GameUI");
