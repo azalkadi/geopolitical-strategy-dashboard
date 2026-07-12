@@ -33,10 +33,28 @@ namespace Meridian.Map
         public Color provinceColor = new Color(1f, 1f, 1f, 0.28f);
 
         [Tooltip("Major road line color.")]
-        public Color roadColor = new Color(0.88f, 0.78f, 0.45f, 0.55f);
+        public Color roadColor = new Color(0.90f, 0.70f, 0.20f, 0.95f);
 
-        [Tooltip("Railway line color.")]
-        public Color railwayColor = new Color(0.55f, 0.22f, 0.18f, 0.7f);
+        [Tooltip("Railway line/tie color.")]
+        public Color railwayColor = new Color(0.12f, 0.12f, 0.14f, 0.95f);
+
+        [Tooltip("Road half-width, in SCREEN PIXELS (constant regardless of zoom — see ScreenLine.shader). A fixed world-space width used to balloon into multi-km-wide blobs once zoomed in, since 1 Mercator-degree-unit is ~111km at the equator.")]
+        public float roadWidth = 1.5f;
+
+        [Tooltip("Railway rail-line half-width, in screen pixels — the base line is thinner than roads; cross-ties (see railTieColor) are what read as \"railway\" rather than extra line width.")]
+        public float railwayWidth = 1f;
+
+        [Tooltip("Cross-tie tick mark color — drawn at regular intervals across the railway line, the classic cartographic railroad symbol.")]
+        public Color railTieColor = new Color(0.85f, 0.84f, 0.80f, 0.95f);
+
+        [Tooltip("Spacing between cross-ties, in world (Mercator-degree) units.")]
+        public float railTieSpacing = 0.5f;
+
+        [Tooltip("Water-crossing (causeway/bridge) line color — bright enough to read as special infrastructure, distinct from ordinary roads.")]
+        public Color waterCrossingColor = new Color(0.55f, 0.95f, 1f, 1f);
+
+        [Tooltip("Border-crossing marker color.")]
+        public Color borderCrossingColor = new Color(1f, 0.55f, 0.25f, 1f);
 
         public GeoWorld World { get; private set; }
         public EconomySystem Economy { get; private set; }
@@ -52,6 +70,9 @@ namespace Meridian.Map
         public GameObject AirBasesRoot { get; private set; }
         public GameObject OilPortsRoot { get; private set; }
         public GameObject NuclearPlantsRoot { get; private set; }
+        public GameObject BorderCrossingsRoot { get; private set; }
+        public GameObject WaterCrossingsRoot { get; private set; }
+        public GameObject WaterCrossingLinesRoot { get; private set; }
 
         public MapMode CurrentMode { get; private set; } = MapMode.Political;
 
@@ -123,6 +144,8 @@ namespace Meridian.Map
             BuildSatelliteQuad();
             BuildInfrastructureMarkers();
             BuildRoadsAndRailways();
+            BuildBorderCrossingMarkers();
+            BuildWaterCrossings();
 
             // Satellite imagery is the default view — the flat political fills are a toggle,
             // not the base map — but only if the basemap actually loaded; otherwise stay on
@@ -348,55 +371,268 @@ namespace Meridian.Map
                       $"{World.AirBases.Count} air base markers, {World.OilPorts.Count} oil port markers, {World.NuclearPlants.Count} nuclear plant markers");
         }
 
-        // Roads and railways as open-polyline line meshes (not closed rings — reuses the same
-        // vertex-color line-list approach as country/province borders, but built as a single
-        // combined mesh per layer since there are thousands of separate line segments).
+        // Roads and railways as THICK line meshes (quads, not 1px GL lines — GL_LINES has no
+        // width control on most platforms, which is exactly why the original version was
+        // indistinguishable from any other thin line). Railways additionally get regularly-
+        // spaced cross-tie tick marks overlaid on a fully solid line (see BuildRailwaysRoot) so
+        // the two layers read as visually different line *types*, not just different colors.
+        //
+        // An earlier version tried to tell railways apart by literally punching gaps in the line
+        // (a dash pattern with dashLen/gapLen in world units). That looked fine at the one zoom
+        // level it was tuned at, but combined badly with switching line width to constant SCREEN
+        // pixels: a fixed-world-length dash is a wildly different number of screen pixels at
+        // different zooms — either a sub-pixel sliver (reads as noise) or a many-pixels-long,
+        // only ~2px-wide needle (reads as broken, not like a railway). Keeping the base line
+        // fully solid/continuous (so the existing joint-at-every-vertex fix still closes every
+        // bend, same as roads) and drawing ties as a decorative overlay on top sidesteps that
+        // mismatch entirely.
         void BuildRoadsAndRailways()
         {
-            RoadsRoot = BuildLineFeaturesRoot("Roads", World.Roads, roadColor, RoadZ);
-            RailwaysRoot = BuildLineFeaturesRoot("Railways", World.Railways, railwayColor, RailZ);
+            RoadsRoot = BuildLineFeaturesRoot("Roads", World.Roads, roadColor, RoadZ, roadWidth);
+            RailwaysRoot = BuildRailwaysRoot(World.Railways, RailZ, railwayWidth);
             Debug.Log($"[map] built {World.Roads.Count} road features, {World.Railways.Count} railway features");
         }
 
-        GameObject BuildLineFeaturesRoot(string rootName, List<LineFeature> features, Color color, float z)
+        GameObject BuildLineFeaturesRoot(string rootName, List<LineFeature> features, Color color, float z, float pixelHalfWidth)
         {
             var root = new GameObject(rootName);
             root.transform.SetParent(transform, false);
             root.SetActive(false); // MapLayers reveals this once zoomed in enough
 
             var verts = new List<Vector3>();
-            var idx = new List<int>();
+            var tris = new List<int>();
+            var cols = new List<Color>();
+            var uvs = new List<Vector2>();
             foreach (var feat in features)
-            {
                 foreach (var line in feat.Lines)
-                {
-                    if (line.Count < 2) continue;
-                    int baseIdx = verts.Count;
-                    foreach (var pt in line) verts.Add(new Vector3(pt.x, pt.y, z));
-                    for (int i = 0; i + 1 < line.Count; i++)
-                    {
-                        idx.Add(baseIdx + i);
-                        idx.Add(baseIdx + i + 1);
-                    }
-                }
-            }
+                    AppendThickLine(verts, tris, cols, uvs, line, z, color);
             if (verts.Count == 0) return root;
 
             var mesh = new Mesh { name = rootName };
             mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            var colors = new Color[verts.Count];
-            for (int i = 0; i < colors.Length; i++) colors[i] = color;
             mesh.SetVertices(verts);
-            mesh.colors = colors;
-            mesh.SetIndices(idx.ToArray(), MeshTopology.Lines, 0);
+            mesh.SetColors(cols);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
             mesh.RecalculateBounds();
 
             root.AddComponent<MeshFilter>().sharedMesh = mesh;
             var mr = root.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = borderMaterial;
+            mr.sharedMaterial = MakeScreenLineMaterial(pixelHalfWidth);
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             mr.receiveShadows = false;
             return root;
+        }
+
+        // Railways: a solid line body (same joined-quad technique as roads) plus cross-tie tick
+        // marks at fixed arc-length spacing — the classic "railroad" cartography symbol — all in
+        // one mesh/material so ties automatically inherit the same constant-screen-pixel scaling
+        // as the line body (see AppendTie: tie dimensions are just larger multiples of the same
+        // per-vertex UV offset the line quads/joints already use, not a separate width control).
+        GameObject BuildRailwaysRoot(List<LineFeature> features, float z, float pixelHalfWidth)
+        {
+            var root = new GameObject("Railways");
+            root.transform.SetParent(transform, false);
+            root.SetActive(false);
+
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            var cols = new List<Color>();
+            var uvs = new List<Vector2>();
+            foreach (var feat in features)
+            {
+                foreach (var line in feat.Lines)
+                {
+                    AppendThickLine(verts, tris, cols, uvs, line, z, railwayColor);
+                    AppendTies(verts, tris, cols, uvs, line, z, railTieColor, railTieSpacing);
+                }
+            }
+            if (verts.Count == 0) return root;
+
+            var mesh = new Mesh { name = "Railways" };
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.SetVertices(verts);
+            mesh.SetColors(cols);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateBounds();
+
+            root.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = root.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = MakeScreenLineMaterial(pixelHalfWidth);
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+            return root;
+        }
+
+        // Material for the constant-screen-width line shader (see ScreenLine.shader) — falls
+        // back to the plain vertex-color fill shader if ScreenLine is missing (e.g. stripped from
+        // a build), which still renders something (just back to world-space-sized geometry)
+        // rather than nothing.
+        Material MakeScreenLineMaterial(float pixelHalfWidth)
+        {
+            var shader = Shader.Find("Meridian/ScreenLine");
+            if (shader == null)
+            {
+                Debug.LogWarning("[map] ScreenLine shader not found; roads/railways will use raw (unscaled) geometry");
+                return fillMaterial;
+            }
+            var mat = new Material(shader) { name = $"ScreenLine_{pixelHalfWidth}" };
+            mat.SetFloat("_PixelHalfWidth", pixelHalfWidth);
+            return mat;
+        }
+
+        // Appends a polyline as a chain of thin quads (each segment = one rectangle) PLUS a
+        // small square "joint" at every interior vertex to close the gap a bend would otherwise
+        // leave (without it, a line reads as a chain of disconnected rectangles — at 10m
+        // road-data resolution this was visible almost everywhere, not just at sharp corners).
+        // Vertices store the RAW line point (no width baked in) plus an offset DIRECTION in UV0;
+        // ScreenLine.shader multiplies that direction by the material's _PixelHalfWidth and the
+        // camera's current world-units-per-pixel every frame, so the rendered width is always
+        // the same number of screen pixels regardless of zoom.
+        static void AppendThickLine(List<Vector3> verts, List<int> tris, List<Color> cols, List<Vector2> uvs, List<Vector2> line, float z, Color color)
+        {
+            if (line.Count < 2) return;
+            for (int i = 0; i + 1 < line.Count; i++)
+                AppendQuad(verts, tris, cols, uvs, line[i], line[i + 1], z, color);
+            for (int i = 1; i + 1 < line.Count; i++)
+                AppendJoint(verts, tris, cols, uvs, line[i], z, color);
+        }
+
+        // Cross-tie tick marks at fixed arc-length spacing (world/Mercator units — this is what
+        // controls how dense the ties look, analogous to the old dash period, but since these sit
+        // ON TOP of an always-solid line rather than punching gaps in it, there's no failure mode
+        // where the underlying line itself goes missing or reads as noise at the wrong zoom).
+        // Each tie is a short quad perpendicular to the rail direction at that point, built with
+        // the same "store raw position + UV offset direction" scheme as AppendQuad/AppendJoint —
+        // its UV magnitudes are just larger multiples of pixelHalfWidth (see TieLengthUnits/
+        // TieThicknessUnits) so it scales together with the line body from the same material.
+        const float TieLengthUnits = 2.6f;    // half-length across the rail, in multiples of pixelHalfWidth
+        const float TieThicknessUnits = 0.8f; // half-thickness along the rail, in multiples of pixelHalfWidth
+
+        static void AppendTies(List<Vector3> verts, List<int> tris, List<Color> cols, List<Vector2> uvs, List<Vector2> line, float z, Color color, float spacing)
+        {
+            if (line.Count < 2 || spacing <= 0f) return;
+            float distToNext = spacing * 0.5f; // offset the first tie half a period in
+            for (int i = 0; i + 1 < line.Count; i++)
+            {
+                Vector2 a = line[i], b = line[i + 1];
+                float segLen = Vector2.Distance(a, b);
+                if (segLen < 1e-6f) continue;
+                Vector2 dir = (b - a) / segLen;
+
+                float t = 0f;
+                while (distToNext <= segLen - t)
+                {
+                    t += distToNext;
+                    AppendTie(verts, tris, cols, uvs, a + dir * t, dir, z, color);
+                    distToNext = spacing;
+                }
+                distToNext -= (segLen - t);
+            }
+        }
+
+        static void AppendTie(List<Vector3> verts, List<int> tris, List<Color> cols, List<Vector2> uvs, Vector2 p, Vector2 alongRail, float z, Color color)
+        {
+            Vector2 crossRail = new Vector2(-alongRail.y, alongRail.x) * TieLengthUnits;
+            Vector2 thick = alongRail * TieThicknessUnits;
+            int baseIdx = verts.Count;
+            var pos = new Vector3(p.x, p.y, z);
+            verts.Add(pos); uvs.Add(-crossRail - thick);
+            verts.Add(pos); uvs.Add(-crossRail + thick);
+            verts.Add(pos); uvs.Add(crossRail + thick);
+            verts.Add(pos); uvs.Add(crossRail - thick);
+            cols.Add(color); cols.Add(color); cols.Add(color); cols.Add(color);
+            tris.Add(baseIdx); tris.Add(baseIdx + 2); tris.Add(baseIdx + 1);
+            tris.Add(baseIdx); tris.Add(baseIdx + 3); tris.Add(baseIdx + 2);
+        }
+
+        static void AppendQuad(List<Vector3> verts, List<int> tris, List<Color> cols, List<Vector2> uvs, Vector2 a, Vector2 b, float z, Color color)
+        {
+            Vector2 dir = (b - a).normalized;
+            Vector2 n = new Vector2(-dir.y, dir.x); // unit perpendicular; shader scales this by pixel width
+            int baseIdx = verts.Count;
+            verts.Add(new Vector3(a.x, a.y, z)); uvs.Add(-n);
+            verts.Add(new Vector3(a.x, a.y, z)); uvs.Add(n);
+            verts.Add(new Vector3(b.x, b.y, z)); uvs.Add(n);
+            verts.Add(new Vector3(b.x, b.y, z)); uvs.Add(-n);
+            cols.Add(color); cols.Add(color); cols.Add(color); cols.Add(color);
+            tris.Add(baseIdx); tris.Add(baseIdx + 2); tris.Add(baseIdx + 1);
+            tris.Add(baseIdx); tris.Add(baseIdx + 3); tris.Add(baseIdx + 2);
+        }
+
+        // An axis-aligned square centered on a shared vertex between two segments. Not a proper
+        // miter join (which would need the two segments' actual angle), but a square this size
+        // always fully covers where two same-width segment ends meet regardless of the angle
+        // between them, which is all that's needed to close the visible gap — a cheap, safe
+        // over-approximation rather than exact miter geometry.
+        static void AppendJoint(List<Vector3> verts, List<int> tris, List<Color> cols, List<Vector2> uvs, Vector2 p, float z, Color color)
+        {
+            int baseIdx = verts.Count;
+            var pos = new Vector3(p.x, p.y, z);
+            verts.Add(pos); uvs.Add(new Vector2(-1, -1));
+            verts.Add(pos); uvs.Add(new Vector2(-1, 1));
+            verts.Add(pos); uvs.Add(new Vector2(1, 1));
+            verts.Add(pos); uvs.Add(new Vector2(1, -1));
+            cols.Add(color); cols.Add(color); cols.Add(color); cols.Add(color);
+            tris.Add(baseIdx); tris.Add(baseIdx + 2); tris.Add(baseIdx + 1);
+            tris.Add(baseIdx); tris.Add(baseIdx + 3); tris.Add(baseIdx + 2);
+        }
+
+        // Border-crossing markers: one dot per computed crossing (see
+        // GeoJsonLoader.ComputeBorderCrossings), same constant-screen-size ScreenDot approach as
+        // city/airport markers. Gated by MapLayers alongside the roads layer they're derived from.
+        void BuildBorderCrossingMarkers()
+        {
+            var dotShader = Shader.Find("Meridian/ScreenDot");
+            if (dotShader == null) { Debug.LogWarning("[map] ScreenDot shader not found; skipping border crossing markers"); return; }
+            var points = World.BorderCrossings.ConvertAll(bc => new PointFeature { Name = $"{bc.CountryA} / {bc.CountryB}", Pos = bc.Pos });
+            BorderCrossingsRoot = BuildPointMarkerSet("BorderCrossings", points, borderCrossingColor, 4f, dotShader);
+        }
+
+        // Water crossings: both a thick line (the causeway/bridge itself) and a marker at its
+        // midpoint (an easier click target than a thin line at world-view zoom). Small, curated
+        // set (see GeoJsonLoader.WaterCrossingsSeed) so it gets its own always-a-few-dozen-max
+        // strategic-tier visibility rather than being gated behind the crowded roads layer.
+        void BuildWaterCrossings()
+        {
+            WaterCrossingLinesRoot = new GameObject("WaterCrossingLines");
+            WaterCrossingLinesRoot.transform.SetParent(transform, false);
+            WaterCrossingLinesRoot.SetActive(false);
+
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            var cols = new List<Color>();
+            var uvs = new List<Vector2>();
+            foreach (var wc in World.WaterCrossings)
+                AppendThickLine(verts, tris, cols, uvs, wc.Line, RoadZ - 0.01f, waterCrossingColor);
+            if (verts.Count > 0)
+            {
+                var mesh = new Mesh { name = "WaterCrossingLines" };
+                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                mesh.SetVertices(verts);
+                mesh.SetColors(cols);
+                mesh.SetUVs(0, uvs);
+                mesh.SetTriangles(tris, 0);
+                mesh.RecalculateBounds();
+                WaterCrossingLinesRoot.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var mr = WaterCrossingLinesRoot.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = MakeScreenLineMaterial(roadWidth * 1.4f);
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                mr.receiveShadows = false;
+            }
+
+            var dotShader = Shader.Find("Meridian/ScreenDot");
+            if (dotShader != null)
+            {
+                var points = World.WaterCrossings.ConvertAll(wc => new PointFeature
+                {
+                    Name = wc.Name,
+                    Pos = (wc.Line[0] + wc.Line[wc.Line.Count - 1]) * 0.5f,
+                });
+                WaterCrossingsRoot = BuildPointMarkerSet("WaterCrossingMarkers", points, waterCrossingColor, 4.5f, dotShader);
+            }
+            Debug.Log($"[map] built {World.WaterCrossings.Count} water crossings, {World.BorderCrossings.Count} border crossing markers");
         }
 
         GameObject BuildPointMarkerSet(string name, List<PointFeature> points, Color color, float pixelRadius, Shader dotShader)

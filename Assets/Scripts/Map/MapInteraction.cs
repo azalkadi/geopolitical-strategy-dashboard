@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Meridian.Geo;
 using Meridian.Sim;
@@ -21,6 +22,50 @@ namespace Meridian.Map
 
         public int Selected => selected;
         public long SimDay => simDay;
+
+        // Independent "map feature" selection — cities/roads/border crossings/water crossings
+        // clicked directly, mutually exclusive with each other and with the country ministry
+        // panel (picking one of these clears `selected` and vice versa, so only one info surface
+        // shows at a time). -1 = none.
+        public int SelectedCity { get; private set; } = -1;
+        public int SelectedRoad { get; private set; } = -1;
+        public int SelectedBorderCrossing { get; private set; } = -1;
+        public int SelectedWaterCrossing { get; private set; } = -1;
+
+        bool HasFeatureSelection => SelectedCity >= 0 || SelectedRoad >= 0 || SelectedBorderCrossing >= 0 || SelectedWaterCrossing >= 0;
+
+        void ClearFeatureSelection()
+        {
+            SelectedCity = SelectedRoad = SelectedBorderCrossing = SelectedWaterCrossing = -1;
+        }
+
+        public void CloseFeaturePanel() => ClearFeatureSelection();
+
+        // For a clicked road, the two cities nearest its two endpoints — not sourced from any
+        // dataset (roads don't carry "connects city A to city B" data), just the closest named
+        // settlement to where the road starts and ends.
+        public (City start, City end) NearestCitiesForRoad(int roadIndex)
+        {
+            var feat = map.World.Roads[roadIndex];
+            if (feat.Lines.Count == 0) return (null, null);
+            var first = feat.Lines[0];
+            var last = feat.Lines[feat.Lines.Count - 1];
+            Vector2 a = first[0];
+            Vector2 b = last[last.Count - 1];
+            return (NearestCity(a), NearestCity(b));
+        }
+
+        City NearestCity(Vector2 pos)
+        {
+            City best = null;
+            float bestDistSq = float.MaxValue;
+            foreach (var c in map.World.Cities)
+            {
+                float d2 = (c.Pos - pos).sqrMagnitude;
+                if (d2 < bestDistSq) { bestDistSq = d2; best = c; }
+            }
+            return best;
+        }
 
         // Click-vs-drag discrimination (left button is also the camera pan).
         Vector3 pressPos;
@@ -108,27 +153,124 @@ namespace Meridian.Map
             }
         }
 
+        // Click priority: water crossings > border crossings > cities > roads > countries — most
+        // specific/smallest target wins, country (always a hit if you're on land) is the
+        // fallback. Each of the first four is only actually tested while its layer is visible
+        // (reuses MapLayers' own zoom-gated GameObject.activeSelf rather than duplicating zoom
+        // thresholds here), so you can't select something you can't currently see on screen.
         void HandleClickSelect()
         {
             if (Input.GetMouseButtonDown(0)) { pressPos = Input.mousePosition; pressed = true; }
-            if (Input.GetMouseButtonUp(0) && pressed)
-            {
-                pressed = false;
-                // Only a click (not a pan-drag) if the pointer barely moved.
-                if ((Input.mousePosition - pressPos).sqrMagnitude > 25f) return;
+            if (!(Input.GetMouseButtonUp(0) && pressed)) return;
+            pressed = false;
+            // Only a click (not a pan-drag) if the pointer barely moved.
+            if ((Input.mousePosition - pressPos).sqrMagnitude > 25f) return;
 
-                Vector3 w = cam.ScreenToWorldPoint(Input.mousePosition);
-                Vector2 lonlat = new Vector2(w.x, w.y);
-                for (int i = 0; i < map.World.Countries.Count; i++)
+            Vector3 mouseScreen = Input.mousePosition;
+
+            if (map.WaterCrossingsRoot != null && map.WaterCrossingsRoot.activeSelf)
+            {
+                var pts = map.World.WaterCrossings.ConvertAll(wc => (wc.Line[0] + wc.Line[wc.Line.Count - 1]) * 0.5f);
+                if (TryPickNearestPoint(pts, mouseScreen, 14f, out int wcIdx))
                 {
-                    var c = map.World.Countries[i];
-                    if (!GeoMath.BboxContains(c.BboxMin, c.BboxMax, lonlat)) continue;
-                    bool inside = false;
-                    foreach (var ring in c.OuterRings)
-                        if (GeoMath.PointInRing(lonlat, ring)) { inside = true; break; }
-                    if (inside) { selected = i; break; }
+                    ClearFeatureSelection();
+                    SelectedWaterCrossing = wcIdx;
+                    return;
                 }
             }
+
+            if (map.BorderCrossingsRoot != null && map.BorderCrossingsRoot.activeSelf)
+            {
+                var pts = map.World.BorderCrossings.ConvertAll(bc => bc.Pos);
+                if (TryPickNearestPoint(pts, mouseScreen, 10f, out int bcIdx))
+                {
+                    ClearFeatureSelection();
+                    SelectedBorderCrossing = bcIdx;
+                    return;
+                }
+            }
+
+            {
+                var pts = map.World.Cities.ConvertAll(c => c.Pos);
+                if (TryPickNearestPoint(pts, mouseScreen, 9f, out int cityIdx))
+                {
+                    ClearFeatureSelection();
+                    SelectedCity = cityIdx;
+                    return;
+                }
+            }
+
+            if (map.RoadsRoot != null && map.RoadsRoot.activeSelf)
+            {
+                if (TryPickRoad(map.World.Roads, mouseScreen, 6f, out int roadIdx))
+                {
+                    ClearFeatureSelection();
+                    SelectedRoad = roadIdx;
+                    return;
+                }
+            }
+
+            Vector3 w = cam.ScreenToWorldPoint(mouseScreen);
+            Vector2 lonlat = new Vector2(w.x, w.y);
+            for (int i = 0; i < map.World.Countries.Count; i++)
+            {
+                var c = map.World.Countries[i];
+                if (!GeoMath.BboxContains(c.BboxMin, c.BboxMax, lonlat)) continue;
+                bool inside = false;
+                foreach (var ring in c.OuterRings)
+                    if (GeoMath.PointInRing(lonlat, ring)) { inside = true; break; }
+                if (inside)
+                {
+                    ClearFeatureSelection();
+                    selected = i;
+                    break;
+                }
+            }
+        }
+
+        bool TryPickNearestPoint(List<Vector2> positions, Vector3 mouseScreen, float pixelRadius, out int index)
+        {
+            index = -1;
+            float bestDistSq = pixelRadius * pixelRadius;
+            for (int i = 0; i < positions.Count; i++)
+            {
+                Vector3 sp = cam.WorldToScreenPoint(new Vector3(positions[i].x, positions[i].y, 0f));
+                float dx = sp.x - mouseScreen.x, dy = sp.y - mouseScreen.y;
+                float d2 = dx * dx + dy * dy;
+                if (d2 < bestDistSq) { bestDistSq = d2; index = i; }
+            }
+            return index >= 0;
+        }
+
+        bool TryPickRoad(List<LineFeature> roads, Vector3 mouseScreen, float pixelThreshold, out int roadIndex)
+        {
+            roadIndex = -1;
+            float bestDistSq = pixelThreshold * pixelThreshold;
+            for (int r = 0; r < roads.Count; r++)
+            {
+                foreach (var line in roads[r].Lines)
+                {
+                    for (int i = 0; i + 1 < line.Count; i++)
+                    {
+                        Vector3 spA = cam.WorldToScreenPoint(new Vector3(line[i].x, line[i].y, 0f));
+                        Vector3 spB = cam.WorldToScreenPoint(new Vector3(line[i + 1].x, line[i + 1].y, 0f));
+                        float d2 = SqDistPointToSegment(mouseScreen, spA, spB);
+                        if (d2 < bestDistSq) { bestDistSq = d2; roadIndex = r; }
+                    }
+                }
+            }
+            return roadIndex >= 0;
+        }
+
+        static float SqDistPointToSegment(Vector3 p, Vector3 a, Vector3 b)
+        {
+            Vector2 ap = new Vector2(p.x - a.x, p.y - a.y);
+            Vector2 ab = new Vector2(b.x - a.x, b.y - a.y);
+            float ab2 = ab.sqrMagnitude;
+            float t = ab2 > 1e-6f ? Mathf.Clamp01(Vector2.Dot(ap, ab) / ab2) : 0f;
+            Vector2 closest = new Vector2(a.x + ab.x * t, a.y + ab.y * t);
+            float dx = p.x - closest.x, dy = p.y - closest.y;
+            return dx * dx + dy * dy;
         }
 
         // Rendering moved to Meridian.UI (TopBar / MinistryBar / CountryPanel / StartScreen /

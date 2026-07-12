@@ -30,17 +30,177 @@ namespace Meridian.Geo
             world.Cities = LoadCities(Path.Combine(DataDir, "ne_10m_populated_places.geojson"));
             world.Ports = LoadPoints(Path.Combine(DataDir, "ne_10m_ports.geojson"), "name", "");
             world.Airports = LoadPoints(Path.Combine(DataDir, "ne_10m_airports.geojson"), "name", "iata_code");
-            // Major roads/railways (Natural Earth 10m, filtered to the world-scale subset —
-            // full detail is ~56k/25k features and not useful at country/continent zoom) and
-            // hand-curated air bases (filtered from the airports set by its own "military" type
-            // tag), oil ports, and nuclear plants (no public bundled dataset for either, so a
+            // Roads/railways pre-filtered (offline, by this project's own tooling — not shipped
+            // as Natural Earth's own "_major" cut) to scalerank<=7: ~34k/9k of the full ~57k/25k
+            // features, keeping named highways/roads/railroads and dropping only the bottom,
+            // mostly-unclassified tier that would be pure clutter at this map's zoom range. Hand-
+            // curated air bases (filtered from the airports set by its own "military" type tag),
+            // oil ports, and nuclear plants (no public bundled dataset for either, so a
             // real-but-not-exhaustive list of major, well-known facilities).
-            world.Roads = LoadLines(Path.Combine(DataDir, "ne_10m_roads_major.geojson"), "name");
-            world.Railways = LoadLines(Path.Combine(DataDir, "ne_10m_railroads_major.geojson"), "name");
+            world.Roads = LoadLines(Path.Combine(DataDir, "ne_10m_roads_extended.geojson"), "name");
+            world.Railways = LoadLines(Path.Combine(DataDir, "ne_10m_railroads_extended.geojson"), "name");
             world.AirBases = LoadPoints(Path.Combine(DataDir, "ne_10m_airbases_military.geojson"), "name", "");
             world.OilPorts = LoadPoints(Path.Combine(DataDir, "ne_10m_oilports.geojson"), "name", "");
             world.NuclearPlants = LoadPoints(Path.Combine(DataDir, "ne_10m_nuclearplants.geojson"), "name", "");
+
+            world.BorderCrossings = ComputeBorderCrossings(world);
+            world.WaterCrossings = WaterCrossingsSeed();
             return world;
+        }
+
+        // --- Border crossings -----------------------------------------------------------
+        //
+        // Not sourced from any dataset — Natural Earth doesn't label border crossings. Instead,
+        // for every NAMED road (unnamed/local segments are skipped — this keeps the count to a
+        // meaningful set of real highways rather than every minor track that happens to clip a
+        // border) we walk its polyline and resolve which country each vertex falls in via the
+        // same bbox-prefiltered point-in-ring test used for click hit-testing. Wherever two
+        // consecutive vertices resolve to different countries, that segment's midpoint is a
+        // real border crossing on a real road.
+        // Samples every Nth vertex instead of every single one. At 10m-resolution road geometry,
+        // consecutive vertices are typically well under a km apart — a border crossing detected
+        // a few vertices later than the true crossing is still accurate to well within visual
+        // tolerance at this map's scale, and this is the difference between the whole computation
+        // taking seconds vs. the ~53s a full-resolution per-ring-indexed pass still measured at
+        // (see CountryGridIndex's own history-of-attempts comment for the earlier, slower ones).
+        const int BorderCrossingSampleStride = 4;
+
+        static List<BorderCrossing> ComputeBorderCrossings(GeoWorld world)
+        {
+            var result = new List<BorderCrossing>();
+            var grid = new CountryGridIndex(world.Countries);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            foreach (var road in world.Roads)
+            {
+                if (string.IsNullOrEmpty(road.Name)) continue;
+                foreach (var line in road.Lines)
+                {
+                    if (line.Count < 2) continue;
+                    string prevCountry = grid.CountryAt(line[0]);
+                    Vector2 prevPt = line[0];
+                    for (int i = BorderCrossingSampleStride; i < line.Count; i += BorderCrossingSampleStride)
+                    {
+                        string here = grid.CountryAt(line[i]);
+                        if (here != null && prevCountry != null && here != prevCountry)
+                        {
+                            var mid = (prevPt + line[i]) * 0.5f;
+                            result.Add(new BorderCrossing { Pos = mid, CountryA = prevCountry, CountryB = here, RoadName = road.Name });
+                        }
+                        if (here != null) prevCountry = here;
+                        prevPt = line[i];
+                    }
+                }
+            }
+            Debug.Log($"[map] computed {result.Count} border crossings from named roads in {sw.ElapsedMilliseconds} ms");
+            return result;
+        }
+
+        // Uniform grid over *per-ring* bboxes (5°-ish cells across the ±180 Mercator-normalized
+        // world — see GeoMath.LonLatToMercator's doc comment for why that range is exactly
+        // ±180). ComputeBorderCrossings calls CountryAt for every vertex of every named road
+        // (tens of thousands of calls); a naive linear scan against all 258 countries — several
+        // of which (archipelago nations) have thousands-of-points polygons — measured as an
+        // effective hang (multiple minutes with no progress).
+        //
+        // The first version of this index bucketed by each *country's* overall bbox — which
+        // measured only marginally faster (158 seconds, not a hang) because several countries'
+        // bboxes span nearly the entire globe due to far-flung territory in the same Feature
+        // (France mainland + French Guiana, USA mainland + Alaska + Hawaii, Russia's longitude
+        // span, UK's overseas territories...). Those few countries were getting registered into
+        // almost every cell, which defeats the whole point of a grid. Indexing per RING instead
+        // (France's mainland ring and its French Guiana ring get separate, tight bboxes) fixes
+        // this at the root rather than special-casing those countries.
+        class CountryGridIndex
+        {
+            const int Cols = 180, Rows = 90; // 2° per cell — tighter than the first (5°) attempt,
+                                              // which still left crowded cells over Europe/the
+                                              // Mediterranean (many small countries + many
+                                              // islands + dense named-road coverage, all at once).
+            readonly List<(int country, int ring, Vector2 rMin, Vector2 rMax)>[] cells =
+                new List<(int, int, Vector2, Vector2)>[Cols * Rows];
+            readonly List<Country> countries;
+
+            public CountryGridIndex(List<Country> countries)
+            {
+                this.countries = countries;
+                for (int i = 0; i < cells.Length; i++) cells[i] = new List<(int, int, Vector2, Vector2)>();
+
+                for (int ci = 0; ci < countries.Count; ci++)
+                {
+                    var rings = countries[ci].OuterRings;
+                    for (int ri = 0; ri < rings.Count; ri++)
+                    {
+                        var ring = rings[ri];
+                        if (ring.Count == 0) continue;
+                        Vector2 rMin = ring[0], rMax = ring[0];
+                        foreach (var p in ring)
+                        {
+                            if (p.x < rMin.x) rMin.x = p.x;
+                            if (p.y < rMin.y) rMin.y = p.y;
+                            if (p.x > rMax.x) rMax.x = p.x;
+                            if (p.y > rMax.y) rMax.y = p.y;
+                        }
+                        var (x0, y0) = CellOf(rMin);
+                        var (x1, y1) = CellOf(rMax);
+                        for (int x = x0; x <= x1; x++)
+                            for (int y = y0; y <= y1; y++)
+                                cells[y * Cols + x].Add((ci, ri, rMin, rMax));
+                    }
+                }
+            }
+
+            static (int, int) CellOf(Vector2 p)
+            {
+                int x = Mathf.Clamp(Mathf.FloorToInt((p.x + 180f) / 360f * Cols), 0, Cols - 1);
+                int y = Mathf.Clamp(Mathf.FloorToInt((p.y + 180f) / 360f * Rows), 0, Rows - 1);
+                return (x, y);
+            }
+
+            public string CountryAt(Vector2 pt)
+            {
+                var (cx, cy) = CellOf(pt);
+                foreach (var (ci, ri, rMin, rMax) in cells[cy * Cols + cx])
+                {
+                    // Cheap per-ring bbox reject before the O(ring length) point-in-ring test —
+                    // a cell can hold a small island's ring alongside a country's whole mainland
+                    // ring; without this, every query pays the full ring test for both even when
+                    // the point is nowhere near one of them.
+                    if (pt.x < rMin.x || pt.x > rMax.x || pt.y < rMin.y || pt.y > rMax.y) continue;
+                    if (GeoMath.PointInRing(pt, countries[ci].OuterRings[ri])) return countries[ci].Name;
+                }
+                return null;
+            }
+        }
+
+        // --- Water crossings (hand-curated) ----------------------------------------------
+        //
+        // Real intercountry causeways/bridges over water. Coordinates are approximate landfall
+        // points (accurate to a few km — fine at this map's scale), sourced from public
+        // references on each structure. Deliberately excludes anything not actually built: no
+        // Qatar-Bahrain Friendship Bridge (announced ~2005, never built) and no Kuwait entry —
+        // Kuwait's only major causeway (Sheikh Jaber Al-Ahmad Al-Sabah) is entirely domestic,
+        // Kuwait City to Subiya/Bubiyan Island, not a link to another country.
+        static List<WaterCrossing> WaterCrossingsSeed()
+        {
+            List<Vector2> L(float lonA, float latA, float lonB, float latB) =>
+                new() { GeoMath.LonLatToMercator(lonA, latA), GeoMath.LonLatToMercator(lonB, latB) };
+
+            return new List<WaterCrossing>
+            {
+                new() { Name = "King Fahd Causeway", CountryA = "Saudi Arabia", CountryB = "Bahrain",
+                        Line = L(50.2077f, 26.2038f, 50.4886f, 26.1875f) }, // Khobar, SA <-> Al Jasra, BH
+                new() { Name = "Øresund Bridge", CountryA = "Denmark", CountryB = "Sweden",
+                        Line = L(12.6197f, 55.5697f, 12.8300f, 55.5550f) }, // Kastrup, DK <-> Lernacken, SE
+                new() { Name = "Johor–Singapore Causeway", CountryA = "Malaysia", CountryB = "Singapore",
+                        Line = L(103.7631f, 1.4655f, 103.7864f, 1.4484f) }, // Johor Bahru, MY <-> Woodlands, SG
+                new() { Name = "Tuas Second Link", CountryA = "Malaysia", CountryB = "Singapore",
+                        Line = L(103.6167f, 1.3667f, 103.6367f, 1.3465f) }, // Tanjung Kupang, MY <-> Tuas, SG
+                new() { Name = "Hong Kong–Zhuhai–Macau Bridge", CountryA = "Hong Kong S.A.R.", CountryB = "China",
+                        Line = L(113.9067f, 22.2897f, 113.5539f, 22.2264f) }, // HK landfall <-> Zhuhai/Macau junction
+                new() { Name = "Thai–Lao Friendship Bridge (1st)", CountryA = "Thailand", CountryB = "Laos",
+                        Line = L(102.7233f, 17.8833f, 102.7264f, 17.8961f) }, // Nong Khai, TH <-> Vientiane area, LA
+            };
         }
 
         // --- Countries -----------------------------------------------------------------
