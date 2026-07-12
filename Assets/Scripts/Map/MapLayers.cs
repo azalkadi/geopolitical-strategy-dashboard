@@ -77,6 +77,13 @@ namespace Meridian.Map
             SetActive(map.AirBasesRoot, z < strategicBelow);
             SetActive(map.OilPortsRoot, z < strategicBelow);
             SetActive(map.NuclearPlantsRoot, z < strategicBelow);
+            // Border crossings are derived from the roads layer, so they share its threshold.
+            SetActive(map.BorderCrossingsRoot, z < roadsBelow);
+            // Water crossings are a handful of real, notable structures — worth showing at the
+            // same wide zoom as other strategic sites rather than hiding them behind the
+            // crowded roads threshold.
+            SetActive(map.WaterCrossingsRoot, z < strategicBelow);
+            SetActive(map.WaterCrossingLinesRoot, z < strategicBelow);
         }
 
         static void SetActive(GameObject go, bool on)
@@ -128,6 +135,14 @@ namespace Meridian.Map
                 DrawPointLabels(map.World.OilPorts, infraLabelStyle);
                 GUI.color = new Color(0.90f, 0.97f, 0.40f, 0.95f);
                 DrawPointLabels(map.World.NuclearPlants, infraLabelStyle);
+
+                GUI.color = new Color(0.55f, 0.95f, 1f, 1f);
+                var wcPoints = map.World.WaterCrossings.ConvertAll(wc => new Meridian.Geo.PointFeature
+                {
+                    Name = wc.Name,
+                    Pos = (wc.Line[0] + wc.Line[wc.Line.Count - 1]) * 0.5f,
+                });
+                DrawPointLabels(wcPoints, infraLabelStyle);
             }
         }
 

@@ -45,6 +45,9 @@ namespace Meridian.Map
             var uiGo = new GameObject("GameUI");
             uiGo.AddComponent<UIDocument>();
             uiGo.AddComponent<GameUIRoot>();
+            // Separate small info panel for clicked map features (city/road/border crossing/
+            // water crossing) — shares the same UIDocument root, own component/file.
+            uiGo.AddComponent<FeaturePanel>();
 
             Debug.Log("[bootstrap] spawned map camera + renderer + interaction + layers + UI");
         }

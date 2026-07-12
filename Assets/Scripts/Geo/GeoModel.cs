@@ -107,6 +107,27 @@ namespace Meridian.Geo
         public List<List<Vector2>> Lines = new();
     }
 
+    // A point where a named road's polyline crosses from one country's polygon into
+    // another's — computed once at load time (GeoJsonLoader.ComputeBorderCrossings), not
+    // sourced from any dataset (Natural Earth doesn't label border crossings).
+    public class BorderCrossing
+    {
+        public Vector2 Pos;
+        public string CountryA = "";
+        public string CountryB = "";
+        public string RoadName = "";
+    }
+
+    // A real intercountry causeway/bridge over water — hand-curated (no free dataset covers
+    // these specifically), see GeoJsonLoader.WaterCrossingsSeed for sourcing notes per entry.
+    public class WaterCrossing
+    {
+        public string Name = "";
+        public string CountryA = "";
+        public string CountryB = "";
+        public List<Vector2> Line = new(); // real endpoint coordinates, straight segment between
+    }
+
     public class GeoWorld
     {
         public List<Country> Countries = new();
@@ -119,6 +140,8 @@ namespace Meridian.Geo
         public List<PointFeature> AirBases = new();
         public List<PointFeature> OilPorts = new();
         public List<PointFeature> NuclearPlants = new();
+        public List<BorderCrossing> BorderCrossings = new();
+        public List<WaterCrossing> WaterCrossings = new();
     }
 
     public static class GeoMath
