@@ -39,14 +39,18 @@ namespace Meridian.Sim
             float readinessTarget = Clampf(DefenseSpending * 20f, 0f, 100f);
             ReadinessIndex = Clampf(ReadinessIndex + (readinessTarget - ReadinessIndex) * 0.02f, 0f, 100f);
 
-            float innovationTarget = Clampf((float)(gdpRankPercentile * 60.0) + ResearchSpending * 15f, 0f, 100f);
+            // Education spending compounds with direct research spending — a strong school
+            // system raises the ceiling on what research money can produce.
+            float innovationTarget = Clampf((float)(gdpRankPercentile * 60.0) + ResearchSpending * 15f + (e.SpendEducation - 4.5f) * 3f, 0f, 100f);
             InnovationIndex = Clampf(InnovationIndex + (innovationTarget - InnovationIndex) * 0.01f, 0f, 100f);
 
             double openness = e.Gdp > 0.01 ? e.Exports / e.Gdp : 0.0;
             float standingTarget = Clampf((float)(gdpRankPercentile * 50.0) + (float)System.Math.Min(20.0, openness * 40.0) + ApprovalRating * 0.3f, 0f, 100f);
             InternationalStanding = Clampf(InternationalStanding + (standingTarget - InternationalStanding) * 0.01f, 0f, 100f);
 
-            float moodTarget = Clampf(70f - (e.Unemployment - 7f) * 2.5f - System.Math.Max(0f, e.Inflation - 4f) * 2f, 0f, 100f);
+            // Healthcare spending is the daily-life lever: people feel underfunded hospitals
+            // long before they feel a GDP decimal point.
+            float moodTarget = Clampf(70f - (e.Unemployment - 7f) * 2.5f - System.Math.Max(0f, e.Inflation - 4f) * 2f + (e.SpendHealthcare - 6.0f) * 2.5f, 0f, 100f);
             PublicMood = Clampf(PublicMood + (moodTarget - PublicMood) * 0.015f, 0f, 100f);
         }
 

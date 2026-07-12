@@ -69,6 +69,10 @@ namespace Meridian.UI
         readonly List<VisualElement> activeToasts = new();
         string[] lastWhySeen;
 
+        // --- decision-event modal (sim pauses while visible) ---
+        VisualElement eventModal;
+        GameEvent builtForEvent;
+
         class SliderBinding
         {
             public VisualElement Thumb;
@@ -109,6 +113,7 @@ namespace Meridian.UI
             BuildToastLayer();
             BuildStartScreen();
             BuildGameOverScreen();
+            BuildEventModal();
 
             root.schedule.Execute(Refresh).Every(100);
         }
@@ -535,7 +540,14 @@ namespace Meridian.UI
             Stat("Public debt", $"${e.PublicDebt:n1}B");
             StatColored("Debt-to-GDP", $"{e.DebtToGdp:0.0}%", e.DebtToGdp <= 60.0);
             Why(e.LastWhy);
-            HelpText("Revenue and expenditure follow from the Economy tax/treasury simulation.");
+
+            Divider();
+            SectionHeader("SPENDING (% OF GDP)");
+            AddSlider("Education", () => e.SpendEducation, 0f, 12f, v => e.SpendEducation = v);
+            AddSlider("Healthcare", () => e.SpendHealthcare, 0f, 15f, v => e.SpendHealthcare = v);
+            AddSlider("Infrastructure", () => e.SpendInfrastructure, 0f, 12f, v => e.SpendInfrastructure = v);
+            Stat("Other government", $"{EconomyState.SpendBase:0.0}%");
+            HelpText("Infrastructure and education feed growth, education also drives innovation, healthcare lifts public mood — all of it costs treasury every day. 'Other' (administration, pensions, debt service) is fixed.");
         }
 
         void DrawTrade(EconomyState e)
@@ -573,7 +585,90 @@ namespace Meridian.UI
             SectionHeader("DIPLOMACY");
             if (n == null) { HelpText("No data."); return; }
             StatColored("International standing", $"{n.InternationalStanding:0.0}", n.InternationalStanding >= 50f);
-            HelpText("Standing is a composite of economic size, trade openness, and approval.");
+
+            var dip = map.Diplomacy;
+            int me = PlayerState.CountryIndex;
+            int sel = interaction.Selected;
+            if (dip == null || me < 0) { HelpText("Standing is a composite of economic size, trade openness, and approval."); return; }
+
+            if (sel >= 0 && sel != me && sel < dip.Count)
+                DrawBilateralDiplomacy(dip, me, sel);
+            else
+                DrawDiplomacyOverview(dip, me);
+        }
+
+        // Viewing a FOREIGN country's Diplomacy tab = your bilateral relationship with it,
+        // and the levers you can pull. This is where diplomacy is actually played.
+        void DrawBilateralDiplomacy(DiplomacySystem dip, int me, int sel)
+        {
+            Divider();
+            SectionHeader($"RELATIONS WITH {map.World.Countries[sel].Name.ToUpperInvariant()}");
+
+            float rel = dip.GetRelation(me, sel);
+            string mood = rel >= 75f ? "Ally" : rel >= 60f ? "Friendly" : rel >= 40f ? "Neutral" : rel >= 25f ? "Strained" : "Hostile";
+            StatColored("Relationship", $"{rel:0} · {mood}", rel >= 50f);
+            if (dip.HasAgreement(me, sel)) Stat("Trade agreement", "IN FORCE");
+
+            bool onCooldown = !dip.CanAct(me, sel, interaction.SimDay);
+            if (onCooldown)
+            {
+                HelpText("Diplomatic channels need time to reset after your last move here (90 days between actions per country).");
+                return;
+            }
+
+            var myEcon = map.Economy.States[me];
+            var myNat = map.National.States[me];
+            var theirEcon = map.Economy.States[sel];
+
+            var aidBtn = MakeButton($"Send Foreign Aid  (${System.Math.Max(0.2, myEcon.Gdp * 0.0005):0.0}B)", 12,
+                GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextPrimary, () =>
+                {
+                    ShowToast(PlayerState.CountryName, dip.SendAid(me, sel, myEcon, myNat, interaction.SimDay));
+                    builtForCategory = (NationCategory)(-1);
+                }, align: TextAnchor.MiddleLeft);
+            aidBtn.style.height = 30; aidBtn.style.marginTop = 6;
+            panelBody.Add(aidBtn);
+
+            if (!dip.HasAgreement(me, sel))
+            {
+                bool eligible = rel >= DiplomacySystem.AgreementThreshold;
+                var tradeBtn = MakeButton(eligible ? "Sign Trade Agreement" : $"Trade Agreement (needs {DiplomacySystem.AgreementThreshold:0}+ relations)", 12,
+                    eligible ? GameTheme.BgButton : GameTheme.Muted(GameTheme.BgButton), GameTheme.BgButtonHover,
+                    eligible ? GameTheme.TextPrimary : GameTheme.TextDim, () =>
+                    {
+                        string result = dip.SignAgreement(me, sel, myEcon, theirEcon, interaction.SimDay);
+                        if (result != null) { ShowToast(PlayerState.CountryName, result); builtForCategory = (NationCategory)(-1); }
+                    }, align: TextAnchor.MiddleLeft);
+                tradeBtn.style.height = 30; tradeBtn.style.marginTop = 4;
+                panelBody.Add(tradeBtn);
+            }
+
+            var denounceBtn = MakeButton("Denounce Publicly", 12, GameTheme.Muted(GameTheme.Negative, 0.4f), GameTheme.Negative, GameTheme.TextPrimary, () =>
+                {
+                    ShowToast(PlayerState.CountryName, dip.Denounce(me, sel, myNat, interaction.SimDay));
+                    builtForCategory = (NationCategory)(-1);
+                }, align: TextAnchor.MiddleLeft);
+            denounceBtn.style.height = 30; denounceBtn.style.marginTop = 4;
+            panelBody.Add(denounceBtn);
+
+            HelpText("Aid buys warmth. Agreements need 65+ relations and lift both economies' exports permanently. Denouncing plays well at home and badly abroad.");
+        }
+
+        // Viewing your OWN Diplomacy tab = the world's view of you: warmest and frostiest
+        // relationships at a glance. Click a country on the map to open its bilateral view.
+        void DrawDiplomacyOverview(DiplomacySystem dip, int me)
+        {
+            Divider();
+            SectionHeader("CLOSEST PARTNERS");
+            foreach (var (idx, rel) in dip.RankedFor(me, friendliest: true, topN: 5))
+                Stat(map.World.Countries[idx].Name, dip.HasAgreement(me, idx) ? $"{rel:0} ◆" : $"{rel:0}");
+
+            Divider();
+            SectionHeader("MOST STRAINED");
+            foreach (var (idx, rel) in dip.RankedFor(me, friendliest: false, topN: 5))
+                StatColored(map.World.Countries[idx].Name, $"{rel:0}", false);
+
+            HelpText("◆ = trade agreement in force. Select another country on the map, then open Diplomacy, to send aid, sign agreements, or denounce.");
         }
 
         void DrawSociety(NationalState n)
@@ -858,6 +953,79 @@ namespace Meridian.UI
             startScreen.style.display = DisplayStyle.None;
         }
 
+        // ============================== DECISION EVENT MODAL ==============================
+
+        // Shown whenever EventSystem.Pending is non-null (Refresh() rebuilds it per event).
+        // The sim clock is already frozen by MapInteraction while a decision is pending, so
+        // this modal deliberately has no close/dismiss — governing means deciding.
+        void BuildEventModal()
+        {
+            eventModal = new VisualElement();
+            eventModal.pickingMode = PickingMode.Position; // swallow map clicks behind it
+            eventModal.style.position = Position.Absolute;
+            eventModal.style.left = 0; eventModal.style.right = 0; eventModal.style.top = 0; eventModal.style.bottom = 0;
+            eventModal.style.backgroundColor = new StyleColor(new Color(0.02f, 0.03f, 0.05f, 0.72f));
+            eventModal.style.alignItems = Align.Center;
+            eventModal.style.justifyContent = Justify.Center;
+            eventModal.style.display = DisplayStyle.None;
+            root.Add(eventModal);
+        }
+
+        void PopulateEventModal(GameEvent ev)
+        {
+            eventModal.Clear();
+
+            var box = new VisualElement();
+            box.style.width = 520;
+            box.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
+            box.style.borderTopLeftRadius = 8; box.style.borderTopRightRadius = 8;
+            box.style.borderBottomLeftRadius = 8; box.style.borderBottomRightRadius = 8;
+            box.style.borderLeftWidth = 3; box.style.borderLeftColor = new StyleColor(GameTheme.Accent);
+            box.style.borderTopWidth = 1; box.style.borderRightWidth = 1; box.style.borderBottomWidth = 1;
+            box.style.borderTopColor = new StyleColor(GameTheme.Border);
+            box.style.borderRightColor = new StyleColor(GameTheme.Border);
+            box.style.borderBottomColor = new StyleColor(GameTheme.Border);
+            box.style.paddingTop = 20; box.style.paddingBottom = 20;
+            box.style.paddingLeft = 24; box.style.paddingRight = 24;
+            eventModal.Add(box);
+
+            var kicker = MakeLabel("URGENT — DECISION REQUIRED", 10, GameTheme.Negative, bold: true);
+            kicker.style.letterSpacing = 1.5f;
+            kicker.style.marginBottom = 6;
+            box.Add(kicker);
+
+            var title = MakeLabel(ev.Title, 20, GameTheme.TextPrimary, bold: true);
+            title.style.marginBottom = 8;
+            box.Add(title);
+
+            var desc = MakeLabel(ev.Description, 13, GameTheme.TextDim);
+            desc.style.whiteSpace = WhiteSpace.Normal;
+            desc.style.marginBottom = 16;
+            box.Add(desc);
+
+            for (int i = 0; i < ev.Choices.Length; i++)
+            {
+                int captured = i;
+                var btn = MakeButton(ev.Choices[i].Label, 13, GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextPrimary, () =>
+                {
+                    var e = map.Economy.States[PlayerState.CountryIndex];
+                    var n = map.National.States[PlayerState.CountryIndex];
+                    string outcome = EventSystem.Choose(captured, e, n);
+                    if (!string.IsNullOrEmpty(outcome)) ShowToast(PlayerState.CountryName, outcome);
+                    builtForCategory = (NationCategory)(-1); // panel numbers may have changed
+                }, align: TextAnchor.MiddleLeft);
+                btn.style.height = 34;
+                btn.style.marginBottom = 8;
+                btn.style.paddingRight = 8;
+                box.Add(btn);
+            }
+
+            var hint = MakeLabel("The world is paused until you decide.", 10, GameTheme.TextDim);
+            hint.style.unityTextAlign = TextAnchor.MiddleCenter;
+            hint.style.marginTop = 4;
+            box.Add(hint);
+        }
+
         // ============================== GAME OVER SCREEN ==============================
 
         void BuildGameOverScreen()
@@ -1026,6 +1194,17 @@ namespace Meridian.UI
             }
 
             CheckForNewEvents();
+
+            // Decision-event modal: visible exactly while a decision is pending, rebuilt once
+            // per distinct event (not per refresh tick — the buttons hold closures).
+            var pendingEvent = EventSystem.Pending;
+            eventModal.style.display = pendingEvent != null ? DisplayStyle.Flex : DisplayStyle.None;
+            if (pendingEvent != null && !ReferenceEquals(pendingEvent, builtForEvent))
+            {
+                builtForEvent = pendingEvent;
+                PopulateEventModal(pendingEvent);
+            }
+            if (pendingEvent == null) builtForEvent = null;
 
             dayLabel.text = $"Day {interaction.SimDay}";
 

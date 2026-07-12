@@ -3,10 +3,11 @@ using Meridian.Geo;
 
 namespace Meridian.Sim
 {
-    // Faithful C# port of crates/ui_dashboard/src/economy.rs — a deterministic ticking
-    // economy for EVERY country (not just the one on screen), seeded from Natural Earth's
-    // real POP_EST/GDP_MD where available. Pure math, engine-agnostic; this is the real
-    // gameplay core and ports 1:1 from the Rust. Kept bug-for-bug faithful to the original.
+    // Started as a faithful C# port of crates/ui_dashboard/src/economy.rs — a deterministic
+    // ticking economy for EVERY country (not just the one on screen), seeded from Natural
+    // Earth's real POP_EST/GDP_MD where available. Pure math, engine-agnostic. Has since
+    // grown past the Rust original: adjustable budget spending levers (education/healthcare/
+    // infrastructure) and diplomacy-driven trade-agreement bonuses are Unity-side additions.
 
     public class EconomyState
     {
@@ -30,6 +31,20 @@ namespace Meridian.Sim
         // a much smaller revenue and growth-drag coefficient (see Tick()).
         public List<CustomTax> CustomTaxes = new();
 
+        // Budget spending levers (% of GDP). Defaults sum with SpendBase to the same flat 20%
+        // the sim used before these were adjustable, so the pre-existing fiscal balance is
+        // unchanged until the player actually moves something. SpendBase is the immovable rest
+        // of government (administration, pensions, debt service, everything not broken out).
+        public float SpendEducation = 4.5f;
+        public float SpendHealthcare = 6.0f;
+        public float SpendInfrastructure = 3.0f;
+        public const float SpendBase = 6.5f;
+        public float TotalSpendingRate => SpendBase + SpendEducation + SpendHealthcare + SpendInfrastructure;
+
+        // Sum of active trade-agreement export bonuses (set by DiplomacySystem; each agreement
+        // adds a small slice of extra export propensity for BOTH signatories).
+        public float TradeAgreementExportBonus;
+
         // Trade openness (exports/imports as a fraction of GDP), set once at seed from the
         // same GDP-per-capita tiering as growth — smaller/less-diversified economies tend to
         // run more trade relative to GDP. Deliberately simplified (real bilateral trade flows
@@ -38,7 +53,7 @@ namespace Meridian.Sim
         float exportPropensity;
         float importPropensity;
 
-        public double Exports => Gdp * exportPropensity;
+        public double Exports => Gdp * (exportPropensity + TradeAgreementExportBonus);
         // Higher tariffs suppress imports (each 10 points of tariff cuts import propensity ~5%).
         public double Imports => Gdp * importPropensity * (1.0 - TaxTariff / 100.0 * 0.5);
         public double TradeBalance => Exports - Imports;
@@ -46,7 +61,7 @@ namespace Meridian.Sim
         // Budget: derived from the same effective-tax/spending assumptions Tick() already uses
         // for Treasury, just expressed as annualized figures instead of a daily accumulator.
         public double AnnualRevenue => Gdp * EffectiveTaxRate() / 100.0;
-        public double AnnualExpenditure => Gdp * 0.20;
+        public double AnnualExpenditure => Gdp * TotalSpendingRate / 100.0;
         public double AnnualDeficit => AnnualExpenditure - AnnualRevenue; // positive == deficit
         public double PublicDebt => System.Math.Max(0.0, -Treasury);
         public double DebtToGdp => Gdp > 0.01 ? PublicDebt / Gdp * 100.0 : 0.0;
@@ -111,7 +126,14 @@ namespace Meridian.Sim
             float effectiveTax = EffectiveTaxRate();
             float taxDrag = (effectiveTax - 25.0f) * 0.04f + customDragTotal;
             float rateDrag = (InterestRate - 4.0f) * 0.05f;
-            float target = baseGrowthTarget - taxDrag - rateDrag + Noise() * 0.15f;
+            // Productive spending pays off in growth: infrastructure is the most direct
+            // (roads/ports/grid capacity), education a slower but real second. Both measured
+            // as deviation from their defaults so the baseline economy is unchanged. Trade
+            // agreements add a small openness dividend on top.
+            float spendBoost = (SpendInfrastructure - 3.0f) * 0.10f
+                             + (SpendEducation - 4.5f) * 0.05f
+                             + TradeAgreementExportBonus * 4.0f;
+            float target = baseGrowthTarget - taxDrag - rateDrag + spendBoost + Noise() * 0.15f;
             GrowthRate = Clampf(GrowthRate * 0.98f + target * 0.02f, -15.0f, 15.0f);
 
             Gdp *= 1.0 + GrowthRate / 100.0 / 365.0;
@@ -130,7 +152,7 @@ namespace Meridian.Sim
                 Inflation + (GrowthRate - baseGrowthTarget) * 0.005f - (InterestRate - 4.0f) * 0.03f + Noise() * 0.02f,
                 -3.0f, 40.0f);
 
-            Treasury += Gdp * effectiveTax / 100.0 / 365.0 - Gdp * 0.20 / 365.0;
+            Treasury += Gdp * effectiveTax / 100.0 / 365.0 - Gdp * TotalSpendingRate / 100.0 / 365.0;
 
             // Custom taxes are a much smaller slice of GDP per point of rate than the core
             // levers (they're narrow/specific, not broad-based) — roughly a 10% custom tax

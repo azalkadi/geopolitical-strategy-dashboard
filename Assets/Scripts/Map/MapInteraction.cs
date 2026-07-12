@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 using Meridian.Geo;
 using Meridian.Sim;
 
@@ -40,8 +41,9 @@ namespace Meridian.Map
             if (map == null || map.World == null || map.Economy == null) return;
 
             // The world is frozen at the start screen / game-over screen — nothing ticks until
-            // the player has actually picked a nation to govern.
-            if (PlayerState.State == GameState.Playing)
+            // the player has actually picked a nation to govern. It also freezes while a
+            // decision event awaits the player's choice: the world waits for the head of state.
+            if (PlayerState.State == GameState.Playing && EventSystem.Pending == null)
                 TickEconomy();
             HandleClickSelect();
         }
@@ -57,8 +59,25 @@ namespace Meridian.Map
                 simDay++;
                 map.Economy.TickAll();
                 map.National?.TickAll(map.Economy);
+                map.Diplomacy?.TickAll();
                 CheckElection(simDay);
                 LogEconomyDiagnostic();
+
+                // Decision events fire for the player's own country only. Once one fires, the
+                // Update() gate freezes the clock until the player chooses, so stop mid-batch —
+                // no more days may pass this frame.
+                if (PlayerState.CountryIndex >= 0 && map.National != null && PlayerState.CountryIndex < map.National.States.Count)
+                {
+                    EventSystem.MaybeFire(simDay, map.Economy.States[PlayerState.CountryIndex], map.National.States[PlayerState.CountryIndex]);
+                    if (EventSystem.Pending != null)
+                    {
+                        // A crisis drops the game out of fast-forward: after deciding, the world
+                        // resumes at 1x so the player reads the consequences instead of instantly
+                        // slamming into the next event. Cranking speed back up is one click.
+                        if (daysPerSecond > 1f) daysPerSecond = 1f;
+                        break;
+                    }
+                }
             }
         }
 
@@ -108,14 +127,32 @@ namespace Meridian.Map
             }
         }
 
+        UIDocument uiDoc;
+
+        // Legacy Input polling doesn't know UI Toolkit exists — without this check, every
+        // click on a HUD button/panel/modal ALSO fell through to the map and click-selected
+        // whatever country happened to be under the cursor (observed: choosing an event-modal
+        // option silently changed the selected country). Ask the UI panel what's under the
+        // pointer; any pickable element there means the click belongs to the UI, not the map.
+        bool PointerOverUI(Vector2 mouseScreenPos)
+        {
+            if (uiDoc == null) uiDoc = FindObjectOfType<UIDocument>();
+            var panel = uiDoc != null ? uiDoc.rootVisualElement?.panel : null;
+            if (panel == null) return false;
+            // Screen space is bottom-left origin; panel space is top-left.
+            Vector2 panelPos = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(mouseScreenPos.x, Screen.height - mouseScreenPos.y));
+            return panel.Pick(panelPos) != null;
+        }
+
         void HandleClickSelect()
         {
-            if (Input.GetMouseButtonDown(0)) { pressPos = Input.mousePosition; pressed = true; }
+            if (Input.GetMouseButtonDown(0)) { pressPos = Input.mousePosition; pressed = !PointerOverUI(Input.mousePosition); }
             if (Input.GetMouseButtonUp(0) && pressed)
             {
                 pressed = false;
                 // Only a click (not a pan-drag) if the pointer barely moved.
                 if ((Input.mousePosition - pressPos).sqrMagnitude > 25f) return;
+                if (PointerOverUI(Input.mousePosition)) return;
 
                 Vector3 w = cam.ScreenToWorldPoint(Input.mousePosition);
                 Vector2 lonlat = new Vector2(w.x, w.y);

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Meridian.Map
 {
@@ -44,9 +45,22 @@ namespace Meridian.Map
             ClampPosition();
         }
 
+        UIDocument uiDoc;
+
+        // Same UI-awareness fix as MapInteraction.PointerOverUI: without it, dragging a panel
+        // slider or holding a button also panned the map underneath.
+        bool PointerOverUI(Vector2 mouseScreenPos)
+        {
+            if (uiDoc == null) uiDoc = FindObjectOfType<UIDocument>();
+            var panel = uiDoc != null ? uiDoc.rootVisualElement?.panel : null;
+            if (panel == null) return false;
+            Vector2 panelPos = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(mouseScreenPos.x, Screen.height - mouseScreenPos.y));
+            return panel.Pick(panelPos) != null;
+        }
+
         void HandlePan()
         {
-            if (Input.GetMouseButtonDown(0))
+            if (Input.GetMouseButtonDown(0) && !PointerOverUI(Input.mousePosition))
             {
                 dragOriginWorld = cam.ScreenToWorldPoint(Input.mousePosition);
                 dragging = true;
@@ -68,6 +82,9 @@ namespace Meridian.Map
         {
             float scroll = Input.mouseScrollDelta.y;
             if (Mathf.Abs(scroll) < 0.0001f) return;
+            // Scrolling over a UI panel (e.g. the start screen's country list) belongs to that
+            // panel's own ScrollView, not the map zoom.
+            if (PointerOverUI(Input.mousePosition)) return;
 
             Vector3 beforeWorld = cam.ScreenToWorldPoint(Input.mousePosition);
             float factor = 1f - scroll * zoomSpeed;

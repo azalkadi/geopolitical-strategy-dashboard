@@ -41,6 +41,7 @@ namespace Meridian.Map
         public GeoWorld World { get; private set; }
         public EconomySystem Economy { get; private set; }
         public NationalSystem National { get; private set; }
+        public DiplomacySystem Diplomacy { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -115,6 +116,10 @@ namespace Meridian.Map
 
             // Politics/Military/Diplomacy/Society/Technology — derived indices, ticked alongside Economy.
             National = NationalSystem.Seed(World.Countries.Count);
+
+            // Bilateral relations for every country pair, seeded from real geography.
+            Diplomacy = DiplomacySystem.Seed(World.Countries);
+            Debug.Log($"[map] seeded diplomacy relations for {World.Countries.Count} countries");
 
             BuildCountryMeshes();
             BuildCountryBorders();

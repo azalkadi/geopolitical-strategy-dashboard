@@ -28,6 +28,7 @@ namespace Meridian.Sim
             TermsServed = 0;
             LastResultMessage = "";
             WonLastElection = true;
+            EventSystem.Reset(); // no stale pending decision carrying into a new game
         }
 
         public static void Begin(int countryIndex, string countryName, long currentDay)
@@ -38,6 +39,10 @@ namespace Meridian.Sim
             TermsServed = 0;
             LastResultMessage = "";
             State = GameState.Playing;
+            // The sim clock never rewinds across PLAY AGAIN, so the first event of a new game
+            // is scheduled relative to NOW, not to a day-90 mark the clock may be long past.
+            EventSystem.Pending = null;
+            EventSystem.NextEventDay = currentDay + 90;
         }
     }
 }
