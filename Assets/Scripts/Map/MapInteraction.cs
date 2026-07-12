@@ -109,6 +109,12 @@ namespace Meridian.Map
                 LogEconomyDiagnostic();
                 MaybeRunDiplomacyDiag();
 
+                if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
+                    PlayerHistory.Record(
+                        map.Economy.States[PlayerState.CountryIndex],
+                        map.National != null && PlayerState.CountryIndex < map.National.States.Count
+                            ? map.National.States[PlayerState.CountryIndex] : null);
+
                 // Decision events fire for the player's own country only. Once one fires, the
                 // Update() gate freezes the clock until the player chooses, so stop mid-batch —
                 // no more days may pass this frame.

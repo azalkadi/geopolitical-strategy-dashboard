@@ -387,6 +387,7 @@ namespace Meridian.UI
         void RebuildSidePanel()
         {
             activeSliders.Clear();
+            activeSparklines.Clear();
             panelBody.Clear();
 
             int sel = interaction.Selected;
@@ -452,6 +453,15 @@ namespace Meridian.UI
             StatColored("Treasury", $"${e.Treasury:n1}B", e.Treasury >= 0);
             Stat("Effective tax rate", $"{e.EffectiveTaxRate():0.0}%");
             Why(e.LastWhy);
+
+            // History charts exist only for the nation the player actually governs — the sim
+            // doesn't record daily series for all 258 countries.
+            if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Gdp.Count >= 2)
+            {
+                AddSparkline("GDP ($B)", PlayerHistory.Gdp, GameTheme.Accent);
+                AddSparkline("Growth (%/yr)", PlayerHistory.Growth, GameTheme.Positive);
+                AddSparkline("Inflation (%)", PlayerHistory.Inflation, GameTheme.Negative);
+            }
 
             Divider();
             DrawTaxSection(e);
@@ -548,6 +558,12 @@ namespace Meridian.UI
             AddSlider("Infrastructure", () => e.SpendInfrastructure, 0f, 12f, v => e.SpendInfrastructure = v);
             Stat("Other government", $"{EconomyState.SpendBase:0.0}%");
             HelpText("Infrastructure and education feed growth, education also drives innovation, healthcare lifts public mood — all of it costs treasury every day. 'Other' (administration, pensions, debt service) is fixed.");
+
+            if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Treasury.Count >= 2)
+            {
+                Divider();
+                AddSparkline("Treasury ($B)", PlayerHistory.Treasury, GameTheme.Accent);
+            }
         }
 
         void DrawTrade(EconomyState e)
@@ -567,6 +583,15 @@ namespace Meridian.UI
             if (n == null) { HelpText("No data."); return; }
             StatColored("Approval rating", $"{n.ApprovalRating:0.0}%", n.ApprovalRating >= 50f);
             HelpText("Approval drifts with growth, unemployment, and inflation — govern well and it rises.");
+
+            if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Approval.Count >= 2)
+            {
+                Divider();
+                SectionHeader("YOUR RECORD");
+                AddSparkline("Approval (%)", PlayerHistory.Approval, GameTheme.Accent);
+                AddSparkline("Unemployment (%)", PlayerHistory.Unemployment, GameTheme.Negative);
+                HelpText("The whole term at a glance — this chart is what the election is really about.");
+            }
         }
 
         void DrawMilitary(NationalState n)
@@ -688,6 +713,72 @@ namespace Meridian.UI
             SectionHeader("SPENDING");
             AddSlider("Research (% GDP)", () => n.ResearchSpending, 0f, 8f, v => n.ResearchSpending = v);
             HelpText("Innovation drifts toward a target from economic scale and research spending.");
+        }
+
+        // A small line chart over a HistorySeries, drawn with UI Toolkit's vector API
+        // (generateVisualContent/painter2D) — no textures, no chart library. Repaints on the
+        // same 100ms Refresh cadence as the rest of the panel (MarkDirtyRepaint from Refresh).
+        class Sparkline : VisualElement
+        {
+            public HistorySeries Series;
+            public Color LineColor = Color.white;
+
+            public Sparkline()
+            {
+                generateVisualContent += OnGenerate;
+                pickingMode = PickingMode.Ignore;
+            }
+
+            void OnGenerate(MeshGenerationContext mgc)
+            {
+                if (Series == null || Series.Count < 2) return;
+                float w = resolvedStyle.width, h = resolvedStyle.height;
+                if (w <= 4f || h <= 4f) return;
+
+                var (mn, mx) = Series.Range();
+                float span = mx - mn;
+                if (span < 1e-6f) span = 1e-6f;
+                // Small vertical margin so a flat-ish line doesn't hug the border.
+                const float pad = 2f;
+
+                var painter = mgc.painter2D;
+                painter.strokeColor = LineColor;
+                painter.lineWidth = 1.5f;
+                painter.BeginPath();
+                int n = Series.Count;
+                for (int i = 0; i < n; i++)
+                {
+                    float x = (float)i / (n - 1) * w;
+                    float t = (Series[i] - mn) / span;
+                    float y = pad + (1f - t) * (h - pad * 2f); // y-down: max value at top
+                    if (i == 0) painter.MoveTo(new Vector2(x, y));
+                    else painter.LineTo(new Vector2(x, y));
+                }
+                painter.Stroke();
+            }
+        }
+
+        readonly List<Sparkline> activeSparklines = new();
+
+        // Chart row: dim uppercase label + min/max annotations, chart below it.
+        void AddSparkline(string label, HistorySeries series, Color color)
+        {
+            var head = Row();
+            head.style.marginTop = 6;
+            head.Add(MakeLabel(label.ToUpperInvariant(), 10, GameTheme.TextDim));
+            var spacer = new VisualElement(); spacer.style.flexGrow = 1; head.Add(spacer);
+            var (mn, mx) = series.Range();
+            head.Add(MakeLabel(series.Count >= 2 ? $"{mn:0.#} – {mx:0.#}" : "gathering data…", 9, GameTheme.TextDim));
+            panelBody.Add(head);
+
+            var chart = new Sparkline { Series = series, LineColor = color };
+            chart.style.height = 36;
+            chart.style.marginTop = 2;
+            chart.style.backgroundColor = new StyleColor(GameTheme.BgSliderTrack);
+            chart.style.borderTopLeftRadius = 3; chart.style.borderTopRightRadius = 3;
+            chart.style.borderBottomLeftRadius = 3; chart.style.borderBottomRightRadius = 3;
+            panelBody.Add(chart);
+            activeSparklines.Add(chart);
         }
 
         // --- panel content helpers ---
@@ -1278,6 +1369,8 @@ namespace Meridian.UI
                     PositionThumb(s.Thumb, Mathf.InverseLerp(s.Lo, s.Hi, v));
                     s.ValueLabel.text = $"{v:0.0}";
                 }
+                // Charts pick up the day's new samples on the same cadence as everything else.
+                foreach (var chart in activeSparklines) chart.MarkDirtyRepaint();
             }
         }
 

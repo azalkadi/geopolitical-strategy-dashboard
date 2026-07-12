@@ -43,6 +43,7 @@ namespace Meridian.Sim
             // is scheduled relative to NOW, not to a day-90 mark the clock may be long past.
             EventSystem.Pending = null;
             EventSystem.NextEventDay = currentDay + 90;
+            PlayerHistory.Reset(); // charts must not show the previous government's record
         }
     }
 }
