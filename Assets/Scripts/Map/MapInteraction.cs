@@ -107,6 +107,7 @@ namespace Meridian.Map
                 map.Diplomacy?.TickAll();
                 CheckElection(simDay);
                 LogEconomyDiagnostic();
+                MaybeRunDiplomacyDiag();
 
                 // Decision events fire for the player's own country only. Once one fires, the
                 // Update() gate freezes the clock until the player chooses, so stop mid-batch —
@@ -124,6 +125,47 @@ namespace Meridian.Map
                     }
                 }
             }
+        }
+
+        // Dev-only: MERIDIAN_DIAG_DIPLOMACY=1 runs a scripted diplomacy self-test at day 30 —
+        // exercises the exact same SendAid/SignAgreement/Denounce calls the panel buttons make
+        // and logs before/after values, so the logic is verifiable from Player.log alone without
+        // relying on pixel-precise UI clicks (which have proven flaky under automation on this
+        // dev machine). Normal play is unaffected: the env var is never set outside a test launch.
+        bool diplomacyDiagDone;
+        void MaybeRunDiplomacyDiag()
+        {
+            if (diplomacyDiagDone || simDay < 30 || map.Diplomacy == null) return;
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_DIPLOMACY") == null) return;
+            diplomacyDiagDone = true;
+
+            int me = PlayerState.CountryIndex;
+            if (me < 0) return;
+            var myEcon = map.Economy.States[me];
+            var myNat = map.National.States[me];
+
+            // Aid target: the friendliest neighbor. Agreement target: same (aid should push it
+            // over the 65 threshold if it wasn't already). Denounce target: the frostiest.
+            var friendliest = map.Diplomacy.RankedFor(me, friendliest: true, topN: 1)[0];
+            var frostiest = map.Diplomacy.RankedFor(me, friendliest: false, topN: 1)[0];
+
+            double treasuryBefore = myEcon.Treasury;
+            float relBefore = friendliest.relation;
+            Debug.Log($"[dipdiag] aid target={map.World.Countries[friendliest.index].Name} relBefore={relBefore:0.0} treasuryBefore={treasuryBefore:0.00}");
+            map.Diplomacy.SendAid(me, friendliest.index, myEcon, myNat, simDay);
+            Debug.Log($"[dipdiag] after aid: rel={map.Diplomacy.GetRelation(me, friendliest.index):0.0} treasury={myEcon.Treasury:0.00} (expect rel +12, treasury -{System.Math.Max(0.2, myEcon.Gdp * 0.0005):0.00})");
+
+            var theirEcon = map.Economy.States[friendliest.index];
+            float exportBonusBefore = myEcon.TradeAgreementExportBonus;
+            string agreementResult = map.Diplomacy.SignAgreement(me, friendliest.index, myEcon, theirEcon, simDay);
+            Debug.Log($"[dipdiag] agreement: result='{agreementResult ?? "REFUSED (relations too low)"}' myExportBonus {exportBonusBefore:0.000}->{myEcon.TradeAgreementExportBonus:0.000} hasAgreement={map.Diplomacy.HasAgreement(me, friendliest.index)}");
+
+            float approvalBefore = myNat.ApprovalRating;
+            float frostyRelBefore = frostiest.relation;
+            map.Diplomacy.Denounce(me, frostiest.index, myNat, simDay);
+            Debug.Log($"[dipdiag] denounce target={map.World.Countries[frostiest.index].Name}: rel {frostyRelBefore:0.0}->{map.Diplomacy.GetRelation(me, frostiest.index):0.0} approval {approvalBefore:0.0}->{myNat.ApprovalRating:0.0}");
+
+            Debug.Log($"[dipdiag] cooldown check: canActAgain={map.Diplomacy.CanAct(me, friendliest.index, simDay)} (expect False right after acting)");
         }
 
         // Dev-only: periodic snapshot of the player's own economy so extended play can be
@@ -228,11 +270,24 @@ namespace Meridian.Map
             }
 
             {
-                var pts = map.World.Cities.ConvertAll(c => c.Pos);
-                if (TryPickNearestPoint(pts, mouseScreen, 9f, out int cityIdx))
+                // Only cities whose zoom tier is currently VISIBLE are clickable. The full list
+                // holds all 7,342 settlements; without this filter, a 9px radius around every
+                // invisible town swallowed nearly every click meant for a country at world zoom
+                // (observed: two attempts to select China landed on Choibalsan, Mongolia, an
+                // off-screen-tier town of 55k).
+                var visiblePts = new List<Vector2>();
+                var visibleIdx = new List<int>();
+                for (int i = 0; i < map.World.Cities.Count; i++)
+                {
+                    var tierRoot = map.CityTierRoots != null ? map.CityTierRoots[(int)map.World.Cities[i].Tier] : null;
+                    if (tierRoot == null || !tierRoot.activeSelf) continue;
+                    visiblePts.Add(map.World.Cities[i].Pos);
+                    visibleIdx.Add(i);
+                }
+                if (TryPickNearestPoint(visiblePts, mouseScreen, 9f, out int pickIdx))
                 {
                     ClearFeatureSelection();
-                    SelectedCity = cityIdx;
+                    SelectedCity = visibleIdx[pickIdx];
                     return;
                 }
             }

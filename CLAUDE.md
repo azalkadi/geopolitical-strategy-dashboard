@@ -189,29 +189,52 @@ All from Natural Earth (public domain) unless noted, either bundled directly or 
   gotchas above). If targeting different hardware, re-derive from the same NASA source at
   whatever the real ceiling is, don't just guess a bigger number.
 
+## Gameplay systems (Sim/)
+
+- `Economy.cs` — per-country ticking economy (taxes, custom taxes, interest, trade, treasury)
+  plus adjustable budget spending levers (education/healthcare/infrastructure, % of GDP) that
+  feed growth/innovation/mood honestly. `TradeAgreementExportBonus` is set by diplomacy.
+- `Events.cs` — decision events: every 150–360 sim days one fires for the player's country
+  (11-event pool, some condition-gated e.g. banking crisis only during weak growth). The sim
+  clock FREEZES while one is pending (`MapInteraction` checks `EventSystem.Pending`) and game
+  speed drops to 1x when one fires. UI modal lives in `GameUIRoot.BuildEventModal`.
+- `Diplomacy.cs` — symmetric relations matrix for all country pairs, geography-seeded
+  (same continent/subregion bonus + deterministic per-pair noise), slow drift to baseline.
+  Player actions: aid / trade agreement (needs 65+ relations, permanent export boost both
+  sides) / denounce, with a 90-day per-country cooldown. UI in `GameUIRoot.DrawDiplomacy` —
+  bilateral view when a foreign country is selected, overview otherwise.
+- All three were verified in a real build: events fire/pause/resume correctly, and a scripted
+  self-test (`MERIDIAN_DIAG_DIPLOMACY=1` env var + `MERIDIAN_AUTOSTART=<country>`) exercises
+  aid/agreement/denounce/cooldown and logs exact before/after numbers to Player.log.
+
+## ⚠ This dev machine has flaky hardware (probably RAM)
+
+Across many runs, GeoJSON parsing randomly fails on DIFFERENT files with DIFFERENT exception
+types (`InvalidCastException` in railways, `IndexOutOfRangeException` in provinces,
+`JsonReaderException` in countries with a literal corrupted character inside a number), while
+the exact same files parse fine on the next run and never change on disk. That pattern is
+data corruption in memory, not a code bug. Mitigations already in place: `GeoJsonLoader`
+loads every dataset through `SafeLoad` (3 attempts, then continue without that layer instead
+of black-screening). If you see a `[geo] ... attempt N failed` warning in Player.log, that's
+this. The user should ideally run a memtest / disable XMP to confirm — mention it if flakiness
+shows up again, but don't burn a session chasing it as a software bug.
+
+Related: automation (computer-use) clicks on this machine intermittently land on the wrong
+UI element — see the memory note on batched clicks, and prefer Player.log-based verification
+(env-var diagnostics like the diplomacy self-test) over pixel-clicking for anything precise.
+
 ## Current status (as of the last worked session)
 
-Solid and verified end-to-end (built, launched, Player.log checked, visually confirmed):
-UI theme overhaul, ministry-bar click-through bug fix, opt-in side panel, satellite-default map
-mode, airports/ports/roads/railways/air-bases/oil-ports/nuclear-plants all rendering with
-correct zoom-gating and labels, the higher-res static satellite basemap.
-
-**NOT yet verified — the Web Mercator reprojection + live satellite tile streaming.** This was
-a large, project-wide change (every geo coordinate now flows through
-`GeoMath.LonLatToMercator`, the camera's zoom range and latitude clamp changed, the static
-basemap became a gridded mesh instead of a flat quad, and a whole new `SatelliteTileLoader.cs`
-subsystem was added). It compiles clean. A full player build was in progress when the session
-ended and its result was never confirmed — no `[headlessbuild]` result line was found in the
-last build log, and it's unknown whether:
-- The reprojected vector layers (borders, roads, cities, click-to-select hit-testing) still
-  align correctly at various zoom levels.
-- The gridded satellite background mesh renders correctly (no seams, no flipped UVs).
-- Live tiles actually fetch, position correctly, and align with the vector overlay.
-- The new camera zoom range (`minOrthoSize=0.03`, `maxOrthoSize=200`) feels reasonable in
-  practice rather than just in theory.
-
-**If you're picking this up fresh: do a full build, launch it, and check all of the above
-before assuming this feature works or building anything else on top of it.** Don't trust the
-"compiles clean" state alone — this codebase has a track record of compiling fine and then
-being visibly broken at runtime (see the shader-stripping and texture-size gotchas above, both
-of which were exactly this pattern).
+Everything below is built, launched, and verified via Player.log + visual checks:
+- Web Mercator projection across all layers; vector/imagery alignment confirmed from world
+  view down to city zoom.
+- Live satellite tile streaming (ESRI World Imagery) — verified fetching and aligning down to
+  Paris-metro detail.
+- Roads/railways extended datasets (~34k/9k features) with constant-pixel-width ScreenLine
+  rendering, 181 computed border crossings, 6 hand-curated water crossings, click-to-select
+  feature info panel (`FeaturePanel.cs`) — this arrived from the work-side session and was
+  merged with the gameplay systems.
+- Decision events, diplomacy, budget levers (see Gameplay systems above).
+- City click-picking is gated by tier visibility (only clickable when its dot is visible at
+  the current zoom) — without that, invisible towns swallowed every country click at world
+  zoom.

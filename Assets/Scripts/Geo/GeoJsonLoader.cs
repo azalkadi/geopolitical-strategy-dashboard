@@ -55,13 +55,37 @@ namespace Meridian.Geo
             return world;
         }
 
+        // Retries before giving up: this dev machine intermittently produces one-off corrupt
+        // reads/parses (three DIFFERENT datasets have each randomly failed with three DIFFERENT
+        // exception types across runs — an InvalidCastException in railways, an
+        // IndexOutOfRangeException in provinces, and a JsonReaderException in countries with a
+        // literal corrupted character inside a number — while the same files parse fine on the
+        // next run; the files on disk never changed). That failure pattern points at flaky
+        // hardware, not code, and a transient corruption virtually never repeats on an
+        // immediate retry — so retrying converts "layer randomly missing this session" into
+        // "layer loads on attempt 2".
+        const int LoadAttempts = 3;
+
         static List<T> SafeLoad<T>(string what, System.Func<List<T>> loader)
         {
-            try { return loader(); }
-            catch (System.Exception e)
+            for (int attempt = 1; ; attempt++)
             {
-                Debug.LogError($"[geo] {what} failed to load ({e.GetType().Name}: {e.Message}) — continuing without this layer");
-                return new List<T>();
+                try
+                {
+                    var result = loader();
+                    if (attempt > 1) Debug.LogWarning($"[geo] {what} loaded on attempt {attempt} (transient failure earlier — see hardware note in GeoJsonLoader.SafeLoad)");
+                    return result;
+                }
+                catch (System.Exception e)
+                {
+                    if (attempt < LoadAttempts)
+                    {
+                        Debug.LogWarning($"[geo] {what} attempt {attempt} failed ({e.GetType().Name}: {e.Message}) — retrying");
+                        continue;
+                    }
+                    Debug.LogError($"[geo] {what} failed {LoadAttempts} attempts ({e.GetType().Name}: {e.Message}) — continuing without this layer");
+                    return new List<T>();
+                }
             }
         }
 
