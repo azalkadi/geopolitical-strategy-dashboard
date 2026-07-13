@@ -189,6 +189,18 @@ All from Natural Earth (public domain) unless noted, either bundled directly or 
   gotchas above). If targeting different hardware, re-derive from the same NASA source at
   whatever the real ceiling is, don't just guess a bigger number.
 
+## Save/load
+
+`Sim/SaveLoad.cs` snapshots the ENTIRE mutable simulation (economies, national indices,
+diplomacy, wars, player/election state, event schedule, history charts) as one JSON file at
+`persistentDataPath/meridian_save.json`. Geography is never saved — it reloads from
+StreamingAssets and the save refuses to load against different geo data (country-count key).
+Sim classes keep all state in PUBLIC members specifically so this can be a dumb complete
+Newtonsoft dump — if you add sim state, make it public or it will silently not persist.
+SAVE button in top bar; autosave on quit (note: killing the process skips OnApplicationQuit);
+CONTINUE on the start screen. Dev verification: `MERIDIAN_DIAG_SAVE=1` (save at day 60 +
+in-process roundtrip check) then relaunch with `MERIDIAN_LOADSAVE=1` (auto-continue at boot).
+
 ## Gameplay systems (Sim/)
 
 - `Economy.cs` — per-country ticking economy (taxes, custom taxes, interest, trade, treasury)
