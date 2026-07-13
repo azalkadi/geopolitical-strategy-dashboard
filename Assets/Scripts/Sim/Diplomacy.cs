@@ -13,16 +13,18 @@ namespace Meridian.Sim
     // raises both signatories' exports, aid genuinely costs treasury.
     public class DiplomacySystem
     {
-        public int Count { get; private set; }
-        float[] relations;      // upper-triangle packed symmetric matrix
-        float[] baselines;      // what each pair drifts back toward
-        HashSet<long> agreements = new(); // packed (min,max) pairs with an active trade agreement
+        // Public (and settable) so the save system can serialize/deserialize the whole object
+        // with Newtonsoft and get an exact replica — see Sim/SaveLoad.cs.
+        public int Count { get; set; }
+        public float[] Relations;      // upper-triangle packed symmetric matrix
+        public float[] Baselines;      // what each pair drifts back toward
+        public HashSet<long> Agreements = new(); // packed (min,max) pairs with an active trade agreement
 
         public const float AgreementThreshold = 65f;
         public const float AgreementExportBonus = 0.015f; // per agreement, both sides
 
         // Cooldown bookkeeping so the player can't spam +12 aid every tick. Keyed by pair.
-        readonly Dictionary<long, long> lastActionDay = new();
+        public Dictionary<long, long> LastActionDay = new();
         public const long ActionCooldownDays = 90;
 
         public static DiplomacySystem Seed(IReadOnlyList<Country> countries)
@@ -31,8 +33,8 @@ namespace Meridian.Sim
             var sys = new DiplomacySystem
             {
                 Count = n,
-                relations = new float[n * (n - 1) / 2],
-                baselines = new float[n * (n - 1) / 2],
+                Relations = new float[n * (n - 1) / 2],
+                Baselines = new float[n * (n - 1) / 2],
             };
 
             for (int i = 0; i < n; i++)
@@ -46,8 +48,8 @@ namespace Meridian.Sim
                     r += (PairHash(countries[i].IsoA3, countries[j].IsoA3) % 3100u) / 100f - 15f;
                     r = Clampf(r, 5f, 95f);
                     int idx = sys.PackIndex(i, j);
-                    sys.relations[idx] = r;
-                    sys.baselines[idx] = r;
+                    sys.Relations[idx] = r;
+                    sys.Baselines[idx] = r;
                 }
             }
             return sys;
@@ -56,22 +58,22 @@ namespace Meridian.Sim
         public float GetRelation(int a, int b)
         {
             if (a == b || a < 0 || b < 0 || a >= Count || b >= Count) return 100f;
-            return relations[PackIndex(a, b)];
+            return Relations[PackIndex(a, b)];
         }
 
         public void ChangeRelation(int a, int b, float delta)
         {
             if (a == b || a < 0 || b < 0 || a >= Count || b >= Count) return;
             int idx = PackIndex(a, b);
-            relations[idx] = Clampf(relations[idx] + delta, 0f, 100f);
+            Relations[idx] = Clampf(Relations[idx] + delta, 0f, 100f);
         }
 
-        public bool HasAgreement(int a, int b) => agreements.Contains(PairKey(a, b));
+        public bool HasAgreement(int a, int b) => Agreements.Contains(PairKey(a, b));
 
         public bool CanAct(int a, int b, long day) =>
-            !lastActionDay.TryGetValue(PairKey(a, b), out long last) || day - last >= ActionCooldownDays;
+            !LastActionDay.TryGetValue(PairKey(a, b), out long last) || day - last >= ActionCooldownDays;
 
-        public void MarkActed(int a, int b, long day) => lastActionDay[PairKey(a, b)] = day;
+        public void MarkActed(int a, int b, long day) => LastActionDay[PairKey(a, b)] = day;
 
         // --- player actions -------------------------------------------------------------
 
@@ -92,7 +94,7 @@ namespace Meridian.Sim
         {
             if (HasAgreement(a, b)) return "An agreement is already in force.";
             if (GetRelation(a, b) < AgreementThreshold) return null;
-            agreements.Add(PairKey(a, b));
+            Agreements.Add(PairKey(a, b));
             ea.TradeAgreementExportBonus += AgreementExportBonus;
             eb.TradeAgreementExportBonus += AgreementExportBonus;
             ChangeRelation(a, b, +5f);
@@ -114,8 +116,8 @@ namespace Meridian.Sim
         // now, but the full matrix stays coherent for future AI-vs-AI diplomacy.
         public void TickAll()
         {
-            for (int i = 0; i < relations.Length; i++)
-                relations[i] += (baselines[i] - relations[i]) * 0.001f;
+            for (int i = 0; i < Relations.Length; i++)
+                Relations[i] += (Baselines[i] - Relations[i]) * 0.001f;
         }
 
         // Top-N friendliest / frostiest countries from `a`'s perspective (excluding itself).

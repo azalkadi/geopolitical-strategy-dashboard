@@ -166,6 +166,16 @@ namespace Meridian.Map
             SetMode(satelliteGo != null ? MapMode.Satellite : MapMode.Political);
         }
 
+        // Swaps the freshly-seeded simulation for a saved one (geography and meshes stay as
+        // built by Start — only the mutable sim state changes). Caller has already validated
+        // the save via SaveLoad.TryRead.
+        public void ApplySave(SaveGame save)
+        {
+            SaveLoad.Apply(save, Economy, National);
+            Diplomacy = save.Diplomacy;
+            Wars = save.Wars;
+        }
+
         // Loads the satellite basemap (StreamingAssets/basemap/satellite.jpg) — the always-
         // available offline backdrop, replaced by live-streamed tiles (SatelliteTileLoader)
         // once zoomed in close enough for them to add real detail. Starts hidden; SetMode

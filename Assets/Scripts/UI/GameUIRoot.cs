@@ -48,6 +48,9 @@ namespace Meridian.UI
         VisualElement startScreen;
         VisualElement startScreenList;
         bool startScreenPopulated;
+        TextField startScreenSearch;
+        VisualElement continueBtn;
+        bool? hasValidSave; // checked once per session, not per keystroke (the save is megabytes)
         VisualElement gameOverScreen;
         Label gameOverMessage;
         Label gameOverStats;
@@ -177,6 +180,15 @@ namespace Meridian.UI
                 bar.Add(btn);
                 mapModeButtons[mode] = btn;
             }
+
+            var saveBtn = MakeButton("SAVE", 11, GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextDim, () =>
+            {
+                bool ok = interaction.SaveNow();
+                ShowToast("System", ok ? "Game saved." : "Save failed — see Player.log.");
+                hasValidSave = null; // start screen re-checks next time it's shown
+            });
+            saveBtn.style.width = 48; saveBtn.style.height = 22; saveBtn.style.marginRight = 4;
+            bar.Add(saveBtn);
 
             // Persistent "your nation" badge — stays visible even while you're inspecting a
             // rival country's panel, since the election countdown is the thing you actually
@@ -1114,8 +1126,33 @@ namespace Meridian.UI
             var subtitle = MakeLabel("SELECT A MEMBER STATE TO GOVERN", 12, GameTheme.TextDim);
             subtitle.style.unityTextAlign = TextAnchor.MiddleCenter;
             subtitle.style.letterSpacing = 1.5f;
-            subtitle.style.marginTop = 4; subtitle.style.marginBottom = 18;
+            subtitle.style.marginTop = 4; subtitle.style.marginBottom = 12;
             startScreen.Add(subtitle);
+
+            // Search + Continue row above the country list.
+            var controlsRow = new VisualElement();
+            controlsRow.style.flexDirection = FlexDirection.Row;
+            controlsRow.style.alignItems = Align.Center;
+            controlsRow.style.width = 420;
+            controlsRow.style.marginBottom = 8;
+
+            var searchLabel = MakeLabel("SEARCH", 10, GameTheme.TextDim);
+            searchLabel.style.letterSpacing = 1f;
+            searchLabel.style.marginRight = 6;
+            controlsRow.Add(searchLabel);
+
+            startScreenSearch = new TextField();
+            startScreenSearch.style.flexGrow = 1;
+            startScreenSearch.style.backgroundColor = new StyleColor(GameTheme.BgSliderTrack);
+            startScreenSearch.style.color = new StyleColor(GameTheme.TextPrimary);
+            startScreenSearch.RegisterValueChangedCallback(_ => { if (startScreenPopulated) PopulateStartScreen(); });
+            controlsRow.Add(startScreenSearch);
+
+            continueBtn = MakeButton("CONTINUE ▶", 12, GameTheme.BgButtonActive, GameTheme.BgButtonHover, GameTheme.TextPrimary, ContinueSavedGame);
+            continueBtn.style.width = 110; continueBtn.style.height = 26; continueBtn.style.marginLeft = 8;
+            continueBtn.style.display = DisplayStyle.None;
+            controlsRow.Add(continueBtn);
+            startScreen.Add(controlsRow);
 
             var listBox = new VisualElement();
             listBox.style.width = 420;
@@ -1146,6 +1183,13 @@ namespace Meridian.UI
             startScreenPopulated = true;
             startScreenList.Clear();
 
+            // Continue button appears when a valid save exists (validated once — the file is
+            // megabytes and this repopulates on every search keystroke).
+            hasValidSave ??= SaveLoad.TryRead(map.World.Countries.Count) != null;
+            continueBtn.style.display = hasValidSave.Value ? DisplayStyle.Flex : DisplayStyle.None;
+
+            string query = startScreenSearch?.value?.Trim().ToLowerInvariant() ?? "";
+
             var indices = new List<int>();
             for (int i = 0; i < map.World.Countries.Count; i++) indices.Add(i);
             indices.Sort((a, b) => string.Compare(map.World.Countries[a].Name, map.World.Countries[b].Name, StringComparison.Ordinal));
@@ -1153,6 +1197,7 @@ namespace Meridian.UI
             foreach (int idx in indices)
             {
                 var country = map.World.Countries[idx];
+                if (query.Length > 0 && !country.Name.ToLowerInvariant().Contains(query)) continue;
                 int capturedIdx = idx;
                 var row = MakeButton(country.Name, 13, GameTheme.BgPanel, GameTheme.BgButtonHover, GameTheme.TextPrimary,
                     () => BeginGame(capturedIdx, country.Name), align: TextAnchor.MiddleLeft);
@@ -1160,6 +1205,31 @@ namespace Meridian.UI
                 row.style.marginBottom = 2;
                 startScreenList.Add(row);
             }
+        }
+
+        // Loads the save and drops straight into the running game — geography/meshes are
+        // already built by MapRenderer.Start; only sim state swaps.
+        void ContinueSavedGame()
+        {
+            var save = SaveLoad.TryRead(map.World.Countries.Count);
+            if (save == null)
+            {
+                hasValidSave = false;
+                continueBtn.style.display = DisplayStyle.None;
+                ShowToast("System", "Save file is missing or invalid.");
+                return;
+            }
+
+            map.ApplySave(save);
+            interaction.RestoreClock(save.SimDay, save.DaysPerSecond);
+            interaction.SelectCountry(save.PlayerCountryIndex);
+            if (PlayerState.State != GameState.Playing) PlayerState.State = GameState.Playing;
+            UIState.ActiveCategory = NationCategory.Economy;
+            UIState.ActiveTopic = null;
+            UIState.PanelOpen = false;
+            builtForSelected = -2; // force a panel rebuild against the loaded state
+            startScreen.style.display = DisplayStyle.None;
+            ShowToast("System", $"Welcome back — day {save.SimDay}, governing {save.PlayerCountryName}.");
         }
 
         void BeginGame(int countryIndex, string countryName)
@@ -1376,6 +1446,21 @@ namespace Meridian.UI
             // is completely unaffected since the env var is never set outside a debug launch.
             if (PlayerState.State == GameState.NotStarted && map.World != null && map.World.Countries.Count > 0)
             {
+                // Dev-only: MERIDIAN_LOADSAVE=1 auto-continues the saved game at boot —
+                // exercises the exact same path as the start screen's CONTINUE button, so the
+                // cross-process load path is verifiable from Player.log alone.
+                if (System.Environment.GetEnvironmentVariable("MERIDIAN_LOADSAVE") != null)
+                {
+                    hasValidSave ??= SaveLoad.TryRead(map.World.Countries.Count) != null;
+                    if (hasValidSave.Value)
+                    {
+                        Debug.Log("[diag] MERIDIAN_LOADSAVE engaged — continuing saved game");
+                        ContinueSavedGame();
+                        return;
+                    }
+                    Debug.LogWarning("[diag] MERIDIAN_LOADSAVE set but no valid save found");
+                }
+
                 string autostart = System.Environment.GetEnvironmentVariable("MERIDIAN_AUTOSTART");
                 if (autostart != null)
                 {

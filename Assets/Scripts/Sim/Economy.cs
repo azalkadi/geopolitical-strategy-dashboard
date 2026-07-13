@@ -11,9 +11,13 @@ namespace Meridian.Sim
 
     public class EconomyState
     {
+        // All state fields are public (including ones only Tick() itself uses, like the PRNG
+        // word and seed-time constants) so the save system can serialize an EconomyState
+        // wholesale with Newtonsoft and get back an exact replica — no hidden state, no drift
+        // between a loaded game and one that never quit.
         public double Gdp;                 // Billions USD
         public float GrowthRate;           // % annualized, smoothed
-        float baseGrowthTarget;            // long-run trend growth (set at seed)
+        public float BaseGrowthTarget;     // long-run trend growth (set at seed)
         public float Unemployment;         // %
         public float Inflation;            // %
         public float TaxIncome;            // four independent player-adjustable levers (%)
@@ -22,7 +26,7 @@ namespace Meridian.Sim
         public float TaxTariff;
         public float InterestRate;         // central bank policy rate, %
         public double Treasury;            // Billions USD, cumulative (negative = deficit)
-        uint rng;
+        public uint Rng;
         public string LastWhy;             // null == None
         public bool HasRealBaseline;       // false when GDP/pop were placeholders
 
@@ -50,12 +54,12 @@ namespace Meridian.Sim
         // run more trade relative to GDP. Deliberately simplified (real bilateral trade flows
         // between specific country pairs are a bigger future system); this gives every country
         // an honest, simulated, tariff-reactive trade balance rather than a placeholder.
-        float exportPropensity;
-        float importPropensity;
+        public float ExportPropensity;
+        public float ImportPropensity;
 
-        public double Exports => Gdp * (exportPropensity + TradeAgreementExportBonus);
+        public double Exports => Gdp * (ExportPropensity + TradeAgreementExportBonus);
         // Higher tariffs suppress imports (each 10 points of tariff cuts import propensity ~5%).
-        public double Imports => Gdp * importPropensity * (1.0 - TaxTariff / 100.0 * 0.5);
+        public double Imports => Gdp * ImportPropensity * (1.0 - TaxTariff / 100.0 * 0.5);
         public double TradeBalance => Exports - Imports;
 
         // Budget: derived from the same effective-tax/spending assumptions Tick() already uses
@@ -82,7 +86,7 @@ namespace Meridian.Sim
             {
                 Gdp = gdp,
                 GrowthRate = baseGrowth,
-                baseGrowthTarget = baseGrowth,
+                BaseGrowthTarget = baseGrowth,
                 Unemployment = 7.0f,
                 Inflation = 2.5f,
                 TaxIncome = 25.0f,
@@ -91,7 +95,7 @@ namespace Meridian.Sim
                 TaxTariff = 5.0f,
                 InterestRate = 4.0f,
                 Treasury = 0.0,
-                rng = HashSeed(c.IsoA3, salt),
+                Rng = HashSeed(c.IsoA3, salt),
                 LastWhy = null,
                 HasRealBaseline = hasReal,
             };
@@ -100,9 +104,9 @@ namespace Meridian.Sim
                 gdpPerCapita < 5_000.0 ? 0.35f :
                 gdpPerCapita < 15_000.0 ? 0.28f :
                 gdpPerCapita < 30_000.0 ? 0.24f : 0.20f;
-            // Noise() needs `rng`, which is only set once the object above exists.
-            state.exportPropensity = baseOpenness * (1.0f + state.Noise() * 0.15f);
-            state.importPropensity = baseOpenness * (1.0f + state.Noise() * 0.15f);
+            // Noise() needs `Rng`, which is only set once the object above exists.
+            state.ExportPropensity = baseOpenness * (1.0f + state.Noise() * 0.15f);
+            state.ImportPropensity = baseOpenness * (1.0f + state.Noise() * 0.15f);
 
             return state;
         }
@@ -133,23 +137,23 @@ namespace Meridian.Sim
             float spendBoost = (SpendInfrastructure - 3.0f) * 0.10f
                              + (SpendEducation - 4.5f) * 0.05f
                              + TradeAgreementExportBonus * 4.0f;
-            float target = baseGrowthTarget - taxDrag - rateDrag + spendBoost + Noise() * 0.15f;
+            float target = BaseGrowthTarget - taxDrag - rateDrag + spendBoost + Noise() * 0.15f;
             GrowthRate = Clampf(GrowthRate * 0.98f + target * 0.02f, -15.0f, 15.0f);
 
             Gdp *= 1.0 + GrowthRate / 100.0 / 365.0;
             if (Gdp < 0.01) Gdp = 0.01;
 
             // Unemployment/inflation must equilibrate around THIS country's own trend growth
-            // (baseGrowthTarget), not a universal constant — baseGrowthTarget ranges from 1.2%
+            // (BaseGrowthTarget), not a universal constant — BaseGrowthTarget ranges from 1.2%
             // (rich countries) to 4.5% (poor ones) depending on GDP-per-capita tier (see Seed).
             // A hardcoded "2.0" reference here was a real bug: any country whose trend growth
             // sits below 2.0 (i.e. every high-income country, the ones players are most likely
             // to pick) had unemployment rise every single day with no equilibrium, forever,
             // regardless of tax policy — confirmed by 660 days of observed play where a rich
             // nation's unemployment climbed 7.0% to 11.1% with no sign of leveling off.
-            Unemployment = Clampf(Unemployment + (baseGrowthTarget - GrowthRate) * 0.01f, 2.0f, 35.0f);
+            Unemployment = Clampf(Unemployment + (BaseGrowthTarget - GrowthRate) * 0.01f, 2.0f, 35.0f);
             Inflation = Clampf(
-                Inflation + (GrowthRate - baseGrowthTarget) * 0.005f - (InterestRate - 4.0f) * 0.03f + Noise() * 0.02f,
+                Inflation + (GrowthRate - BaseGrowthTarget) * 0.005f - (InterestRate - 4.0f) * 0.03f + Noise() * 0.02f,
                 -3.0f, 40.0f);
 
             Treasury += Gdp * effectiveTax / 100.0 / 365.0 - Gdp * TotalSpendingRate / 100.0 / 365.0;
@@ -178,12 +182,12 @@ namespace Meridian.Sim
 
         uint Xorshift32()
         {
-            uint x = rng;
+            uint x = Rng;
             if (x == 0) x = 0x9e3779b9;
             x ^= x << 13;
             x ^= x >> 17;
             x ^= x << 5;
-            rng = x;
+            Rng = x;
             return x;
         }
 

@@ -81,6 +81,26 @@ namespace Meridian.Map
         // Forces the selection (used to auto-open the player's own country panel on game start).
         public void SelectCountry(int idx) => selected = idx;
 
+        // Save/load plumbing: the clock lives here, so restoring/saving it does too.
+        public void RestoreClock(long day, float speed)
+        {
+            simDay = day;
+            daysPerSecond = speed;
+            dayAccum = 0;
+        }
+
+        public bool SaveNow()
+        {
+            if (map?.Economy == null || map.National == null || map.Diplomacy == null || map.Wars == null) return false;
+            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars);
+        }
+
+        // Autosave: quitting mid-game shouldn't cost the player their run.
+        void OnApplicationQuit()
+        {
+            if (PlayerState.State == GameState.Playing) SaveNow();
+        }
+
         void Update()
         {
             if (map == null || map.World == null || map.Economy == null) return;
@@ -90,7 +110,36 @@ namespace Meridian.Map
             // decision event awaits the player's choice: the world waits for the head of state.
             if (PlayerState.State == GameState.Playing && EventSystem.Pending == null)
                 TickEconomy();
+            HandleKeyboard();
             HandleClickSelect();
+        }
+
+        float speedBeforePause = 1f;
+
+        void HandleKeyboard()
+        {
+            // Keystrokes belong to a focused text field (custom tax name, country search),
+            // not to game shortcuts.
+            if (IsTextInputFocused()) return;
+
+            if (PlayerState.State == GameState.Playing && Input.GetKeyDown(KeyCode.Space))
+            {
+                if (daysPerSecond > 0f) { speedBeforePause = daysPerSecond; daysPerSecond = 0f; }
+                else daysPerSecond = speedBeforePause > 0f ? speedBeforePause : 1f;
+            }
+
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                Meridian.UI.UIState.PanelOpen = false;
+                ClearFeatureSelection();
+            }
+        }
+
+        bool IsTextInputFocused()
+        {
+            if (uiDoc == null) uiDoc = FindObjectOfType<UIDocument>();
+            var focused = uiDoc != null ? uiDoc.rootVisualElement?.panel?.focusController?.focusedElement : null;
+            return focused is TextField;
         }
 
         void TickEconomy()
@@ -118,6 +167,7 @@ namespace Meridian.Map
                 LogEconomyDiagnostic();
                 MaybeRunDiplomacyDiag();
                 MaybeRunWarDiag();
+                MaybeRunSaveDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -232,6 +282,32 @@ namespace Meridian.Map
                 var w = wars[0];
                 Debug.Log($"[wardiag] day {simDay}: score={w.Score:0.0} exhA={w.ExhaustionAttacker:0.0} exhD={w.ExhaustionDefender:0.0} myApproval={map.National.States[me].ApprovalRating:0.0} myGrowth={map.Economy.States[me].GrowthRate:0.00} canDemand={map.Wars.PlayerCanDemandConcessions(w)}");
             }
+        }
+
+        // Dev-only: MERIDIAN_DIAG_SAVE=1 saves at day 60 and immediately re-reads the file,
+        // comparing key deserialized values against the live sim — verifies serialization
+        // fidelity in-process. Pair with a second launch using MERIDIAN_LOADSAVE=1 (see
+        // GameUIRoot's autostart block) to verify the full cross-process load path.
+        bool saveDiagDone;
+        void MaybeRunSaveDiag()
+        {
+            if (saveDiagDone || simDay < 60) return;
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_SAVE") == null) return;
+            saveDiagDone = true;
+
+            int me = PlayerState.CountryIndex;
+            var e = map.Economy.States[me];
+            bool ok = SaveNow();
+            var read = SaveLoad.TryRead(map.Economy.States.Count);
+            bool roundtrip = read != null
+                && read.SimDay == simDay
+                && System.Math.Abs(read.Economies[me].Gdp - e.Gdp) < 1e-9
+                && System.Math.Abs(read.Economies[me].Treasury - e.Treasury) < 1e-9
+                && read.Economies[me].Rng == e.Rng
+                && System.Math.Abs(read.Diplomacy.GetRelation(0, 1) - map.Diplomacy.GetRelation(0, 1)) < 1e-4f
+                && read.Nationals[me].ApprovalRating == map.National.States[me].ApprovalRating
+                && read.Wars.Active.Count == map.Wars.Active.Count;
+            Debug.Log($"[savediag] saved={ok} roundtripValid={roundtrip} day={simDay} gdp={e.Gdp:0.000} treasury={e.Treasury:0.000}");
         }
 
         // Dev-only: periodic snapshot of the player's own economy so extended play can be

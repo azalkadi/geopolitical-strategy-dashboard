@@ -26,6 +26,23 @@ namespace Meridian.Sim
 
         public void Clear() { head = 0; count = 0; }
 
+        // Chronological snapshot / restore, for the save system.
+        public float[] ToArray()
+        {
+            var arr = new float[count];
+            for (int i = 0; i < count; i++) arr[i] = this[i];
+            return arr;
+        }
+
+        public void LoadFrom(float[] values)
+        {
+            Clear();
+            if (values == null) return;
+            // If the snapshot somehow exceeds capacity, keep the newest samples (Add discards
+            // oldest naturally).
+            foreach (var v in values) Add(v);
+        }
+
         public (float min, float max) Range()
         {
             if (count == 0) return (0f, 1f);
