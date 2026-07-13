@@ -50,9 +50,69 @@ namespace Meridian.Geo
 
             // Derived from the layers above, so they inherit those layers' guards — but each
             // still gets its own SafeLoad since the computation itself could throw.
-            world.BorderCrossings = SafeLoad("border crossings", () => ComputeBorderCrossings(world));
+            world.BorderCrossings = SafeLoad("border crossings", () => LoadOrComputeBorderCrossings(world));
             world.WaterCrossings = SafeLoad("water crossings", WaterCrossingsSeed);
             return world;
+        }
+
+        // The border-crossing walk over all named roads costs ~12s of a ~24s total load, and its
+        // output is fully determined by the roads + countries data — so compute once, cache to
+        // persistentDataPath, and reload instantly forever after. The cache key is the input
+        // datasets' feature counts: any data update changes those, invalidating the cache. (Keyed
+        // counts, not hashes — a hash would need to read all 50MB anyway, spending what it saves.)
+        [System.Serializable]
+        class BorderCrossingCache
+        {
+            public string Key;
+            public List<BorderCrossingDto> Crossings = new();
+        }
+
+        [System.Serializable]
+        class BorderCrossingDto
+        {
+            public float X, Y;
+            public string A, B, Road;
+        }
+
+        static List<BorderCrossing> LoadOrComputeBorderCrossings(GeoWorld world)
+        {
+            string cachePath = Path.Combine(Application.persistentDataPath, "border_crossings_cache.json");
+            string key = $"v1:roads={world.Roads.Count}:countries={world.Countries.Count}";
+
+            try
+            {
+                if (File.Exists(cachePath))
+                {
+                    var cached = Newtonsoft.Json.JsonConvert.DeserializeObject<BorderCrossingCache>(File.ReadAllText(cachePath, Encoding.UTF8));
+                    if (cached != null && cached.Key == key)
+                    {
+                        var list = new List<BorderCrossing>(cached.Crossings.Count);
+                        foreach (var d in cached.Crossings)
+                            list.Add(new BorderCrossing { Pos = new Vector2(d.X, d.Y), CountryA = d.A, CountryB = d.B, RoadName = d.Road });
+                        Debug.Log($"[map] loaded {list.Count} border crossings from cache");
+                        return list;
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[geo] border-crossing cache unreadable ({e.GetType().Name}) — recomputing");
+            }
+
+            var computed = ComputeBorderCrossings(world);
+
+            try
+            {
+                var cache = new BorderCrossingCache { Key = key };
+                foreach (var c in computed)
+                    cache.Crossings.Add(new BorderCrossingDto { X = c.Pos.x, Y = c.Pos.y, A = c.CountryA, B = c.CountryB, Road = c.RoadName });
+                File.WriteAllText(cachePath, Newtonsoft.Json.JsonConvert.SerializeObject(cache), Encoding.UTF8);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[geo] couldn't write border-crossing cache ({e.GetType().Name}) — will recompute next boot");
+            }
+            return computed;
         }
 
         // Retries before giving up: this dev machine intermittently produces one-off corrupt

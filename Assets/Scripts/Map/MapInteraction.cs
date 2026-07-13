@@ -105,9 +105,19 @@ namespace Meridian.Map
                 map.Economy.TickAll();
                 map.National?.TickAll(map.Economy);
                 map.Diplomacy?.TickAll();
+
+                if (map.Wars != null && map.National != null && map.Diplomacy != null)
+                {
+                    foreach (var headline in map.Wars.TickAll(map.Economy, map.National, map.Diplomacy, map.CountryNames, simDay))
+                        WorldFeed.Push("World", headline);
+                    foreach (var headline in map.WorldAI.Tick(simDay, map.Economy, map.National, map.Diplomacy, map.Wars, map.CountryNames))
+                        WorldFeed.Push("World", headline);
+                }
+
                 CheckElection(simDay);
                 LogEconomyDiagnostic();
                 MaybeRunDiplomacyDiag();
+                MaybeRunWarDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -120,14 +130,28 @@ namespace Meridian.Map
                 // no more days may pass this frame.
                 if (PlayerState.CountryIndex >= 0 && map.National != null && PlayerState.CountryIndex < map.National.States.Count)
                 {
-                    EventSystem.MaybeFire(simDay, map.Economy.States[PlayerState.CountryIndex], map.National.States[PlayerState.CountryIndex]);
+                    var pe = map.Economy.States[PlayerState.CountryIndex];
+                    var pn = map.National.States[PlayerState.CountryIndex];
+                    EventSystem.MaybeFire(simDay, pe, pn);
                     if (EventSystem.Pending != null)
                     {
-                        // A crisis drops the game out of fast-forward: after deciding, the world
-                        // resumes at 1x so the player reads the consequences instead of instantly
-                        // slamming into the next event. Cranking speed back up is one click.
-                        if (daysPerSecond > 1f) daysPerSecond = 1f;
-                        break;
+                        // Dev-only: MERIDIAN_AUTOPILOT=1 auto-takes the first option of every
+                        // decision event so unattended long-run tests (war diag, soak tests)
+                        // aren't frozen forever at the first modal nobody is there to click.
+                        if (System.Environment.GetEnvironmentVariable("MERIDIAN_AUTOPILOT") != null)
+                        {
+                            string title = EventSystem.Pending.Title;
+                            string outcome = EventSystem.Choose(0, pe, pn);
+                            Debug.Log($"[autopilot] day {simDay}: '{title}' auto-resolved with option 1 — {outcome}");
+                        }
+                        else
+                        {
+                            // A crisis drops the game out of fast-forward: after deciding, the
+                            // world resumes at 1x so the player reads the consequences instead
+                            // of instantly slamming into the next event.
+                            if (daysPerSecond > 1f) daysPerSecond = 1f;
+                            break;
+                        }
                     }
                 }
             }
@@ -172,6 +196,42 @@ namespace Meridian.Map
             Debug.Log($"[dipdiag] denounce target={map.World.Countries[frostiest.index].Name}: rel {frostyRelBefore:0.0}->{map.Diplomacy.GetRelation(me, frostiest.index):0.0} approval {approvalBefore:0.0}->{myNat.ApprovalRating:0.0}");
 
             Debug.Log($"[dipdiag] cooldown check: canActAgain={map.Diplomacy.CanAct(me, friendliest.index, simDay)} (expect False right after acting)");
+        }
+
+        // Dev-only: MERIDIAN_DIAG_WAR=1 declares a war for the player at day 40 against the
+        // frostiest eligible country, then logs war state every 60 days — verifies declaration
+        // gates, score drift, exhaustion, economic drag, and end conditions from Player.log
+        // alone (same rationale as the diplomacy self-test: automation clicks are unreliable
+        // on this machine, env-var + log verification is not).
+        bool warDiagStarted;
+        long warDiagNextLog;
+        void MaybeRunWarDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_WAR") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.Wars == null) return;
+
+            if (!warDiagStarted && simDay >= 40)
+            {
+                warDiagStarted = true;
+                var (idx, rel) = map.Diplomacy.RankedFor(me, friendliest: false, topN: 1)[0];
+                // Force the relations precondition if needed — this is a test harness verifying
+                // war MECHANICS; the eligibility gate has its own check logged below. (In real
+                // play the player crosses the <35 line by denouncing.)
+                bool eligibleNaturally = map.Wars.CanDeclare(me, idx, map.Diplomacy);
+                if (!eligibleNaturally) map.Diplomacy.ChangeRelation(me, idx, -30f);
+                var declared = map.Wars.Declare(me, idx, simDay, map.Diplomacy, map.National);
+                Debug.Log($"[wardiag] target={map.World.Countries[idx].Name} relBefore={rel:0.0} eligibleNaturally={eligibleNaturally} declared={(declared != null)} myStrength={WarSystem.Strength(map.Economy.States[me], map.National.States[me]):0.00} theirStrength={WarSystem.Strength(map.Economy.States[idx], map.National.States[idx]):0.00}");
+            }
+
+            if (warDiagStarted && simDay >= warDiagNextLog)
+            {
+                warDiagNextLog = simDay + 60;
+                var wars = map.Wars.WarsOf(me);
+                if (wars.Count == 0) { Debug.Log($"[wardiag] day {simDay}: no active war (ended)"); return; }
+                var w = wars[0];
+                Debug.Log($"[wardiag] day {simDay}: score={w.Score:0.0} exhA={w.ExhaustionAttacker:0.0} exhD={w.ExhaustionDefender:0.0} myApproval={map.National.States[me].ApprovalRating:0.0} myGrowth={map.Economy.States[me].GrowthRate:0.00} canDemand={map.Wars.PlayerCanDemandConcessions(w)}");
+            }
         }
 
         // Dev-only: periodic snapshot of the player's own economy so extended play can be

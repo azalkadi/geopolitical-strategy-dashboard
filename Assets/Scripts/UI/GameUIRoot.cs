@@ -62,6 +62,7 @@ namespace Meridian.UI
         NationCategory builtForCategory = (NationCategory)(-1);
         string builtForTopic = "__unbuilt__";
         bool builtForPanelOpen = false;
+        int builtForWarStamp = 0;
         readonly List<SliderBinding> activeSliders = new();
 
         // --- event toasts (AI policy changes / threshold-crossing events, surfaced live) ---
@@ -81,6 +82,17 @@ namespace Meridian.UI
             public float Lo, Hi;
             public bool Dragging;
         }
+
+        // A stat row whose value keeps updating while the panel stays open (war scores,
+        // exhaustion — anything that changes every sim day). Plain Stat()/StatColored() rows
+        // are snapshots taken at panel-build time; these re-read on every refresh tick.
+        class LiveStatBinding
+        {
+            public Label ValueLabel;
+            public Func<string> Get;
+            public Func<bool> Good; // null = neutral color
+        }
+        readonly List<LiveStatBinding> activeLiveStats = new();
 
         void Awake()
         {
@@ -388,6 +400,7 @@ namespace Meridian.UI
         {
             activeSliders.Clear();
             activeSparklines.Clear();
+            activeLiveStats.Clear();
             panelBody.Clear();
 
             int sel = interaction.Selected;
@@ -599,10 +612,111 @@ namespace Meridian.UI
             SectionHeader("MILITARY");
             if (n == null) { HelpText("No data."); return; }
             StatColored("Readiness index", $"{n.ReadinessIndex:0.0}", n.ReadinessIndex >= 50f);
+
+            int me = PlayerState.CountryIndex;
+            int sel = interaction.Selected;
+            var e = map.Economy != null && sel >= 0 && sel < map.Economy.States.Count ? map.Economy.States[sel] : null;
+            if (e != null) Stat("Military strength", $"{WarSystem.Strength(e, n):0.0}");
+
+            if (sel == me)
+            {
+                Divider();
+                SectionHeader("SPENDING");
+                AddSlider("Defense (% GDP)", () => n.DefenseSpending, 0f, 10f, v => n.DefenseSpending = v);
+                HelpText("Readiness drifts toward a target set by defense spending. Strength = economy × defense share × readiness.");
+                DrawOwnWars(me);
+            }
+            else if (me >= 0 && map.Wars != null)
+            {
+                DrawForeignMilitary(me, sel);
+            }
+        }
+
+        // Your own Military tab: every war you're in, its momentum, and the ways out.
+        void DrawOwnWars(int me)
+        {
+            var wars = map.Wars?.WarsOf(me);
+            if (wars == null || wars.Count == 0) return;
+
             Divider();
-            SectionHeader("SPENDING");
-            AddSlider("Defense (% GDP)", () => n.DefenseSpending, 0f, 10f, v => n.DefenseSpending = v);
-            HelpText("Readiness drifts toward a target set by defense spending.");
+            SectionHeader("ACTIVE WARS");
+            foreach (var w in wars)
+            {
+                var war = w; // captured by the buttons below
+                bool iAmAttacker = war.Attacker == me;
+                int enemy = iAmAttacker ? war.Defender : war.Attacker;
+                float myScore = iAmAttacker ? war.Score : -war.Score;
+                float myExhaustion = iAmAttacker ? war.ExhaustionAttacker : war.ExhaustionDefender;
+
+                Stat("At war with", map.World.Countries[enemy].Name);
+                LiveStat("War score",
+                    () => { float s = iAmAttacker ? war.Score : -war.Score; return $"{s:+0.0;-0.0;0.0}"; },
+                    () => (iAmAttacker ? war.Score : -war.Score) >= 0f);
+                LiveStat("War exhaustion",
+                    () => $"{(iAmAttacker ? war.ExhaustionAttacker : war.ExhaustionDefender):0.0}%",
+                    () => (iAmAttacker ? war.ExhaustionAttacker : war.ExhaustionDefender) < 50f);
+
+                if (map.Wars.PlayerCanDemandConcessions(war))
+                {
+                    var demandBtn = MakeButton("Demand Concessions (they capitulate)", 12, GameTheme.BgButtonActive, GameTheme.BgButtonHover, GameTheme.TextPrimary, () =>
+                    {
+                        string result = map.Wars.PlayerDemandConcessions(war, map.Economy, map.National, map.Diplomacy, map.CountryNames);
+                        if (result != null) ShowToast(PlayerState.CountryName, result);
+                        builtForCategory = (NationCategory)(-1);
+                    }, align: TextAnchor.MiddleLeft);
+                    demandBtn.style.height = 30; demandBtn.style.marginTop = 4;
+                    panelBody.Add(demandBtn);
+                }
+
+                var peaceBtn = MakeButton("Offer White Peace", 12, GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextPrimary, () =>
+                {
+                    string result = map.Wars.PlayerOfferWhitePeace(war, map.Diplomacy, map.CountryNames, interaction.SimDay);
+                    ShowToast(PlayerState.CountryName, result ?? "Your envoys were already rebuffed recently — wait before offering again.");
+                    builtForCategory = (NationCategory)(-1);
+                }, align: TextAnchor.MiddleLeft);
+                peaceBtn.style.height = 30; peaceBtn.style.marginTop = 4;
+                panelBody.Add(peaceBtn);
+                Divider();
+            }
+            HelpText("War score above +40 lets you demand reparations. Exhaustion grinds down approval and mood the longer a war runs — wars must END.");
+        }
+
+        // A foreign country's Military tab: the war option, or the state of your war with them.
+        void DrawForeignMilitary(int me, int sel)
+        {
+            Divider();
+            var existing = map.Wars.WarBetween(me, sel);
+            if (existing != null)
+            {
+                SectionHeader("AT WAR");
+                bool iAmAttacker = existing.Attacker == me;
+                LiveStat("War score",
+                    () => { float s = iAmAttacker ? existing.Score : -existing.Score; return $"{s:+0.0;-0.0;0.0}"; },
+                    () => (iAmAttacker ? existing.Score : -existing.Score) >= 0f);
+                HelpText("Manage this war from your own country's Military ministry.");
+                return;
+            }
+
+            SectionHeader("WAR");
+            if (map.Wars.CanDeclare(me, sel, map.Diplomacy))
+            {
+                var declareBtn = MakeButton("⚔ Declare War", 13, GameTheme.Muted(GameTheme.Negative, 0.35f), GameTheme.Negative, GameTheme.TextPrimary, () =>
+                {
+                    map.Wars.Declare(me, sel, interaction.SimDay, map.Diplomacy, map.National);
+                    ShowToast(PlayerState.CountryName, $"War declared on {map.World.Countries[sel].Name}. The world is watching.");
+                    builtForCategory = (NationCategory)(-1);
+                }, align: TextAnchor.MiddleLeft);
+                declareBtn.style.height = 32; declareBtn.style.marginTop = 4;
+                panelBody.Add(declareBtn);
+                HelpText("Declaring war floors relations, costs international standing, and drags both economies daily until peace. Compare military strength first.");
+            }
+            else
+            {
+                float rel = map.Diplomacy.GetRelation(me, sel);
+                HelpText(rel >= WarSystem.DeclareRelationCeiling
+                    ? $"Relations are too warm to justify war (must be below {WarSystem.DeclareRelationCeiling:0}; currently {rel:0})."
+                    : "War is not possible right now (already at war, or a trade agreement binds you).");
+            }
         }
 
         void DrawDiplomacy(NationalState n)
@@ -812,6 +926,21 @@ namespace Meridian.UI
             var spacer = new VisualElement(); spacer.style.flexGrow = 1; row.Add(spacer);
             row.Add(MakeLabel(value, 14, good ? GameTheme.Positive : GameTheme.Negative, bold: true));
             panelBody.Add(row);
+        }
+
+        // Live variant: value re-reads every refresh tick while the panel is open, so numbers
+        // that move daily (war score, exhaustion) don't render as frozen snapshots.
+        void LiveStat(string label, Func<string> get, Func<bool> good = null)
+        {
+            var row = Row();
+            row.style.marginBottom = 5;
+            row.Add(MakeLabel(label.ToUpperInvariant(), 10, GameTheme.TextDim));
+            var spacer = new VisualElement(); spacer.style.flexGrow = 1; row.Add(spacer);
+            bool g = good?.Invoke() ?? true;
+            var val = MakeLabel(get(), 14, good == null ? GameTheme.TextPrimary : (g ? GameTheme.Positive : GameTheme.Negative), bold: true);
+            row.Add(val);
+            panelBody.Add(row);
+            activeLiveStats.Add(new LiveStatBinding { ValueLabel = val, Get = get, Good = good });
         }
 
         void Why(string text)
@@ -1180,7 +1309,11 @@ namespace Meridian.UI
             for (int i = 0; i < n; i++)
             {
                 string why = map.Economy.States[i].LastWhy;
-                if (!string.IsNullOrEmpty(why) && why != lastWhySeen[i])
+                // Only countries the player is actually looking at get economy toasts — with
+                // 258 simulated economies, global threshold-crossing chatter crowded genuine
+                // world headlines (war declarations, peaces) out of the 4-slot toast stack.
+                bool relevant = i == PlayerState.CountryIndex || i == interaction.Selected;
+                if (relevant && !string.IsNullOrEmpty(why) && why != lastWhySeen[i])
                     ShowToast(map.World.Countries[i].Name, why);
                 lastWhySeen[i] = why;
             }
@@ -1286,6 +1419,10 @@ namespace Meridian.UI
 
             CheckForNewEvents();
 
+            // World headlines (war declarations, peaces, AI agreements) from the sim.
+            while (WorldFeed.TryDequeue(out string src, out string msg))
+                ShowToast(src, msg);
+
             // Decision-event modal: visible exactly while a decision is pending, rebuilt once
             // per distinct event (not per refresh tick — the buttons hold closures).
             var pendingEvent = EventSystem.Pending;
@@ -1352,12 +1489,29 @@ namespace Meridian.UI
                 topStatsRow.style.display = DisplayStyle.None;
             }
 
-            if (sel != builtForSelected || UIState.ActiveCategory != builtForCategory || UIState.ActiveTopic != builtForTopic || UIState.PanelOpen != builtForPanelOpen)
+            // STRUCTURAL war changes (a war starting/ending, a peace/declare button becoming
+            // valid or invalid) need a full panel rebuild — the LiveStat bindings only keep
+            // NUMBERS fresh, they can't add or remove buttons. Cheap to compute, only nonzero
+            // while the Military tab is showing.
+            int warStamp = 0;
+            if (UIState.ActiveCategory == NationCategory.Military && map.Wars != null && PlayerState.CountryIndex >= 0)
+            {
+                foreach (var w in map.Wars.WarsOf(PlayerState.CountryIndex))
+                    warStamp = warStamp * 31 + (map.Wars.PlayerCanDemandConcessions(w) ? 2 : 1);
+                if (sel >= 0 && sel != PlayerState.CountryIndex)
+                {
+                    warStamp = warStamp * 31 + (map.Wars.WarBetween(PlayerState.CountryIndex, sel) != null ? 2 : 1);
+                    warStamp = warStamp * 31 + (map.Diplomacy != null && map.Wars.CanDeclare(PlayerState.CountryIndex, sel, map.Diplomacy) ? 2 : 1);
+                }
+            }
+
+            if (sel != builtForSelected || UIState.ActiveCategory != builtForCategory || UIState.ActiveTopic != builtForTopic || UIState.PanelOpen != builtForPanelOpen || warStamp != builtForWarStamp)
             {
                 builtForSelected = sel;
                 builtForCategory = UIState.ActiveCategory;
                 builtForTopic = UIState.ActiveTopic;
                 builtForPanelOpen = UIState.PanelOpen;
+                builtForWarStamp = warStamp;
                 RebuildSidePanel();
             }
             else
@@ -1371,6 +1525,13 @@ namespace Meridian.UI
                 }
                 // Charts pick up the day's new samples on the same cadence as everything else.
                 foreach (var chart in activeSparklines) chart.MarkDirtyRepaint();
+
+                foreach (var ls in activeLiveStats)
+                {
+                    ls.ValueLabel.text = ls.Get();
+                    if (ls.Good != null)
+                        ls.ValueLabel.style.color = ls.Good() ? GameTheme.Positive : GameTheme.Negative;
+                }
             }
         }
 

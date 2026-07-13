@@ -60,6 +60,9 @@ namespace Meridian.Map
         public EconomySystem Economy { get; private set; }
         public NationalSystem National { get; private set; }
         public DiplomacySystem Diplomacy { get; private set; }
+        public WarSystem Wars { get; private set; }
+        public WorldAI WorldAI { get; private set; }
+        public GeoWorldNames CountryNames { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -141,6 +144,11 @@ namespace Meridian.Map
             // Bilateral relations for every country pair, seeded from real geography.
             Diplomacy = DiplomacySystem.Seed(World.Countries);
             Debug.Log($"[map] seeded diplomacy relations for {World.Countries.Count} countries");
+
+            // Wars + autonomous world activity (AI wars/agreements, surfaced via WorldFeed toasts).
+            Wars = new WarSystem();
+            CountryNames = new GeoWorldNames(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Name : "?");
+            WorldAI = new WorldAI(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Continent : "");
 
             BuildCountryMeshes();
             BuildCountryBorders();

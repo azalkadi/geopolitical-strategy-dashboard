@@ -44,6 +44,7 @@ namespace Meridian.Sim
             EventSystem.Pending = null;
             EventSystem.NextEventDay = currentDay + 90;
             PlayerHistory.Reset(); // charts must not show the previous government's record
+            WorldFeed.Clear();     // stale headlines from a previous game don't carry over
         }
     }
 }
