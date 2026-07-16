@@ -9,16 +9,18 @@ simulate, manage 8 ministries, win or lose elections on approval rating. Built i
 port of an original Rust/Bevy prototype (kept untouched as a reference one folder up from this
 project).
 
-## 🌳 [[Feature Tree]]
+## 🌳 [[Feature Tree.canvas|Feature Tree]]
 
-The game's own main features and sub-features, as a tree — see [[Feature Tree]] for the full
-diagram (Map & World, the 8 ministries, World Systems, Meta Systems) with a link into the right
-note for each leaf.
+The game's own main features and sub-features, as a **Canvas** board (Obsidian's native visual
+board — drag, zoom, rearrange freely) rather than a static diagram: [[Feature Tree.canvas|open
+Feature Tree]]. Map & World, all 8 ministries, World Systems, and Meta Systems each branch into
+their sub-features; wherever a leaf has real documentation behind it, that leaf **is** the actual
+note, embedded as a card — click into it directly from the canvas.
 
 ## Vault map
 
 The diagram below is a different tree — this is how *the documentation itself* is organized,
-not the game's features (that's [[Feature Tree]] above).
+not the game's features (that's the [[Feature Tree.canvas|Feature Tree canvas]] above).
 
 ```mermaid
 graph TD
