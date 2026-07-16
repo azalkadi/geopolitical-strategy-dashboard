@@ -1,57 +1,57 @@
 {
   "nodes": [
-    {"id":"title","type":"text","text":"<div style='text-align:center'><span style='font-size:22px'>\n\n<b>Feature Relationships</b>\n\nCross-cutting influence between features under different ministries — same-ministry relationships already live in the [[Meridian Overview.canvas|Feature Tree]] and aren't repeated here. Features with no cross-ministry relationship (Tax & Interest Rate, Elections, Defense Spending & Readiness) are left out of this specific diagram.\n\nLaid out in two rows (Actions/Drivers on top, Effects/State on bottom) with matching columns wherever a straight vertical line was possible — a node with several partners can only line up with one, the rest curve gently.\n\n</span></div>","x":0,"y":-620,"width":4400,"height":260},
+    {"id":"title","type":"text","text":"<div style='text-align:center'><span style='font-size:22px'>\n\n<b>Feature Relationships</b>\n\nCross-cutting influence between features under different ministries — same-ministry relationships already live in the [[Meridian Overview.canvas|Feature Tree]]. Node color = ministry (see key below); edge color matches its source node. A few nodes influence 3+ things at once, so not every line can be perfectly straight — width was kept compact on purpose so the text stays large without heavy zoom-out.\n\n</span></div>","x":0,"y":-280,"width":2360,"height":220},
 
-    {"id":"rowA_label","type":"text","text":"<div style='text-align:center'><span style='font-size:40px'>\n\n⚙️ <b>Actions / Drivers</b>\n\n</span></div>","x":0,"y":-260,"width":4400,"height":90},
-    {"id":"rowB_label","type":"text","text":"<div style='text-align:center'><span style='font-size:40px'>\n\n📊 <b>Effects / State</b>\n\n</span></div>","x":0,"y":700,"width":4400,"height":90},
-    {"id":"legend","type":"text","text":"<div style='text-align:center'><span style='font-size:26px'>\n\n<b>Ministry key:</b> 🟢 Economy · 🔵 Diplomacy · 🔴 Military · 🟡 Politics · 🟣 Society · 🔷 Technology · 🟠 World Systems · ⚪ Meta\n\n</span></div>","x":0,"y":1120,"width":4400,"height":100},
+    {"id":"e3","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Budget — Spend Levers</b>\n\n</span></div>","x":0,"y":0,"width":440,"height":280,"color":"#2f9e44"},
+    {"id":"m3","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>War Score & Exhaustion</b>\n\n</span></div>","x":480,"y":0,"width":440,"height":280,"color":"#e03131"},
+    {"id":"e2","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>GDP / Growth / Treasury</b>\n\n</span></div>","x":960,"y":0,"width":440,"height":280,"color":"#2f9e44"},
+    {"id":"p1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Approval Rating</b>\n\n</span></div>","x":1440,"y":0,"width":440,"height":280,"color":"#e8a600"},
+    {"id":"d1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Bilateral Relations</b>\n\n</span></div>","x":1920,"y":0,"width":440,"height":280,"color":"#1c7ed6"},
 
-    {"id":"e3","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Budget — Spend Levers</b>\n\n</span></div>","x":0,"y":-140,"width":400,"height":170,"color":"#2f9e44"},
-    {"id":"m3","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>War Score & Exhaustion</b>\n\n</span></div>","x":460,"y":-140,"width":400,"height":170,"color":"#e03131"},
-    {"id":"d2","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Send Aid</b>\n\n</span></div>","x":920,"y":-140,"width":400,"height":170,"color":"#1c7ed6"},
-    {"id":"d4","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Denounce</b>\n\n</span></div>","x":1380,"y":-140,"width":400,"height":170,"color":"#1c7ed6"},
-    {"id":"d3","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Sign Trade Agreement</b>\n\n</span></div>","x":1840,"y":-140,"width":400,"height":170,"color":"#1c7ed6"},
-    {"id":"w2","type":"file","file":"Architecture/Decision Events.md","x":2300,"y":-140,"width":400,"height":170,"color":"#f76707"},
-    {"id":"m2","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Declare War</b>\n\n</span></div>","x":2760,"y":-140,"width":400,"height":170,"color":"#e03131"},
-    {"id":"x1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Player History</b>\n\n</span></div>","x":3220,"y":-140,"width":400,"height":170,"color":"#868e96"},
-    {"id":"x2","type":"file","file":"Architecture/Save Load.md","x":3680,"y":-140,"width":400,"height":170,"color":"#868e96"},
-    {"id":"w1","type":"file","file":"Architecture/World AI.md","x":4140,"y":-140,"width":400,"height":170,"color":"#f76707"},
+    {"id":"d2","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Send Aid</b>\n\n</span></div>","x":0,"y":320,"width":440,"height":280,"color":"#1c7ed6"},
+    {"id":"m2","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Declare War</b>\n\n</span></div>","x":480,"y":320,"width":440,"height":280,"color":"#e03131"},
+    {"id":"p2","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>International Standing</b>\n\n</span></div>","x":960,"y":320,"width":440,"height":280,"color":"#e8a600"},
+    {"id":"d4","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Denounce</b>\n\n</span></div>","x":1440,"y":320,"width":440,"height":280,"color":"#1c7ed6"},
+    {"id":"d3","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Sign Trade Agreement</b>\n\n</span></div>","x":1920,"y":320,"width":440,"height":280,"color":"#1c7ed6"},
 
-    {"id":"t1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Innovation Index</b>\n\n</span></div>","x":0,"y":880,"width":400,"height":170,"color":"#0c8599"},
-    {"id":"s1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Public Mood</b>\n\n</span></div>","x":460,"y":880,"width":400,"height":170,"color":"#9c36b5"},
-    {"id":"e2","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>GDP / Growth / Treasury</b>\n\n</span></div>","x":920,"y":880,"width":400,"height":170,"color":"#2f9e44"},
-    {"id":"p2","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>International Standing</b>\n\n</span></div>","x":1380,"y":880,"width":400,"height":170,"color":"#e8a600"},
-    {"id":"e4","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Trade Agreement Bonus</b>\n\n</span></div>","x":1840,"y":880,"width":400,"height":170,"color":"#2f9e44"},
-    {"id":"p1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Approval Rating</b>\n\n</span></div>","x":2300,"y":880,"width":400,"height":170,"color":"#e8a600"},
-    {"id":"d1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Bilateral Relations</b>\n\n</span></div>","x":2760,"y":880,"width":400,"height":170,"color":"#1c7ed6"}
+    {"id":"w1","type":"file","file":"Architecture/World AI.md","x":0,"y":640,"width":440,"height":280,"color":"#f76707"},
+    {"id":"w2","type":"file","file":"Architecture/Decision Events.md","x":480,"y":640,"width":440,"height":280,"color":"#f76707"},
+    {"id":"s1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Public Mood</b>\n\n</span></div>","x":960,"y":640,"width":440,"height":280,"color":"#9c36b5"},
+    {"id":"t1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Innovation Index</b>\n\n</span></div>","x":1440,"y":640,"width":440,"height":280,"color":"#0c8599"},
+    {"id":"e4","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Trade Agreement Bonus</b>\n\n</span></div>","x":1920,"y":640,"width":440,"height":280,"color":"#2f9e44"},
+
+    {"id":"x1","type":"text","text":"<div style='text-align:center'><span style='font-size:48px'>\n\n<b>Player History</b>\n\n</span></div>","x":0,"y":960,"width":440,"height":280,"color":"#868e96"},
+    {"id":"x2","type":"file","file":"Architecture/Save Load.md","x":480,"y":960,"width":440,"height":280,"color":"#868e96"},
+
+    {"id":"legend","type":"text","text":"<div style='text-align:center'><span style='font-size:26px'>\n\n<b>Ministry key:</b> 🟢 Economy · 🔵 Diplomacy · 🔴 Military · 🟡 Politics · 🟣 Society · 🔷 Technology · 🟠 World Systems · ⚪ Meta\n\n</span></div>","x":0,"y":1300,"width":2360,"height":100}
   ],
   "edges": [
     {"id":"r1","fromNode":"e2","fromSide":"right","toNode":"p1","toSide":"left","label":"drives approval","color":"#2f9e44"},
-    {"id":"r2","fromNode":"e3","fromSide":"bottom","toNode":"t1","toSide":"top","label":"feeds innovation","color":"#2f9e44"},
+    {"id":"r2","fromNode":"e3","fromSide":"right","toNode":"t1","toSide":"left","label":"feeds innovation","color":"#2f9e44"},
     {"id":"r3","fromNode":"e3","fromSide":"bottom","toNode":"s1","toSide":"top","label":"feeds mood","color":"#2f9e44"},
 
-    {"id":"r4","fromNode":"d1","fromSide":"top","toNode":"m2","toSide":"bottom","label":"gates eligibility (≤35)","color":"#1c7ed6"},
-    {"id":"r5","fromNode":"d2","fromSide":"bottom","toNode":"e2","toSide":"top","label":"costs treasury","color":"#1c7ed6"},
-    {"id":"r6","fromNode":"d2","fromSide":"bottom","toNode":"p2","toSide":"top","label":"raises standing","color":"#1c7ed6"},
+    {"id":"r4","fromNode":"d1","fromSide":"left","toNode":"m2","toSide":"right","label":"gates eligibility (≤35)","color":"#1c7ed6"},
+    {"id":"r5","fromNode":"d2","fromSide":"right","toNode":"e2","toSide":"left","label":"costs treasury","color":"#1c7ed6"},
+    {"id":"r6","fromNode":"d2","fromSide":"right","toNode":"p2","toSide":"left","label":"raises standing","color":"#1c7ed6"},
     {"id":"r7","fromNode":"d3","fromSide":"bottom","toNode":"e4","toSide":"top","label":"boosts export bonus","color":"#1c7ed6"},
-    {"id":"r8","fromNode":"d4","fromSide":"bottom","toNode":"p1","toSide":"top","label":"raises approval","color":"#1c7ed6"},
-    {"id":"r9","fromNode":"d4","fromSide":"bottom","toNode":"p2","toSide":"top","label":"lowers standing","color":"#1c7ed6"},
+    {"id":"r8","fromNode":"d4","fromSide":"top","toNode":"p1","toSide":"bottom","label":"raises approval","color":"#1c7ed6"},
+    {"id":"r9","fromNode":"d4","fromSide":"left","toNode":"p2","toSide":"right","label":"lowers standing","color":"#1c7ed6"},
 
-    {"id":"r10","fromNode":"m2","fromSide":"bottom","toNode":"d1","toSide":"top","label":"lowers relations","color":"#e03131"},
-    {"id":"r11","fromNode":"m3","fromSide":"bottom","toNode":"e2","toSide":"top","label":"drains growth & treasury","color":"#e03131"},
-    {"id":"r12","fromNode":"m3","fromSide":"bottom","toNode":"p1","toSide":"top","label":"moves approval","color":"#e03131"},
+    {"id":"r10","fromNode":"m2","fromSide":"right","toNode":"d1","toSide":"left","label":"lowers relations","color":"#e03131"},
+    {"id":"r11","fromNode":"m3","fromSide":"right","toNode":"e2","toSide":"left","label":"drains growth & treasury","color":"#e03131"},
+    {"id":"r12","fromNode":"m3","fromSide":"right","toNode":"p1","toSide":"left","label":"moves approval","color":"#e03131"},
     {"id":"r13","fromNode":"m3","fromSide":"bottom","toNode":"p2","toSide":"top","label":"moves standing","color":"#e03131"},
     {"id":"r14","fromNode":"m3","fromSide":"bottom","toNode":"s1","toSide":"top","label":"moves mood","color":"#e03131"},
 
-    {"id":"r15","fromNode":"w1","fromSide":"left","toNode":"m2","toSide":"right","label":"declares AI wars","color":"#f76707"},
-    {"id":"r16","fromNode":"w1","fromSide":"left","toNode":"d3","toSide":"right","label":"signs AI trade deals","color":"#f76707"},
-    {"id":"r17","fromNode":"w2","fromSide":"bottom","toNode":"e2","toSide":"top","label":"mutates economy","color":"#f76707"},
-    {"id":"r18","fromNode":"w2","fromSide":"bottom","toNode":"p1","toSide":"top","label":"mutates approval/standing","color":"#f76707"},
+    {"id":"r15","fromNode":"w1","fromSide":"top","toNode":"m2","toSide":"bottom","label":"declares AI wars","color":"#f76707"},
+    {"id":"r16","fromNode":"w1","fromSide":"right","toNode":"d3","toSide":"left","label":"signs AI trade deals","color":"#f76707"},
+    {"id":"r17","fromNode":"w2","fromSide":"top","toNode":"e2","toSide":"bottom","label":"mutates economy","color":"#f76707"},
+    {"id":"r18","fromNode":"w2","fromSide":"top","toNode":"p1","toSide":"bottom","label":"mutates approval/standing","color":"#f76707"},
 
-    {"id":"r19","fromNode":"x1","fromSide":"bottom","toNode":"e2","toSide":"top","label":"records daily","color":"#868e96"},
-    {"id":"r20","fromNode":"x1","fromSide":"bottom","toNode":"p1","toSide":"top","label":"records daily","color":"#868e96"},
-    {"id":"r21","fromNode":"x2","fromSide":"bottom","toNode":"e2","toSide":"top","label":"serializes","color":"#868e96"},
-    {"id":"r22","fromNode":"x2","fromSide":"bottom","toNode":"d1","toSide":"top","label":"serializes","color":"#868e96"},
-    {"id":"r23","fromNode":"x2","fromSide":"left","toNode":"m3","toSide":"right","label":"serializes","color":"#868e96"}
+    {"id":"r19","fromNode":"x1","fromSide":"top","toNode":"e2","toSide":"bottom","label":"records daily","color":"#868e96"},
+    {"id":"r20","fromNode":"x1","fromSide":"top","toNode":"p1","toSide":"bottom","label":"records daily","color":"#868e96"},
+    {"id":"r21","fromNode":"x2","fromSide":"top","toNode":"e2","toSide":"bottom","label":"serializes","color":"#868e96"},
+    {"id":"r22","fromNode":"x2","fromSide":"top","toNode":"d1","toSide":"bottom","label":"serializes","color":"#868e96"},
+    {"id":"r23","fromNode":"x2","fromSide":"top","toNode":"m3","toSide":"bottom","label":"serializes","color":"#868e96"}
   ]
 }
