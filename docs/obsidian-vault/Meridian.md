@@ -19,6 +19,15 @@ visual board: drag, zoom, rearrange freely), not a static diagram or a wall of s
 - **Feature Tree** — Map & World, all 8 ministries, World Systems, and Meta Systems branching
   into their sub-features, with real documentation embedded as clickable cards wherever it exists
 
+## 🔗 [[Feature Relationships.canvas|Feature Relationships]]
+
+The tree only shows "belongs under X ministry" — it doesn't show that Denouncing (Diplomacy)
+raises your Approval Rating (Politics), or that a war (Military) drains your Treasury
+(Economy). [[Feature Relationships.canvas|Open Feature Relationships]] for the cross-cutting
+picture: one colored group per ministry, with labeled arrows only for connections that cross
+between **different** ministries — same-ministry relationships are left out since the tree
+already covers those.
+
 ## Vault map
 
 The diagram below is a different tree — this is how *the documentation itself* is organized,

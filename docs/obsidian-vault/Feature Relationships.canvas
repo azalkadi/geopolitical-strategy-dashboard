@@ -1,0 +1,70 @@
+{
+  "nodes": [
+    {"id":"title","type":"text","text":"# Feature Relationships\nCross-cutting influence between features that live under **different** ministries (\"fathers\") in the [[Meridian Overview.canvas|Feature Tree]] — same-father relationships (e.g. Research Spend → Innovation Index) are already implied by the tree and aren't repeated here.","x":0,"y":-260,"width":1200,"height":160},
+
+    {"id":"g_econ","type":"group","label":"Economy","x":0,"y":0,"width":600,"height":520,"color":"#2f9e44"},
+    {"id":"e1","type":"text","text":"Tax & Interest Rate","x":40,"y":60,"width":520,"height":80},
+    {"id":"e2","type":"text","text":"GDP / Growth / Treasury","x":40,"y":170,"width":520,"height":80},
+    {"id":"e3","type":"text","text":"Budget — Spend Levers","x":40,"y":280,"width":520,"height":80},
+    {"id":"e4","type":"text","text":"Trade Agreement Bonus","x":40,"y":390,"width":520,"height":80},
+
+    {"id":"g_dip","type":"group","label":"Diplomacy","x":650,"y":0,"width":600,"height":520,"color":"#1c7ed6"},
+    {"id":"d1","type":"text","text":"Bilateral Relations","x":690,"y":60,"width":520,"height":80},
+    {"id":"d2","type":"text","text":"Send Aid","x":690,"y":170,"width":520,"height":80},
+    {"id":"d3","type":"text","text":"Sign Trade Agreement","x":690,"y":280,"width":520,"height":80},
+    {"id":"d4","type":"text","text":"Denounce","x":690,"y":390,"width":520,"height":80},
+
+    {"id":"g_mil","type":"group","label":"Military","x":1300,"y":0,"width":600,"height":520,"color":"#e03131"},
+    {"id":"m1","type":"text","text":"Defense Spending & Readiness","x":1340,"y":60,"width":520,"height":80},
+    {"id":"m2","type":"text","text":"Declare War","x":1340,"y":170,"width":520,"height":80},
+    {"id":"m3","type":"text","text":"War Score & Exhaustion","x":1340,"y":280,"width":520,"height":80},
+
+    {"id":"g_pol","type":"group","label":"Politics","x":1950,"y":0,"width":600,"height":520,"color":"#e8a600"},
+    {"id":"p1","type":"text","text":"Approval Rating","x":1990,"y":60,"width":520,"height":80},
+    {"id":"p2","type":"text","text":"International Standing","x":1990,"y":170,"width":520,"height":80},
+    {"id":"p3","type":"text","text":"Elections","x":1990,"y":280,"width":520,"height":80},
+
+    {"id":"g_soc","type":"group","label":"Society","x":0,"y":650,"width":600,"height":250,"color":"#9c36b5"},
+    {"id":"s1","type":"text","text":"Public Mood","x":40,"y":710,"width":520,"height":80},
+
+    {"id":"g_tech","type":"group","label":"Technology","x":650,"y":650,"width":600,"height":250,"color":"#0c8599"},
+    {"id":"t1","type":"text","text":"Innovation Index","x":690,"y":710,"width":520,"height":80},
+
+    {"id":"g_world","type":"group","label":"World Systems","x":1300,"y":650,"width":600,"height":300,"color":"#f76707"},
+    {"id":"w1","type":"file","file":"Architecture/World AI.md","x":1340,"y":710,"width":520,"height":90},
+    {"id":"w2","type":"file","file":"Architecture/Decision Events.md","x":1340,"y":820,"width":520,"height":90},
+
+    {"id":"g_meta","type":"group","label":"Meta","x":1950,"y":650,"width":600,"height":300,"color":"#868e96"},
+    {"id":"x1","type":"text","text":"Player History","x":1990,"y":710,"width":520,"height":80},
+    {"id":"x2","type":"file","file":"Architecture/Save Load.md","x":1990,"y":820,"width":520,"height":90}
+  ],
+  "edges": [
+    {"id":"r1","fromNode":"e2","fromSide":"top","toNode":"p1","toSide":"top","label":"drives approval"},
+    {"id":"r2","fromNode":"e3","fromSide":"bottom","toNode":"t1","toSide":"top","label":"feeds innovation"},
+    {"id":"r3","fromNode":"e3","fromSide":"bottom","toNode":"s1","toSide":"top","label":"feeds mood"},
+
+    {"id":"r4","fromNode":"d1","fromSide":"right","toNode":"m2","toSide":"left","label":"gates eligibility (≤35)"},
+    {"id":"r5","fromNode":"d2","fromSide":"left","toNode":"e2","toSide":"right","label":"costs treasury"},
+    {"id":"r6","fromNode":"d2","fromSide":"right","toNode":"p2","toSide":"left","label":"raises standing"},
+    {"id":"r7","fromNode":"d3","fromSide":"left","toNode":"e4","toSide":"right","label":"boosts export bonus"},
+    {"id":"r8","fromNode":"d4","fromSide":"right","toNode":"p1","toSide":"left","label":"raises approval"},
+    {"id":"r9","fromNode":"d4","fromSide":"right","toNode":"p2","toSide":"left","label":"lowers standing"},
+
+    {"id":"r10","fromNode":"m2","fromSide":"left","toNode":"d1","toSide":"right","label":"lowers relations"},
+    {"id":"r11","fromNode":"m3","fromSide":"left","toNode":"e2","toSide":"right","label":"drains growth & treasury"},
+    {"id":"r12","fromNode":"m3","fromSide":"right","toNode":"p1","toSide":"left","label":"moves approval"},
+    {"id":"r13","fromNode":"m3","fromSide":"right","toNode":"p2","toSide":"left","label":"moves standing"},
+    {"id":"r14","fromNode":"m3","fromSide":"bottom","toNode":"s1","toSide":"top","label":"moves mood"},
+
+    {"id":"r15","fromNode":"w1","fromSide":"top","toNode":"m2","toSide":"bottom","label":"declares AI wars"},
+    {"id":"r16","fromNode":"w1","fromSide":"top","toNode":"d3","toSide":"bottom","label":"signs AI trade deals"},
+    {"id":"r17","fromNode":"w2","fromSide":"left","toNode":"e2","toSide":"bottom","label":"mutates economy"},
+    {"id":"r18","fromNode":"w2","fromSide":"top","toNode":"p1","toSide":"bottom","label":"mutates approval/standing"},
+
+    {"id":"r19","fromNode":"x1","fromSide":"top","toNode":"e2","toSide":"bottom","label":"records daily"},
+    {"id":"r20","fromNode":"x1","fromSide":"right","toNode":"p1","toSide":"bottom","label":"records daily"},
+    {"id":"r21","fromNode":"x2","fromSide":"top","toNode":"e2","toSide":"bottom","label":"serializes"},
+    {"id":"r22","fromNode":"x2","fromSide":"left","toNode":"d1","toSide":"bottom","label":"serializes"},
+    {"id":"r23","fromNode":"x2","fromSide":"top","toNode":"m3","toSide":"bottom","label":"serializes"}
+  ]
+}
