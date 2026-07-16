@@ -1,6 +1,6 @@
 {
   "nodes": [
-    {"id":"root","type":"file","file":"Meridian.md","x":1630,"y":-260,"width":260,"height":80},
+    {"id":"root","type":"file","file":"Meridian.md","x":1470,"y":-260,"width":260,"height":80},
 
     {"id":"b0","type":"text","text":"## Map & World","x":40,"y":0,"width":240,"height":70},
     {"id":"c0_0","type":"file","file":"Game Design/Map Modes and Coloring.md","x":40,"y":160,"width":240,"height":90},
@@ -11,50 +11,49 @@
     {"id":"c0_5","type":"text","text":"Click-to-select (cities, roads, border/water crossings, countries)","x":40,"y":810,"width":240,"height":90},
 
     {"id":"b1","type":"file","file":"Game Design/Economy Mechanics.md","x":360,"y":0,"width":240,"height":90},
-    {"id":"c1_0","type":"text","text":"Tax rates: income, corporate, VAT, tariff, custom","x":360,"y":160,"width":240,"height":90},
+    {"id":"c1_0","type":"text","text":"Tax: income, corporate, VAT, tariff, custom","x":360,"y":160,"width":240,"height":90},
     {"id":"c1_1","type":"text","text":"Interest rate","x":360,"y":290,"width":240,"height":70},
     {"id":"c1_2","type":"text","text":"GDP, growth, unemployment, inflation","x":360,"y":420,"width":240,"height":90},
-    {"id":"c1_3","type":"text","text":"Treasury, debt, deficit","x":360,"y":550,"width":240,"height":70},
+    {"id":"c1_3","type":"text","text":"Treasury","x":360,"y":550,"width":240,"height":70},
+    {"id":"c1_4","type":"text","text":"Debt & deficit","x":360,"y":680,"width":240,"height":70},
+    {"id":"c1_5","type":"text","text":"Budget — spend levers: education, healthcare, infrastructure","x":360,"y":810,"width":240,"height":90},
 
-    {"id":"b2","type":"text","text":"## Budget Ministry","x":680,"y":0,"width":240,"height":70},
-    {"id":"c2_0","type":"file","file":"Game Design/Economy Mechanics.md","x":680,"y":160,"width":240,"height":90},
+    {"id":"b2","type":"text","text":"## Trade Ministry","x":680,"y":0,"width":240,"height":70},
+    {"id":"c2_0","type":"text","text":"Exports / imports / trade balance","x":680,"y":160,"width":240,"height":90},
+    {"id":"c2_1","type":"file","file":"Game Design/Economy Mechanics.md","x":680,"y":290,"width":240,"height":90},
 
-    {"id":"b3","type":"text","text":"## Trade Ministry","x":1000,"y":0,"width":240,"height":70},
-    {"id":"c3_0","type":"text","text":"Exports / imports / trade balance","x":1000,"y":160,"width":240,"height":90},
-    {"id":"c3_1","type":"file","file":"Game Design/Economy Mechanics.md","x":1000,"y":290,"width":240,"height":90},
+    {"id":"b3","type":"file","file":"Game Design/Diplomacy Mechanics.md","x":1000,"y":0,"width":240,"height":90},
+    {"id":"c3_0","type":"text","text":"Bilateral relations, 0-100 per country pair","x":1000,"y":160,"width":240,"height":90},
+    {"id":"c3_1","type":"text","text":"Send aid","x":1000,"y":290,"width":240,"height":70},
+    {"id":"c3_2","type":"text","text":"Sign trade agreement","x":1000,"y":420,"width":240,"height":70},
+    {"id":"c3_3","type":"text","text":"Denounce","x":1000,"y":550,"width":240,"height":70},
 
-    {"id":"b4","type":"file","file":"Game Design/Diplomacy Mechanics.md","x":1320,"y":0,"width":240,"height":90},
-    {"id":"c4_0","type":"text","text":"Bilateral relations, 0-100 per country pair","x":1320,"y":160,"width":240,"height":90},
-    {"id":"c4_1","type":"text","text":"Send aid","x":1320,"y":290,"width":240,"height":70},
-    {"id":"c4_2","type":"text","text":"Sign trade agreement","x":1320,"y":420,"width":240,"height":70},
-    {"id":"c4_3","type":"text","text":"Denounce","x":1320,"y":550,"width":240,"height":70},
+    {"id":"b4","type":"file","file":"Game Design/War Mechanics.md","x":1320,"y":0,"width":240,"height":90},
+    {"id":"c4_0","type":"text","text":"Defense spending & readiness","x":1320,"y":160,"width":240,"height":90},
+    {"id":"c4_1","type":"text","text":"Declare war","x":1320,"y":290,"width":240,"height":70},
+    {"id":"c4_2","type":"text","text":"Demand concessions","x":1320,"y":420,"width":240,"height":70},
+    {"id":"c4_3","type":"text","text":"Offer white peace","x":1320,"y":550,"width":240,"height":70},
 
-    {"id":"b5","type":"file","file":"Game Design/War Mechanics.md","x":1640,"y":0,"width":240,"height":90},
-    {"id":"c5_0","type":"text","text":"Defense spending & readiness","x":1640,"y":160,"width":240,"height":90},
-    {"id":"c5_1","type":"text","text":"Declare war","x":1640,"y":290,"width":240,"height":70},
-    {"id":"c5_2","type":"text","text":"Demand concessions","x":1640,"y":420,"width":240,"height":70},
-    {"id":"c5_3","type":"text","text":"Offer white peace","x":1640,"y":550,"width":240,"height":70},
+    {"id":"b5","type":"file","file":"Game Design/Elections.md","x":1640,"y":0,"width":240,"height":90},
+    {"id":"c5_0","type":"text","text":"Approval rating","x":1640,"y":160,"width":240,"height":70},
+    {"id":"c5_1","type":"text","text":"International standing","x":1640,"y":290,"width":240,"height":70},
+    {"id":"c5_2","type":"text","text":"Elections — 4-year term","x":1640,"y":420,"width":240,"height":70},
 
-    {"id":"b6","type":"file","file":"Game Design/Elections.md","x":1960,"y":0,"width":240,"height":90},
-    {"id":"c6_0","type":"text","text":"Approval rating","x":1960,"y":160,"width":240,"height":70},
-    {"id":"c6_1","type":"text","text":"International standing","x":1960,"y":290,"width":240,"height":70},
-    {"id":"c6_2","type":"text","text":"Elections — 4-year term","x":1960,"y":420,"width":240,"height":70},
+    {"id":"b6","type":"file","file":"Architecture/National State.md","x":1960,"y":0,"width":240,"height":90},
+    {"id":"c6_0","type":"text","text":"Public mood","x":1960,"y":160,"width":240,"height":70},
 
     {"id":"b7","type":"file","file":"Architecture/National State.md","x":2280,"y":0,"width":240,"height":90},
-    {"id":"c7_0","type":"text","text":"Public mood","x":2280,"y":160,"width":240,"height":70},
+    {"id":"c7_0","type":"text","text":"Research spend","x":2280,"y":160,"width":240,"height":70},
+    {"id":"c7_1","type":"text","text":"Innovation index","x":2280,"y":290,"width":240,"height":70},
 
-    {"id":"b8","type":"file","file":"Architecture/National State.md","x":2600,"y":0,"width":240,"height":90},
-    {"id":"c8_0","type":"text","text":"Research spend","x":2600,"y":160,"width":240,"height":70},
-    {"id":"c8_1","type":"text","text":"Innovation index","x":2600,"y":290,"width":240,"height":70},
+    {"id":"b8","type":"text","text":"## World Systems\n(run without the player)","x":2600,"y":0,"width":240,"height":90},
+    {"id":"c8_0","type":"file","file":"Architecture/World AI.md","x":2600,"y":170,"width":240,"height":90},
+    {"id":"c8_1","type":"file","file":"Architecture/Decision Events.md","x":2600,"y":300,"width":240,"height":90},
 
-    {"id":"b9","type":"text","text":"## World Systems\n(run without the player)","x":2920,"y":0,"width":240,"height":90},
-    {"id":"c9_0","type":"file","file":"Architecture/World AI.md","x":2920,"y":170,"width":240,"height":90},
-    {"id":"c9_1","type":"file","file":"Architecture/Decision Events.md","x":2920,"y":300,"width":240,"height":90},
-
-    {"id":"b10","type":"text","text":"## Meta Systems","x":3240,"y":0,"width":240,"height":70},
-    {"id":"c10_0","type":"file","file":"Architecture/Save Load.md","x":3240,"y":160,"width":240,"height":90},
-    {"id":"c10_1","type":"file","file":"Architecture/History and World Feed.md","x":3240,"y":290,"width":240,"height":90},
-    {"id":"c10_2","type":"text","text":"World feed — toast headlines (same note as Player history)","x":3240,"y":420,"width":240,"height":90}
+    {"id":"b9","type":"text","text":"## Meta Systems","x":2920,"y":0,"width":240,"height":70},
+    {"id":"c9_0","type":"file","file":"Architecture/Save Load.md","x":2920,"y":160,"width":240,"height":90},
+    {"id":"c9_1","type":"file","file":"Architecture/History and World Feed.md","x":2920,"y":290,"width":240,"height":90},
+    {"id":"c9_2","type":"text","text":"World feed — toast headlines (same note as Player history)","x":2920,"y":420,"width":240,"height":90}
   ],
   "edges": [
     {"id":"e_root_b0","fromNode":"root","fromSide":"bottom","toNode":"b0","toSide":"top"},
@@ -67,7 +66,6 @@
     {"id":"e_root_b7","fromNode":"root","fromSide":"bottom","toNode":"b7","toSide":"top"},
     {"id":"e_root_b8","fromNode":"root","fromSide":"bottom","toNode":"b8","toSide":"top"},
     {"id":"e_root_b9","fromNode":"root","fromSide":"bottom","toNode":"b9","toSide":"top"},
-    {"id":"e_root_b10","fromNode":"root","fromSide":"bottom","toNode":"b10","toSide":"top"},
 
     {"id":"e_b0_c0","fromNode":"b0","fromSide":"bottom","toNode":"c0_0","toSide":"top"},
     {"id":"e_b0_c1","fromNode":"c0_0","fromSide":"bottom","toNode":"c0_1","toSide":"top"},
@@ -80,11 +78,16 @@
     {"id":"e_b1_c1","fromNode":"c1_0","fromSide":"bottom","toNode":"c1_1","toSide":"top"},
     {"id":"e_b1_c2","fromNode":"c1_1","fromSide":"bottom","toNode":"c1_2","toSide":"top"},
     {"id":"e_b1_c3","fromNode":"c1_2","fromSide":"bottom","toNode":"c1_3","toSide":"top"},
+    {"id":"e_b1_c4","fromNode":"c1_3","fromSide":"bottom","toNode":"c1_4","toSide":"top"},
+    {"id":"e_b1_c5","fromNode":"c1_4","fromSide":"bottom","toNode":"c1_5","toSide":"top"},
 
     {"id":"e_b2_c0","fromNode":"b2","fromSide":"bottom","toNode":"c2_0","toSide":"top"},
+    {"id":"e_b2_c1","fromNode":"c2_0","fromSide":"bottom","toNode":"c2_1","toSide":"top"},
 
     {"id":"e_b3_c0","fromNode":"b3","fromSide":"bottom","toNode":"c3_0","toSide":"top"},
     {"id":"e_b3_c1","fromNode":"c3_0","fromSide":"bottom","toNode":"c3_1","toSide":"top"},
+    {"id":"e_b3_c2","fromNode":"c3_1","fromSide":"bottom","toNode":"c3_2","toSide":"top"},
+    {"id":"e_b3_c3","fromNode":"c3_2","fromSide":"bottom","toNode":"c3_3","toSide":"top"},
 
     {"id":"e_b4_c0","fromNode":"b4","fromSide":"bottom","toNode":"c4_0","toSide":"top"},
     {"id":"e_b4_c1","fromNode":"c4_0","fromSide":"bottom","toNode":"c4_1","toSide":"top"},
@@ -94,22 +97,17 @@
     {"id":"e_b5_c0","fromNode":"b5","fromSide":"bottom","toNode":"c5_0","toSide":"top"},
     {"id":"e_b5_c1","fromNode":"c5_0","fromSide":"bottom","toNode":"c5_1","toSide":"top"},
     {"id":"e_b5_c2","fromNode":"c5_1","fromSide":"bottom","toNode":"c5_2","toSide":"top"},
-    {"id":"e_b5_c3","fromNode":"c5_2","fromSide":"bottom","toNode":"c5_3","toSide":"top"},
 
     {"id":"e_b6_c0","fromNode":"b6","fromSide":"bottom","toNode":"c6_0","toSide":"top"},
-    {"id":"e_b6_c1","fromNode":"c6_0","fromSide":"bottom","toNode":"c6_1","toSide":"top"},
-    {"id":"e_b6_c2","fromNode":"c6_1","fromSide":"bottom","toNode":"c6_2","toSide":"top"},
 
     {"id":"e_b7_c0","fromNode":"b7","fromSide":"bottom","toNode":"c7_0","toSide":"top"},
+    {"id":"e_b7_c1","fromNode":"c7_0","fromSide":"bottom","toNode":"c7_1","toSide":"top"},
 
     {"id":"e_b8_c0","fromNode":"b8","fromSide":"bottom","toNode":"c8_0","toSide":"top"},
     {"id":"e_b8_c1","fromNode":"c8_0","fromSide":"bottom","toNode":"c8_1","toSide":"top"},
 
     {"id":"e_b9_c0","fromNode":"b9","fromSide":"bottom","toNode":"c9_0","toSide":"top"},
     {"id":"e_b9_c1","fromNode":"c9_0","fromSide":"bottom","toNode":"c9_1","toSide":"top"},
-
-    {"id":"e_b10_c0","fromNode":"b10","fromSide":"bottom","toNode":"c10_0","toSide":"top"},
-    {"id":"e_b10_c1","fromNode":"c10_0","fromSide":"bottom","toNode":"c10_1","toSide":"top"},
-    {"id":"e_b10_c2","fromNode":"c10_1","fromSide":"bottom","toNode":"c10_2","toSide":"top"}
+    {"id":"e_b9_c2","fromNode":"c9_1","fromSide":"bottom","toNode":"c9_2","toSide":"top"}
   ]
 }
