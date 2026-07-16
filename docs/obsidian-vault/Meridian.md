@@ -9,18 +9,20 @@ simulate, manage 8 ministries, win or lose elections on approval rating. Built i
 port of an original Rust/Bevy prototype (kept untouched as a reference one folder up from this
 project).
 
-## 🌳 [[Feature Tree.canvas|Feature Tree]]
+## 🗺️ [[Meridian Overview.canvas|Meridian Overview]]
 
-The game's own main features and sub-features, as a **Canvas** board (Obsidian's native visual
-board — drag, zoom, rearrange freely) rather than a static diagram: [[Feature Tree.canvas|open
-Feature Tree]]. Map & World, all 8 ministries, World Systems, and Meta Systems each branch into
-their sub-features; wherever a leaf has real documentation behind it, that leaf **is** the actual
-note, embedded as a card — click into it directly from the canvas.
+The one-page answer to "what is this game" — a single **Canvas** board (Obsidian's native
+visual board: drag, zoom, rearrange freely), not a static diagram or a wall of separate notes:
+[[Meridian Overview.canvas|open Meridian Overview]]. Three sections on one board:
+- **What is Meridian?** — the pitch and quick facts
+- **Core Loop** — the 7-step cycle from picking a country to the next election, looping back
+- **Feature Tree** — Map & World, all 8 ministries, World Systems, and Meta Systems branching
+  into their sub-features, with real documentation embedded as clickable cards wherever it exists
 
 ## Vault map
 
 The diagram below is a different tree — this is how *the documentation itself* is organized,
-not the game's features (that's the [[Feature Tree.canvas|Feature Tree canvas]] above).
+not the game's features (that's the [[Meridian Overview.canvas|Meridian Overview canvas]] above).
 
 ```mermaid
 graph TD
