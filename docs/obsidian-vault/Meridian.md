@@ -9,7 +9,16 @@ simulate, manage 8 ministries, win or lose elections on approval rating. Built i
 port of an original Rust/Bevy prototype (kept untouched as a reference one folder up from this
 project).
 
+## 🌳 [[Feature Tree]]
+
+The game's own main features and sub-features, as a tree — see [[Feature Tree]] for the full
+diagram (Map & World, the 8 ministries, World Systems, Meta Systems) with a link into the right
+note for each leaf.
+
 ## Vault map
+
+The diagram below is a different tree — this is how *the documentation itself* is organized,
+not the game's features (that's [[Feature Tree]] above).
 
 ```mermaid
 graph TD
