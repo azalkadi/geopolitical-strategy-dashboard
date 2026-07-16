@@ -205,6 +205,11 @@ namespace Meridian.Map
                     }
                 }
             }
+
+            // Relations drift every tick (baseline decay, AI-vs-AI diplomacy, war exhaustion) —
+            // repaint the relation-colored map once per frame that actually advanced a day,
+            // rather than only when the player personally takes a diplomacy action.
+            map.RefreshCountryColors();
         }
 
         // Dev-only: MERIDIAN_DIAG_DIPLOMACY=1 runs a scripted diplomacy self-test at day 30 —

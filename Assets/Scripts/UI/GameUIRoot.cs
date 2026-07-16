@@ -1236,6 +1236,7 @@ namespace Meridian.UI
         {
             PlayerState.Begin(countryIndex, countryName, interaction.SimDay);
             interaction.SelectCountry(countryIndex);
+            map.RefreshCountryColors(); // paint the world by relation-to-player from turn one
             UIState.ActiveCategory = NationCategory.Economy;
             // Closed by default — the side panel is opt-in via the ministry bar, not forced open
             // just because a nation (even your own) is selected.
@@ -1359,6 +1360,7 @@ namespace Meridian.UI
             var again = MakeButton("PLAY AGAIN", 14, GameTheme.BgButtonActive, GameTheme.BgButtonHover, GameTheme.Accent, () =>
             {
                 PlayerState.Reset();
+                map.RefreshCountryColors(); // back to the neutral palette until a new country is picked
                 gameOverScreen.style.display = DisplayStyle.None;
                 startScreen.style.display = DisplayStyle.Flex;
             });

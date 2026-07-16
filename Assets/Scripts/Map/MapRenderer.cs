@@ -56,6 +56,18 @@ namespace Meridian.Map
         [Tooltip("Border-crossing marker color.")]
         public Color borderCrossingColor = new Color(1f, 0.55f, 0.25f, 1f);
 
+        [Tooltip("Fill/border color for the player's own country once a game has started — a country has no meaningful 'relation to itself', so it always gets this fixed highlight instead of a spot on the relation gradient.")]
+        public Color selfColor = new Color(0.80f, 0.66f, 0.22f, 1f);
+
+        [Tooltip("Relation-gradient color at 0 (hostile) — see RefreshCountryColors.")]
+        public Color hostileRelationColor = new Color(0.72f, 0.20f, 0.16f, 1f);
+
+        [Tooltip("Relation-gradient color at 50 (neutral).")]
+        public Color neutralRelationColor = new Color(0.50f, 0.48f, 0.42f, 1f);
+
+        [Tooltip("Relation-gradient color at 100 (friendly).")]
+        public Color friendlyRelationColor = new Color(0.22f, 0.60f, 0.28f, 1f);
+
         public GeoWorld World { get; private set; }
         public EconomySystem Economy { get; private set; }
         public NationalSystem National { get; private set; }
@@ -83,6 +95,11 @@ namespace Meridian.Map
         Material borderMaterial;
         readonly List<GameObject> countryFillObjects = new();
         GameObject satelliteGo;
+        // Indexed by country index (same order as World.Countries) so RefreshCountryColors can
+        // recolor an individual country's fill/border without rebuilding its geometry — null
+        // entries are countries whose mesh/outline was empty and never got a GameObject at all.
+        Mesh[] fillMeshByCountry;
+        Mesh[] borderMeshByCountry;
         // z offsets so each layer draws above the one under it.
         const float FillZ = 0f;
         const float BorderZ = -0.1f;
@@ -174,6 +191,7 @@ namespace Meridian.Map
             SaveLoad.Apply(save, Economy, National);
             Diplomacy = save.Diplomacy;
             Wars = save.Wars;
+            RefreshCountryColors();
         }
 
         // Loads the satellite basemap (StreamingAssets/basemap/satellite.jpg) — the always-
@@ -270,8 +288,12 @@ namespace Meridian.Map
 
         void BuildCountryBorders()
         {
-            foreach (var c in World.Countries)
-                MakeLineMeshObject(c.Name + " (border)", c.OutlineRings, borderColor, BorderZ, transform);
+            borderMeshByCountry = new Mesh[World.Countries.Count];
+            for (int ci = 0; ci < World.Countries.Count; ci++)
+            {
+                var c = World.Countries[ci];
+                borderMeshByCountry[ci] = MakeLineMeshObject(c.Name + " (border)", c.OutlineRings, borderColor, BorderZ, transform);
+            }
             Debug.Log("[map] built country border meshes");
         }
 
@@ -702,9 +724,11 @@ namespace Meridian.Map
         }
 
         // Builds a line-list mesh GameObject from a set of lon/lat rings, parented under `parent`.
-        void MakeLineMeshObject(string name, List<List<Vector2>> rings, Color color, float z, Transform parent)
+        // Returns the built Mesh (or null if there was nothing to build) so callers that need to
+        // recolor it later — see RefreshCountryColors — don't have to re-find it via the GameObject.
+        Mesh MakeLineMeshObject(string name, List<List<Vector2>> rings, Color color, float z, Transform parent)
         {
-            if (rings == null || rings.Count == 0) return;
+            if (rings == null || rings.Count == 0) return null;
 
             var verts = new List<Vector3>();
             var idx = new List<int>();
@@ -720,7 +744,7 @@ namespace Meridian.Map
                     idx.Add(baseIdx + (i + 1) % ring.Count);
                 }
             }
-            if (verts.Count == 0) return;
+            if (verts.Count == 0) return null;
 
             var mesh = new Mesh { name = name };
             mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
@@ -738,15 +762,21 @@ namespace Meridian.Map
             mr.sharedMaterial = borderMaterial;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             mr.receiveShadows = false;
+            return mesh;
         }
 
         void BuildCountryMeshes()
         {
+            fillMeshByCountry = new Mesh[World.Countries.Count];
             for (int ci = 0; ci < World.Countries.Count; ci++)
             {
                 var c = World.Countries[ci];
                 if (c.MeshVerts.Count == 0 || c.MeshIndices.Count == 0) continue;
 
+                // Pre-game fallback (no player country chosen yet, so "relation to the player"
+                // is meaningless) — the same hash-based "no two neighbors share a tint" palette
+                // this map always used. RefreshCountryColors repaints everything to the real
+                // relation gradient the moment a game actually starts.
                 var color = Palette[(int)(HashName(c.Name) % (ulong)Palette.Length)];
 
                 var mesh = new Mesh { name = c.Name };
@@ -774,8 +804,54 @@ namespace Meridian.Map
                 mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 mr.receiveShadows = false;
                 countryFillObjects.Add(go);
+                fillMeshByCountry[ci] = mesh;
             }
             Debug.Log("[map] built country fill meshes");
+        }
+
+        // Recolors every country's fill (Political mode) and border (both modes, but especially
+        // meaningful in Satellite mode where there's no fill to look at) by its diplomatic
+        // relation to the player's own country. Cheap to call often — this only replaces each
+        // mesh's per-vertex Color[] in place, no geometry rebuild — so it's called once whenever
+        // the player's country is (re)assigned (new game / loaded save) and once per sim day
+        // while playing, so relation drift and diplomacy actions show up on the map promptly.
+        // Before a game has started (no player country yet), falls back to leaving whatever
+        // colors BuildCountryMeshes/BuildCountryBorders already painted (the hash-based palette).
+        public void RefreshCountryColors()
+        {
+            if (fillMeshByCountry == null || borderMeshByCountry == null) return;
+            int me = PlayerState.CountryIndex;
+
+            for (int ci = 0; ci < World.Countries.Count; ci++)
+            {
+                // No player country (start screen / game-over "play again") — reset to the same
+                // hash-based palette BuildCountryMeshes painted at boot, so the map doesn't sit
+                // there showing a previous game's relation colors while no game is in progress.
+                Color c = me < 0
+                    ? Palette[(int)(HashName(World.Countries[ci].Name) % (ulong)Palette.Length)]
+                    : RelationColor(ci, me);
+                ApplyMeshColor(fillMeshByCountry[ci], c);
+                ApplyMeshColor(borderMeshByCountry[ci], me < 0 ? borderColor : c);
+            }
+        }
+
+        Color RelationColor(int countryIndex, int playerIndex)
+        {
+            if (countryIndex == playerIndex) return selfColor;
+            if (Diplomacy == null) return neutralRelationColor;
+            float rel = Diplomacy.GetRelation(playerIndex, countryIndex); // 0-100
+            return rel <= 50f
+                ? Color.Lerp(hostileRelationColor, neutralRelationColor, rel / 50f)
+                : Color.Lerp(neutralRelationColor, friendlyRelationColor, (rel - 50f) / 50f);
+        }
+
+        static void ApplyMeshColor(Mesh mesh, Color color)
+        {
+            if (mesh == null) return;
+            int n = mesh.vertexCount;
+            var colors = new Color[n];
+            for (int i = 0; i < n; i++) colors[i] = color;
+            mesh.colors = colors;
         }
 
         // FNV-1a over the name — deterministic-but-varied palette index per country.
