@@ -70,6 +70,27 @@ namespace Meridian.Sim
         public double PublicDebt => System.Math.Max(0.0, -Treasury);
         public double DebtToGdp => Gdp > 0.01 ? PublicDebt / Gdp * 100.0 : 0.0;
 
+        // Dynamic population (seeded from Natural Earth POP_EST, then grows/shrinks with living
+        // conditions — see NationalState.Tick, which owns the mood/healthcare inputs).
+        public double Population;
+        public float PopulationGrowth; // %/yr, smoothed
+        public double GdpPerCapita => Population > 1 ? Gdp * 1e9 / Population : 0.0;
+
+        // Sovereign credit: markets price government debt off the debt load. The premium is
+        // added to the policy rate when servicing debt (see Tick) — sustained deficits walk the
+        // rating down the tiers and the interest bill up, the classic debt-spiral mechanic.
+        // Thresholds are debt-to-GDP percentages, loosely modeled on real rating-agency bands.
+        public string CreditRatingLabel =>
+            DebtToGdp < 30 ? "AAA" : DebtToGdp < 60 ? "AA" : DebtToGdp < 90 ? "A" :
+            DebtToGdp < 120 ? "BBB" : DebtToGdp < 150 ? "BB" : DebtToGdp < 200 ? "B" : "C";
+        public float CreditRiskPremium =>
+            DebtToGdp < 30 ? 0f : DebtToGdp < 60 ? 0.3f : DebtToGdp < 90 ? 0.8f :
+            DebtToGdp < 120 ? 1.5f : DebtToGdp < 150 ? 2.5f : DebtToGdp < 200 ? 4f : 6f;
+        public double AnnualDebtService => PublicDebt * (InterestRate + CreditRiskPremium) / 100.0;
+        // Last rating seen by Tick, for downgrade/upgrade event detection. Serialized so a
+        // loaded game doesn't fire a spurious rating-change toast on its first tick.
+        public string LastCreditRating = "AAA";
+
         public static EconomyState Seed(Country c, uint salt)
         {
             bool hasReal = c.GdpMd > 0 && c.PopEst > 0;
@@ -98,6 +119,8 @@ namespace Meridian.Sim
                 Rng = HashSeed(c.IsoA3, salt),
                 LastWhy = null,
                 HasRealBaseline = hasReal,
+                Population = System.Math.Max(c.PopEst, 10_000L),
+                PopulationGrowth = 1.0f,
             };
 
             float baseOpenness =
@@ -158,6 +181,22 @@ namespace Meridian.Sim
 
             Treasury += Gdp * effectiveTax / 100.0 / 365.0 - Gdp * TotalSpendingRate / 100.0 / 365.0;
 
+            // Debt service: outstanding debt accrues interest at the policy rate PLUS the
+            // market's credit-risk premium — running big debts at a junk rating compounds fast.
+            if (Treasury < 0)
+                Treasury -= AnnualDebtService / 365.0;
+
+            // Rating transitions surface through the same LastWhy channel as every other
+            // threshold event (checked AFTER today's interest, so the number is current).
+            // The actual message is deferred into the if/else-if cascade below so a same-day
+            // rating change can't be silently clobbered by a recession/unemployment/inflation
+            // message overwriting LastWhy after it — LastCreditRating itself still always
+            // advances here so a transition is never detected twice.
+            string rating = CreditRatingLabel;
+            bool ratingChanged = rating != LastCreditRating;
+            bool ratingDowngrade = ratingChanged && RatingRank(rating) > RatingRank(LastCreditRating);
+            LastCreditRating = rating;
+
             // Custom taxes are a much smaller slice of GDP per point of rate than the core
             // levers (they're narrow/specific, not broad-based) — roughly a 10% custom tax
             // yields ~0.1% of GDP annually, versus the core levers' ~20-25% combined.
@@ -167,7 +206,11 @@ namespace Meridian.Sim
             // Same "crossed a threshold this tick" event logic as the Rust (reconstructs the
             // pre-update value by subtracting the delta). Faithful to the original, including
             // its inflation reconstruction only accounting for the growth term.
-            if (prevGrowth >= 0.0f && GrowthRate < 0.0f)
+            if (ratingChanged)
+                LastWhy = ratingDowngrade
+                    ? $"Credit rating downgraded to {rating} — debt servicing costs rise"
+                    : $"Credit rating upgraded to {rating} — borrowing gets cheaper";
+            else if (prevGrowth >= 0.0f && GrowthRate < 0.0f)
                 LastWhy = "GDP growth turned negative — economy entering recession";
             else if (prevGrowth < 0.0f && GrowthRate >= 0.0f)
                 LastWhy = "GDP growth turned positive — recession easing";
@@ -209,6 +252,11 @@ namespace Meridian.Sim
         }
 
         static float Clampf(float v, float lo, float hi) => v < lo ? lo : (v > hi ? hi : v);
+
+        public static int RatingRank(string r) => r switch
+        {
+            "AAA" => 0, "AA" => 1, "A" => 2, "BBB" => 3, "BB" => 4, "B" => 5, _ => 6,
+        };
     }
 
     // A player-defined tax beyond the four core levers — freely named, rated, and removable.

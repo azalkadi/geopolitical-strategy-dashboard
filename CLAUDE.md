@@ -19,6 +19,19 @@ this entirely through Claude. They also said explicitly at one point: **don't do
 what's asked in a given message.** If a session surfaces something worth doing that wasn't
 requested, mention it and ask, don't just do it.
 
+## Session handoff — update this file every session
+
+The user works on this repo from **two computers** with two separate Claude Code sessions, and
+switches between them without warning. **After every programming session (any session that
+changes code, not just docs), update the "Current status" section at the bottom of this file**
+with what actually shipped and what's next — that's the mechanism that lets a fresh session on
+the other machine pick up with full context instead of re-discovering state from `git log`.
+Keep it a short factual delta, not a changelog essay. Also always `git fetch origin` and check
+for remote commits before starting local work (see the merge note in Current status below for
+why this matters — the other machine's session can and does land commits between your runs).
+The [[Development Roadmap.canvas]] in `docs/obsidian-vault/` tracks the big chronological
+stages; this file's Current status section tracks the finer-grained "since last session" delta.
+
 ## Running it
 
 Unity Editor **6000.5.3f1** (Unity 6.5) is the target, installed via Unity Hub with an
@@ -250,3 +263,60 @@ Everything below is built, launched, and verified via Player.log + visual checks
 - City click-picking is gated by tier visibility (only clickable when its dot is visible at
   the current zoom) — without that, invisible towns swallowed every country click at world
   zoom.
+- Camera is now hard-clamped on both axes (`MapCameraController.ClampPosition`/`ClampAxis`) so
+  the map can never scroll/zoom out past the world edge on any aspect ratio or zoom level; the
+  old single-axis `latitudeClamp` field is gone.
+- Economy depth: `Population`/`PopulationGrowth` (driven by `PublicMood` + healthcare spend in
+  `NationalState.Tick`), `GdpPerCapita`, credit rating tiers AAA→C off `DebtToGdp` with a
+  `CreditRiskPremium` that compounds into `AnnualDebtService`, negative-treasury interest
+  drain. `MapRenderer.ApplySave` reseeds `Population` for saves written before this existed
+  (would otherwise deserialize to 0 and simulate a permanently empty world).
+- UI overhaul across `GameUIRoot.cs`: side-panel content grouped into `StartCard()`/`EndCard()`
+  card sections instead of a flat stat list, 0–100 indices render as `StatBar` progress bars,
+  sparklines are shaded area charts with a current-value dot, real calendar dates
+  (`DateString`, epoch 2026-01-01) instead of "Day N", severity-colored toasts, and a start-
+  screen country **preview card** (click a nation → stats/flavor text → "TAKE OFFICE" — this
+  changed prior behavior where clicking a country began the game immediately).
+- Relation-based map coloring (landed on the work-side session, `MapRenderer.RefreshCountryColors`):
+  once a game has started, Political-mode country fills and Satellite-mode country borders are
+  colored by `DiplomacySystem.GetRelation(playerIndex, i)` (hostile→neutral→friendly gradient),
+  with the player's own country always getting a fixed highlight color; falls back to the
+  original hash-based "no two neighbors share a tint" palette before a game starts / after
+  "PLAY AGAIN". **Country flags are still not implemented** — next up.
+- `docs/obsidian-vault/` — a full Obsidian vault documenting architecture, game design, and
+  data sources (also landed on the work-side session), plus a new
+  `Development Roadmap.canvas` (this session) laying out the 7 build stages from foundation
+  through a tagged v1.0.
+- **Merge note:** this session's local work (camera clamp, UI overhaul, economy depth) was
+  started before fetching 16 commits that had landed on `origin/master` from the work-side
+  session (the vault + relation coloring above). Reconciled via `git stash` → fast-forward to
+  `origin/master` → `git stash pop`, which produced exactly one real conflict — both sides
+  inserted a line immediately after `Wars = save.Wars;` in `MapRenderer.ApplySave`. Resolved by
+  keeping both (population migration guard, then `RefreshCountryColors()`). This is the
+  scenario the "Session handoff" section above exists to prevent — always fetch first.
+- **Not yet done:** country flags in the UI; Task #17 (casing-style road/rail visuals +
+  in-game player-buildable road/rail infrastructure) — see stage 4 of the roadmap canvas.
+- **Post-merge review pass (same session):** ran an 8-angle automated review over the merged
+  diff (most verify sub-agents hit a session usage cap, so findings were hand-verified against
+  the actual code instead). Confirmed and fixed 5 real bugs: (1) `MapCameraController` — with
+  `maxOrthoSize` tightened to exactly `MapExtent` (180), the very first `ClampPosition()` call
+  forced the camera to `(0,0)` on every launch regardless of the `(10,20)` start position set in
+  `Awake()`/`Bootstrap.cs` — both now start at `(0,0)` to match what the clamp enforces anyway,
+  instead of setting a value that was always immediately discarded. (2) `Economy.Tick()` — a
+  same-day credit-rating change could get silently overwritten by the recession/unemployment/
+  inflation `LastWhy` messages below it, losing the toast permanently since `LastCreditRating`
+  had already advanced; folded the rating message into the same if/else-if cascade so exactly
+  one message wins per tick, rating given priority. (3) `MapRenderer.ApplySave`'s population
+  migration guard didn't reset `LastCreditRating` for pre-existing saves, so loading an old save
+  with real debt could fire a spurious "credit rating downgraded" toast on its first tick — now
+  baselines it alongside Population. (4) `GameUIRoot.StatBar` (Approval, Readiness, Standing,
+  Mood, Innovation, bilateral Relationship) had silently dropped the green/red good-vs-bad fill
+  coloring the old `StatColored` rows had — added a `good` predicate back, live-updated every
+  refresh tick same as `LiveStat`. (5) The start-screen `previewCard` wasn't hidden/cleared on
+  PLAY AGAIN, so a stale country preview + TAKE OFFICE button could linger after a completed
+  game. Also deduped `Economy.Tick()`'s inline debt-service formula to call the
+  `AnnualDebtService` property instead of re-deriving it. Rebuilt, relaunched, Player.log clean
+  (no errors/exceptions), user confirmed the live build looks right. Two minor non-behavioral
+  reuse findings (duplicated population-floor logic across 3 call sites; `Diplomacy.
+  AgreementPartnersOf` hand-unpacking `PairKey`'s bit layout instead of a shared helper) were
+  left as-is — cosmetic, no observed failure mode, low priority next to the roadmap's stage 4.

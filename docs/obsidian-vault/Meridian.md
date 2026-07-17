@@ -28,6 +28,14 @@ picture: one colored group per ministry, with labeled arrows only for connection
 between **different** ministries — same-ministry relationships are left out since the tree
 already covers those.
 
+## 🗓️ [[Development Roadmap.canvas|Development Roadmap]]
+
+Neither of the boards above is chronological — both describe the game as it stands right now.
+[[Development Roadmap.canvas|Open Development Roadmap]] for the build order instead: seven
+stages left to right, from the geo/rendering foundation through to a tagged v1.0, with each
+stage marked done / next / planned / milestone. The per-session delta (what actually shipped
+since the roadmap was last touched) lives in `CLAUDE.md` at the repo root, not here.
+
 ## Vault map
 
 The diagram below is a different tree — this is how *the documentation itself* is organized,

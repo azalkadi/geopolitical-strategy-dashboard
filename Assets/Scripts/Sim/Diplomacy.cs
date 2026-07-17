@@ -120,6 +120,20 @@ namespace Meridian.Sim
                 Relations[i] += (Baselines[i] - Relations[i]) * 0.001f;
         }
 
+        // Every country `a` currently has a trade agreement with (for the Trade panel).
+        public List<int> AgreementPartnersOf(int a)
+        {
+            var partners = new List<int>();
+            foreach (long key in Agreements)
+            {
+                int hi = (int)(key >> 32), lo = (int)(key & 0xffffffff);
+                if (hi == a) partners.Add(lo);
+                else if (lo == a) partners.Add(hi);
+            }
+            partners.Sort();
+            return partners;
+        }
+
         // Top-N friendliest / frostiest countries from `a`'s perspective (excluding itself).
         public List<(int index, float relation)> RankedFor(int a, bool friendliest, int topN)
         {

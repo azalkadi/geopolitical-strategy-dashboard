@@ -27,7 +27,7 @@ namespace Meridian.Map
             var cam = camGo.GetComponent<Camera>();
             cam.orthographic = true;
             cam.orthographicSize = 180f; // MapCameraController.Awake() re-sets this anyway; kept in sync for clarity
-            cam.transform.position = new Vector3(10f, 20f, -10f);
+            cam.transform.position = new Vector3(0f, 0f, -10f); // ditto — see MapCameraController.Awake()
             cam.clearFlags = CameraClearFlags.SolidColor;
             if (camGo.GetComponent<MapCameraController>() == null)
                 camGo.AddComponent<MapCameraController>();

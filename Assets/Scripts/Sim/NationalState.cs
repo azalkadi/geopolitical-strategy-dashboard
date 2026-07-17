@@ -52,6 +52,14 @@ namespace Meridian.Sim
             // long before they feel a GDP decimal point.
             float moodTarget = Clampf(70f - (e.Unemployment - 7f) * 2.5f - System.Math.Max(0f, e.Inflation - 4f) * 2f + (e.SpendHealthcare - 6.0f) * 2.5f, 0f, 100f);
             PublicMood = Clampf(PublicMood + (moodTarget - PublicMood) * 0.015f, 0f, 100f);
+
+            // Population dynamics live here (not in EconomyState.Tick) because the drivers —
+            // mood and healthcare — are this class's numbers. Good living conditions pull
+            // growth toward ~2%/yr, misery toward decline; GDP per capita then moves with the
+            // ratio of the two growth curves.
+            float popTarget = Clampf(0.8f + (PublicMood - 50f) * 0.02f + (e.SpendHealthcare - 6.0f) * 0.06f, -0.8f, 2.5f);
+            e.PopulationGrowth = Clampf(e.PopulationGrowth + (popTarget - e.PopulationGrowth) * 0.005f, -0.8f, 2.5f);
+            e.Population *= 1.0 + e.PopulationGrowth / 100.0 / 365.0;
         }
 
         static float Clampf(float v, float lo, float hi) => v < lo ? lo : (v > hi ? hi : v);

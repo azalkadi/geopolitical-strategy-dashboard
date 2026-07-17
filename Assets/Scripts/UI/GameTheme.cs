@@ -12,6 +12,9 @@ namespace Meridian.UI
         public static readonly Color BgBar = new Color(0.055f, 0.09f, 0.15f, 0.97f);
         public static readonly Color BgPanel = new Color(0.075f, 0.115f, 0.175f, 0.96f);
         public static readonly Color BgDropdown = new Color(0.095f, 0.14f, 0.205f, 0.98f);
+        // Section cards inside the panel — one step lighter than the panel so grouped content
+        // reads as distinct plates rather than one long list.
+        public static readonly Color BgCard = new Color(0.10f, 0.15f, 0.215f, 0.92f);
 
         // Default (non-category) buttons: official UN blue instead of flat gray or candy purple,
         // so neutral controls read as institutional/official rather than toy-like.

@@ -191,6 +191,23 @@ namespace Meridian.Map
             SaveLoad.Apply(save, Economy, National);
             Diplomacy = save.Diplomacy;
             Wars = save.Wars;
+
+            // Migration: saves written before population dynamics existed deserialize with
+            // Population = 0 — reseed those from the geo data instead of simulating a
+            // permanently empty world. LastCreditRating shipped in the same feature batch, so
+            // the same saves deserialize it to its "AAA" field default regardless of the
+            // country's actual carried-over debt — baseline it to the current real rating too,
+            // or a save with pre-existing debt fires a spurious downgrade toast on its first tick.
+            for (int i = 0; i < Economy.States.Count && i < World.Countries.Count; i++)
+            {
+                var e = Economy.States[i];
+                if (e.Population < 1)
+                {
+                    e.Population = System.Math.Max(World.Countries[i].PopEst, 10_000L);
+                    if (e.PopulationGrowth == 0f) e.PopulationGrowth = 1.0f;
+                    e.LastCreditRating = e.CreditRatingLabel;
+                }
+            }
             RefreshCountryColors();
         }
 

@@ -16,12 +16,12 @@ namespace Meridian.Map
         // static texture, so this is pushed much closer than the old equirectangular build ever
         // needed.
         public float minOrthoSize = 0.03f; // most zoomed-in (~a few km of view height)
-        // Mercator's Y range at the standard polar cutoff is ±180 (matching X), doubled from
-        // equirectangular's ±90 — maxOrthoSize scales up to match so "zoomed all the way out"
-        // still frames the whole map with the same margin as before.
-        public float maxOrthoSize = 200f;
+        // The whole projected map spans ±180 on both axes. 180 = the map exactly fills the
+        // viewport's height when fully zoomed out; anything larger would show empty void
+        // around the world.
+        public float maxOrthoSize = 180f;
         public float zoomSpeed = 0.15f;
-        public float latitudeClamp = 170f; // keep the camera center within the projected map
+        const float MapExtent = 180f; // half-extent of the Mercator world square
 
         Camera cam;
         Vector3 dragOriginWorld;
@@ -32,10 +32,12 @@ namespace Meridian.Map
             cam = GetComponent<Camera>();
             cam.orthographic = true;
             cam.orthographicSize = Mathf.Clamp(180f, minOrthoSize, maxOrthoSize);
-            // Start centered on the map. Keep the camera in front of the z=0 map plane.
-            // (10, 20) is still a reasonable starting center post-Mercator — at moderate
-            // latitudes like 20° the projection is close to linear, so this barely shifts.
-            transform.position = new Vector3(10f, 20f, -10f);
+            // Start centered on the whole map. At this fully-zoomed-out size the view is as
+            // tall as (or, on any landscape aspect, wider than) the map itself, so
+            // ClampPosition's very first call would force any off-center start back to 0
+            // anyway — start there directly instead of setting a value the clamp immediately
+            // discards.
+            transform.position = new Vector3(0f, 0f, -10f);
         }
 
         void Update()
@@ -97,11 +99,27 @@ namespace Meridian.Map
             transform.position += shift;
         }
 
+        // Keeps the VIEW inside the map, not just the camera center: the visible half-extents
+        // (orthoSize vertically, orthoSize × aspect horizontally) are subtracted from the map
+        // bounds so no pan or zoom can ever show void beyond an edge. On ultrawide monitors
+        // the view is wider than the whole map until fairly zoomed in — that axis locks
+        // centered (the clamp range inverts, so min/max swap to 0).
         void ClampPosition()
         {
+            float halfH = cam.orthographicSize;
+            float halfW = halfH * cam.aspect;
+
             var p = transform.position;
-            p.y = Mathf.Clamp(p.y, -latitudeClamp, latitudeClamp);
+            p.x = ClampAxis(p.x, halfW);
+            p.y = ClampAxis(p.y, halfH);
             transform.position = p;
+        }
+
+        static float ClampAxis(float center, float halfView)
+        {
+            float room = MapExtent - halfView;
+            if (room <= 0f) return 0f; // view wider than the map — lock centered
+            return Mathf.Clamp(center, -room, room);
         }
     }
 }

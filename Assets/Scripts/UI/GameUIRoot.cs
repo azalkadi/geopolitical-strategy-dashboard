@@ -51,6 +51,8 @@ namespace Meridian.UI
         TextField startScreenSearch;
         VisualElement continueBtn;
         bool? hasValidSave; // checked once per session, not per keystroke (the save is megabytes)
+        VisualElement previewCard;
+        int previewIndex = -1;
         VisualElement gameOverScreen;
         Label gameOverMessage;
         Label gameOverStats;
@@ -96,6 +98,17 @@ namespace Meridian.UI
             public Func<bool> Good; // null = neutral color
         }
         readonly List<LiveStatBinding> activeLiveStats = new();
+
+        // Progress bars for 0-100 indices (approval, readiness, mood...) that keep filling/
+        // draining live while the panel is open.
+        class LiveBarBinding
+        {
+            public VisualElement Fill;
+            public Label ValueLabel;
+            public Func<float> Get;
+            public Func<bool> Good;
+        }
+        readonly List<LiveBarBinding> activeLiveBars = new();
 
         void Awake()
         {
@@ -155,7 +168,7 @@ namespace Meridian.UI
             title.style.marginRight = 12;
             bar.Add(title);
 
-            dayLabel = MakeLabel("Day 0", 13, GameTheme.TextPrimary, bold: true);
+            dayLabel = MakeLabel(DateString(0), 13, GameTheme.TextPrimary, bold: true);
             dayLabel.style.marginRight = 12;
             bar.Add(dayLabel);
 
@@ -408,12 +421,36 @@ namespace Meridian.UI
             sidePanel.Add(panelBody);
         }
 
+        // Where content helpers (Stat/StatBar/AddSlider/...) append. Defaults to panelBody;
+        // StartCard temporarily redirects it into a card so whole sections get card styling
+        // without every helper needing a container parameter.
+        VisualElement currentContainer;
+
+        void StartCard()
+        {
+            var card = new VisualElement();
+            card.style.backgroundColor = new StyleColor(GameTheme.BgCard);
+            card.style.borderTopLeftRadius = 6; card.style.borderTopRightRadius = 6;
+            card.style.borderBottomLeftRadius = 6; card.style.borderBottomRightRadius = 6;
+            card.style.borderLeftWidth = 2;
+            card.style.borderLeftColor = new StyleColor(GameTheme.Muted(UIState.ActiveCategory.Accent(), 0.35f));
+            card.style.paddingLeft = 10; card.style.paddingRight = 10;
+            card.style.paddingTop = 8; card.style.paddingBottom = 8;
+            card.style.marginBottom = 8;
+            panelBody.Add(card);
+            currentContainer = card;
+        }
+
+        void EndCard() => currentContainer = panelBody;
+
         void RebuildSidePanel()
         {
             activeSliders.Clear();
             activeSparklines.Clear();
             activeLiveStats.Clear();
+            activeLiveBars.Clear();
             panelBody.Clear();
+            currentContainer = panelBody;
 
             int sel = interaction.Selected;
             if (map.World == null || sel < 0 || sel >= map.World.Countries.Count || !UIState.PanelOpen)
@@ -469,39 +506,46 @@ namespace Meridian.UI
                 return;
             }
 
+            StartCard();
             SectionHeader("ECONOMY");
             string real = e.HasRealBaseline ? "" : "  (placeholder baseline)";
             Stat("GDP", $"${e.Gdp:n1}B{real}");
+            Stat("GDP per capita", $"${e.GdpPerCapita:n0}");
             StatColored("Growth", $"{e.GrowthRate:0.0}%/yr", e.GrowthRate >= 0);
             Stat("Unemployment", $"{e.Unemployment:0.0}%");
             Stat("Inflation", $"{e.Inflation:0.0}%");
             StatColored("Treasury", $"${e.Treasury:n1}B", e.Treasury >= 0);
             Stat("Effective tax rate", $"{e.EffectiveTaxRate():0.0}%");
             Why(e.LastWhy);
+            EndCard();
 
             // History charts exist only for the nation the player actually governs — the sim
             // doesn't record daily series for all 258 countries.
             if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Gdp.Count >= 2)
             {
+                StartCard();
+                SectionHeader("TRENDS");
                 AddSparkline("GDP ($B)", PlayerHistory.Gdp, GameTheme.Accent);
                 AddSparkline("Growth (%/yr)", PlayerHistory.Growth, GameTheme.Positive);
                 AddSparkline("Inflation (%)", PlayerHistory.Inflation, GameTheme.Negative);
+                EndCard();
             }
 
-            Divider();
             DrawTaxSection(e);
         }
 
         void DrawTaxSection(EconomyState e)
         {
+            StartCard();
             SectionHeader("CORE TAXES & RATES");
             AddSlider("Income tax", () => e.TaxIncome, 0f, 60f, v => e.TaxIncome = v);
             AddSlider("Corporate tax", () => e.TaxCorporate, 0f, 60f, v => e.TaxCorporate = v);
             AddSlider("VAT", () => e.TaxVat, 0f, 40f, v => e.TaxVat = v);
             AddSlider("Tariffs", () => e.TaxTariff, 0f, 40f, v => e.TaxTariff = v);
             AddSlider("Interest rate", () => e.InterestRate, 0f, 20f, v => e.InterestRate = v);
+            EndCard();
 
-            Divider();
+            StartCard();
             SectionHeader($"CUSTOM TAXES ({e.CustomTaxes.Count})");
             HelpText("Create any tax you want — a plastic bag tax, a sugar tax, a luxury tax, a carbon tax, anything. Drag to set its rate, or remove it entirely.");
             foreach (var tax in e.CustomTaxes)
@@ -510,6 +554,7 @@ namespace Meridian.UI
                 AddSlider(t.Name, () => t.Rate, 0f, 50f, v => t.Rate = v, onRemove: () => e.CustomTaxes.Remove(t));
             }
             AddNewTaxRow(e);
+            EndCard();
         }
 
         // Small "Economy › Tax Rates" trail with a clickable way back to the category overview
@@ -531,14 +576,14 @@ namespace Meridian.UI
             row.Add(sep);
 
             row.Add(MakeLabel(topic, 12, UIState.ActiveCategory.Accent(), bold: true));
-            panelBody.Add(row);
+            currentContainer.Add(row);
         }
 
         void AddNewTaxRow(EconomyState e)
         {
             var hint = MakeLabel("New tax name:", 10, GameTheme.TextDim);
             hint.style.marginTop = 10;
-            panelBody.Add(hint);
+            currentContainer.Add(hint);
 
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
@@ -562,80 +607,122 @@ namespace Meridian.UI
             addBtn.style.width = 80; addBtn.style.height = 26;
             row.Add(addBtn);
 
-            panelBody.Add(row);
+            currentContainer.Add(row);
         }
 
         void DrawBudget(EconomyState e)
         {
+            StartCard();
             SectionHeader("BUDGET");
             Stat("Annual revenue", $"${e.AnnualRevenue:n1}B");
             Stat("Annual expenditure", $"${e.AnnualExpenditure:n1}B");
             StatColored("Deficit/Surplus", $"{(e.AnnualDeficit > 0 ? "-" : "+")}${System.Math.Abs(e.AnnualDeficit):n1}B/yr", e.AnnualDeficit <= 0);
-            Divider();
+            Why(e.LastWhy);
+            EndCard();
+
+            StartCard();
+            SectionHeader("SOVEREIGN DEBT");
             Stat("Public debt", $"${e.PublicDebt:n1}B");
             StatColored("Debt-to-GDP", $"{e.DebtToGdp:0.0}%", e.DebtToGdp <= 60.0);
-            Why(e.LastWhy);
+            LiveStat("Credit rating", () => e.CreditRatingLabel, () => EconomyState.RatingRank(e.CreditRatingLabel) <= 2);
+            LiveStat("Debt service", () => $"${e.AnnualDebtService:n1}B/yr", () => e.AnnualDebtService < e.AnnualRevenue * 0.1);
+            HelpText("Debt accrues interest at your policy rate PLUS a market risk premium that worsens with every rating tier. Past BBB the interest bill starts feeding the debt that causes it.");
+            EndCard();
 
-            Divider();
+            StartCard();
             SectionHeader("SPENDING (% OF GDP)");
             AddSlider("Education", () => e.SpendEducation, 0f, 12f, v => e.SpendEducation = v);
             AddSlider("Healthcare", () => e.SpendHealthcare, 0f, 15f, v => e.SpendHealthcare = v);
             AddSlider("Infrastructure", () => e.SpendInfrastructure, 0f, 12f, v => e.SpendInfrastructure = v);
             Stat("Other government", $"{EconomyState.SpendBase:0.0}%");
             HelpText("Infrastructure and education feed growth, education also drives innovation, healthcare lifts public mood — all of it costs treasury every day. 'Other' (administration, pensions, debt service) is fixed.");
+            EndCard();
 
             if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Treasury.Count >= 2)
             {
-                Divider();
+                StartCard();
                 AddSparkline("Treasury ($B)", PlayerHistory.Treasury, GameTheme.Accent);
+                EndCard();
             }
         }
 
         void DrawTrade(EconomyState e)
         {
+            StartCard();
             SectionHeader("TRADE");
             Stat("Exports", $"${e.Exports:n1}B");
             Stat("Imports", $"${e.Imports:n1}B");
             StatColored("Trade balance", $"{(e.TradeBalance >= 0 ? "+" : "")}{e.TradeBalance:n1}B", e.TradeBalance >= 0);
-            Divider();
             Stat("Tariff rate", $"{e.TaxTariff:0.0}%");
             HelpText("Higher tariffs shrink imports and improve the trade balance — adjust tariffs under Economy.");
+            EndCard();
+
+            int sel = interaction.Selected;
+            if (map.Diplomacy != null && sel >= 0)
+            {
+                var partners = map.Diplomacy.AgreementPartnersOf(sel);
+                StartCard();
+                SectionHeader($"TRADE AGREEMENTS ({partners.Count})");
+                if (partners.Count == 0)
+                    HelpText("No agreements in force. Warm relations to 65+ under Diplomacy, then sign — each agreement permanently lifts exports on both sides.");
+                foreach (int p in partners)
+                    Stat(map.World.Countries[p].Name, $"+{DiplomacySystem.AgreementExportBonus * 100:0.0}% exports");
+                EndCard();
+            }
         }
 
         void DrawPolitics(NationalState n)
         {
+            StartCard();
             SectionHeader("POLITICS");
-            if (n == null) { HelpText("No data."); return; }
-            StatColored("Approval rating", $"{n.ApprovalRating:0.0}%", n.ApprovalRating >= 50f);
-            HelpText("Approval drifts with growth, unemployment, and inflation — govern well and it rises.");
+            if (n == null) { HelpText("No data."); EndCard(); return; }
+            StatBar("Approval rating", () => n.ApprovalRating, GameTheme.Accent, () => n.ApprovalRating >= 50f);
+            if (interaction.Selected == PlayerState.CountryIndex)
+            {
+                long daysLeft = System.Math.Max(0, PlayerState.TermStartDay + PlayerState.TermLengthDays - interaction.SimDay);
+                Stat("Next election", DateString(PlayerState.TermStartDay + PlayerState.TermLengthDays));
+                Stat("Terms served", $"{PlayerState.TermsServed}");
+                HelpText(daysLeft > 0
+                    ? "Above 50% on election day is safe; below 35% is a loss; in between is a gamble."
+                    : "The election is due.");
+            }
+            else
+            {
+                HelpText("Approval drifts with growth, unemployment, and inflation — govern well and it rises.");
+            }
+            EndCard();
 
             if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Approval.Count >= 2)
             {
-                Divider();
+                StartCard();
                 SectionHeader("YOUR RECORD");
                 AddSparkline("Approval (%)", PlayerHistory.Approval, GameTheme.Accent);
                 AddSparkline("Unemployment (%)", PlayerHistory.Unemployment, GameTheme.Negative);
                 HelpText("The whole term at a glance — this chart is what the election is really about.");
+                EndCard();
             }
         }
 
         void DrawMilitary(NationalState n)
         {
+            StartCard();
             SectionHeader("MILITARY");
-            if (n == null) { HelpText("No data."); return; }
-            StatColored("Readiness index", $"{n.ReadinessIndex:0.0}", n.ReadinessIndex >= 50f);
+            if (n == null) { HelpText("No data."); EndCard(); return; }
+            StatBar("Readiness index", () => n.ReadinessIndex, UIState.ActiveCategory.Accent(), () => n.ReadinessIndex >= 50f);
 
             int me = PlayerState.CountryIndex;
             int sel = interaction.Selected;
             var e = map.Economy != null && sel >= 0 && sel < map.Economy.States.Count ? map.Economy.States[sel] : null;
-            if (e != null) Stat("Military strength", $"{WarSystem.Strength(e, n):0.0}");
+            if (e != null) LiveStat("Military strength", () => $"{WarSystem.Strength(e, n):0.0}");
+            EndCard();
 
             if (sel == me)
             {
-                Divider();
+                StartCard();
                 SectionHeader("SPENDING");
                 AddSlider("Defense (% GDP)", () => n.DefenseSpending, 0f, 10f, v => n.DefenseSpending = v);
                 HelpText("Readiness drifts toward a target set by defense spending. Strength = economy × defense share × readiness.");
+                EndCard();
                 DrawOwnWars(me);
             }
             else if (me >= 0 && map.Wars != null)
@@ -650,7 +737,7 @@ namespace Meridian.UI
             var wars = map.Wars?.WarsOf(me);
             if (wars == null || wars.Count == 0) return;
 
-            Divider();
+            StartCard();
             SectionHeader("ACTIVE WARS");
             foreach (var w in wars)
             {
@@ -677,7 +764,7 @@ namespace Meridian.UI
                         builtForCategory = (NationCategory)(-1);
                     }, align: TextAnchor.MiddleLeft);
                     demandBtn.style.height = 30; demandBtn.style.marginTop = 4;
-                    panelBody.Add(demandBtn);
+                    currentContainer.Add(demandBtn);
                 }
 
                 var peaceBtn = MakeButton("Offer White Peace", 12, GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextPrimary, () =>
@@ -687,16 +774,17 @@ namespace Meridian.UI
                     builtForCategory = (NationCategory)(-1);
                 }, align: TextAnchor.MiddleLeft);
                 peaceBtn.style.height = 30; peaceBtn.style.marginTop = 4;
-                panelBody.Add(peaceBtn);
+                currentContainer.Add(peaceBtn);
                 Divider();
             }
             HelpText("War score above +40 lets you demand reparations. Exhaustion grinds down approval and mood the longer a war runs — wars must END.");
+            EndCard();
         }
 
         // A foreign country's Military tab: the war option, or the state of your war with them.
         void DrawForeignMilitary(int me, int sel)
         {
-            Divider();
+            StartCard();
             var existing = map.Wars.WarBetween(me, sel);
             if (existing != null)
             {
@@ -706,6 +794,7 @@ namespace Meridian.UI
                     () => { float s = iAmAttacker ? existing.Score : -existing.Score; return $"{s:+0.0;-0.0;0.0}"; },
                     () => (iAmAttacker ? existing.Score : -existing.Score) >= 0f);
                 HelpText("Manage this war from your own country's Military ministry.");
+                EndCard();
                 return;
             }
 
@@ -719,7 +808,7 @@ namespace Meridian.UI
                     builtForCategory = (NationCategory)(-1);
                 }, align: TextAnchor.MiddleLeft);
                 declareBtn.style.height = 32; declareBtn.style.marginTop = 4;
-                panelBody.Add(declareBtn);
+                currentContainer.Add(declareBtn);
                 HelpText("Declaring war floors relations, costs international standing, and drags both economies daily until peace. Compare military strength first.");
             }
             else
@@ -729,18 +818,21 @@ namespace Meridian.UI
                     ? $"Relations are too warm to justify war (must be below {WarSystem.DeclareRelationCeiling:0}; currently {rel:0})."
                     : "War is not possible right now (already at war, or a trade agreement binds you).");
             }
+            EndCard();
         }
 
         void DrawDiplomacy(NationalState n)
         {
+            StartCard();
             SectionHeader("DIPLOMACY");
-            if (n == null) { HelpText("No data."); return; }
-            StatColored("International standing", $"{n.InternationalStanding:0.0}", n.InternationalStanding >= 50f);
+            if (n == null) { HelpText("No data."); EndCard(); return; }
+            StatBar("International standing", () => n.InternationalStanding, UIState.ActiveCategory.Accent(), () => n.InternationalStanding >= 50f);
 
             var dip = map.Diplomacy;
             int me = PlayerState.CountryIndex;
             int sel = interaction.Selected;
-            if (dip == null || me < 0) { HelpText("Standing is a composite of economic size, trade openness, and approval."); return; }
+            if (dip == null || me < 0) { HelpText("Standing is a composite of economic size, trade openness, and approval."); EndCard(); return; }
+            EndCard();
 
             if (sel >= 0 && sel != me && sel < dip.Count)
                 DrawBilateralDiplomacy(dip, me, sel);
@@ -752,18 +844,22 @@ namespace Meridian.UI
         // and the levers you can pull. This is where diplomacy is actually played.
         void DrawBilateralDiplomacy(DiplomacySystem dip, int me, int sel)
         {
-            Divider();
+            StartCard();
             SectionHeader($"RELATIONS WITH {map.World.Countries[sel].Name.ToUpperInvariant()}");
 
             float rel = dip.GetRelation(me, sel);
             string mood = rel >= 75f ? "Ally" : rel >= 60f ? "Friendly" : rel >= 40f ? "Neutral" : rel >= 25f ? "Strained" : "Hostile";
-            StatColored("Relationship", $"{rel:0} · {mood}", rel >= 50f);
+            // The "· {mood}" word in the header only recomputes on a full panel rebuild, but the
+            // fill color below is wired live off the same >=50 split, so at least the bar itself
+            // never visibly disagrees with the live numeric readout while the panel stays open.
+            StatBar($"Relationship · {mood}", () => dip.GetRelation(me, sel), GameTheme.Positive, () => dip.GetRelation(me, sel) >= 50f);
             if (dip.HasAgreement(me, sel)) Stat("Trade agreement", "IN FORCE");
 
             bool onCooldown = !dip.CanAct(me, sel, interaction.SimDay);
             if (onCooldown)
             {
                 HelpText("Diplomatic channels need time to reset after your last move here (90 days between actions per country).");
+                EndCard();
                 return;
             }
 
@@ -778,7 +874,7 @@ namespace Meridian.UI
                     builtForCategory = (NationCategory)(-1);
                 }, align: TextAnchor.MiddleLeft);
             aidBtn.style.height = 30; aidBtn.style.marginTop = 6;
-            panelBody.Add(aidBtn);
+            currentContainer.Add(aidBtn);
 
             if (!dip.HasAgreement(me, sel))
             {
@@ -791,7 +887,7 @@ namespace Meridian.UI
                         if (result != null) { ShowToast(PlayerState.CountryName, result); builtForCategory = (NationCategory)(-1); }
                     }, align: TextAnchor.MiddleLeft);
                 tradeBtn.style.height = 30; tradeBtn.style.marginTop = 4;
-                panelBody.Add(tradeBtn);
+                currentContainer.Add(tradeBtn);
             }
 
             var denounceBtn = MakeButton("Denounce Publicly", 12, GameTheme.Muted(GameTheme.Negative, 0.4f), GameTheme.Negative, GameTheme.TextPrimary, () =>
@@ -800,45 +896,66 @@ namespace Meridian.UI
                     builtForCategory = (NationCategory)(-1);
                 }, align: TextAnchor.MiddleLeft);
             denounceBtn.style.height = 30; denounceBtn.style.marginTop = 4;
-            panelBody.Add(denounceBtn);
+            currentContainer.Add(denounceBtn);
 
             HelpText("Aid buys warmth. Agreements need 65+ relations and lift both economies' exports permanently. Denouncing plays well at home and badly abroad.");
+            EndCard();
         }
 
         // Viewing your OWN Diplomacy tab = the world's view of you: warmest and frostiest
         // relationships at a glance. Click a country on the map to open its bilateral view.
         void DrawDiplomacyOverview(DiplomacySystem dip, int me)
         {
-            Divider();
+            StartCard();
             SectionHeader("CLOSEST PARTNERS");
             foreach (var (idx, rel) in dip.RankedFor(me, friendliest: true, topN: 5))
                 Stat(map.World.Countries[idx].Name, dip.HasAgreement(me, idx) ? $"{rel:0} ◆" : $"{rel:0}");
+            EndCard();
 
-            Divider();
+            StartCard();
             SectionHeader("MOST STRAINED");
             foreach (var (idx, rel) in dip.RankedFor(me, friendliest: false, topN: 5))
                 StatColored(map.World.Countries[idx].Name, $"{rel:0}", false);
+            EndCard();
 
             HelpText("◆ = trade agreement in force. Select another country on the map, then open Diplomacy, to send aid, sign agreements, or denounce.");
         }
 
         void DrawSociety(NationalState n)
         {
+            StartCard();
             SectionHeader("SOCIETY");
-            if (n == null) { HelpText("No data."); return; }
-            StatColored("Public mood", $"{n.PublicMood:0.0}", n.PublicMood >= 50f);
-            HelpText("Mood tracks daily-life conditions — unemployment and inflation, distinct from government approval.");
+            if (n == null) { HelpText("No data."); EndCard(); return; }
+            StatBar("Public mood", () => n.PublicMood, UIState.ActiveCategory.Accent(), () => n.PublicMood >= 50f);
+            HelpText("Mood tracks daily-life conditions — unemployment, inflation, healthcare — distinct from government approval.");
+            EndCard();
+
+            int sel = interaction.Selected;
+            var e = map.Economy != null && sel >= 0 && sel < map.Economy.States.Count ? map.Economy.States[sel] : null;
+            if (e != null)
+            {
+                StartCard();
+                SectionHeader("POPULATION");
+                LiveStat("Population", () => $"{e.Population:n0}");
+                LiveStat("Growth", () => $"{e.PopulationGrowth:+0.00;-0.00}%/yr", () => e.PopulationGrowth >= 0f);
+                HelpText("People vote with their feet and their cradles: good living conditions grow a nation, misery shrinks it.");
+                EndCard();
+            }
         }
 
         void DrawTechnology(NationalState n)
         {
+            StartCard();
             SectionHeader("TECHNOLOGY");
-            if (n == null) { HelpText("No data."); return; }
-            StatColored("Innovation index", $"{n.InnovationIndex:0.0}", n.InnovationIndex >= 50f);
-            Divider();
+            if (n == null) { HelpText("No data."); EndCard(); return; }
+            StatBar("Innovation index", () => n.InnovationIndex, UIState.ActiveCategory.Accent(), () => n.InnovationIndex >= 50f);
+            EndCard();
+
+            StartCard();
             SectionHeader("SPENDING");
             AddSlider("Research (% GDP)", () => n.ResearchSpending, 0f, 8f, v => n.ResearchSpending = v);
-            HelpText("Innovation drifts toward a target from economic scale and research spending.");
+            HelpText("Innovation drifts toward a target from economic scale, research spending, and education.");
+            EndCard();
         }
 
         // A small line chart over a HistorySeries, drawn with UI Toolkit's vector API
@@ -868,19 +985,38 @@ namespace Meridian.UI
                 const float pad = 2f;
 
                 var painter = mgc.painter2D;
-                painter.strokeColor = LineColor;
-                painter.lineWidth = 1.5f;
-                painter.BeginPath();
                 int n = Series.Count;
-                for (int i = 0; i < n; i++)
+                Vector2 PointAt(int i)
                 {
                     float x = (float)i / (n - 1) * w;
                     float t = (Series[i] - mn) / span;
-                    float y = pad + (1f - t) * (h - pad * 2f); // y-down: max value at top
-                    if (i == 0) painter.MoveTo(new Vector2(x, y));
-                    else painter.LineTo(new Vector2(x, y));
+                    return new Vector2(x, pad + (1f - t) * (h - pad * 2f)); // y-down: max at top
+                }
+
+                // Translucent area fill under the curve — reads as a chart, not just a squiggle.
+                painter.fillColor = new Color(LineColor.r, LineColor.g, LineColor.b, 0.16f);
+                painter.BeginPath();
+                painter.MoveTo(new Vector2(0, h));
+                for (int i = 0; i < n; i++) painter.LineTo(PointAt(i));
+                painter.LineTo(new Vector2(w, h));
+                painter.ClosePath();
+                painter.Fill();
+
+                painter.strokeColor = LineColor;
+                painter.lineWidth = 1.5f;
+                painter.BeginPath();
+                for (int i = 0; i < n; i++)
+                {
+                    if (i == 0) painter.MoveTo(PointAt(i));
+                    else painter.LineTo(PointAt(i));
                 }
                 painter.Stroke();
+
+                // "You are here" dot on the newest sample.
+                painter.fillColor = LineColor;
+                painter.BeginPath();
+                painter.Arc(PointAt(n - 1), 2.5f, 0, 360);
+                painter.Fill();
             }
         }
 
@@ -895,7 +1031,7 @@ namespace Meridian.UI
             var spacer = new VisualElement(); spacer.style.flexGrow = 1; head.Add(spacer);
             var (mn, mx) = series.Range();
             head.Add(MakeLabel(series.Count >= 2 ? $"{mn:0.#} – {mx:0.#}" : "gathering data…", 9, GameTheme.TextDim));
-            panelBody.Add(head);
+            currentContainer.Add(head);
 
             var chart = new Sparkline { Series = series, LineColor = color };
             chart.style.height = 36;
@@ -903,7 +1039,7 @@ namespace Meridian.UI
             chart.style.backgroundColor = new StyleColor(GameTheme.BgSliderTrack);
             chart.style.borderTopLeftRadius = 3; chart.style.borderTopRightRadius = 3;
             chart.style.borderBottomLeftRadius = 3; chart.style.borderBottomRightRadius = 3;
-            panelBody.Add(chart);
+            currentContainer.Add(chart);
             activeSparklines.Add(chart);
         }
 
@@ -914,7 +1050,7 @@ namespace Meridian.UI
             var l = MakeLabel(text, 12, UIState.ActiveCategory.Accent(), bold: true);
             l.style.letterSpacing = 1f;
             l.style.marginBottom = 4;
-            panelBody.Add(l);
+            currentContainer.Add(l);
         }
 
         // Deliberately mismatched sizes for label vs. value — small/dim/uppercase for the label,
@@ -927,7 +1063,7 @@ namespace Meridian.UI
             row.Add(MakeLabel(label.ToUpperInvariant(), 10, GameTheme.TextDim));
             var spacer = new VisualElement(); spacer.style.flexGrow = 1; row.Add(spacer);
             row.Add(MakeLabel(value, 14, GameTheme.TextPrimary, bold: true));
-            panelBody.Add(row);
+            currentContainer.Add(row);
         }
 
         void StatColored(string label, string value, bool good)
@@ -937,7 +1073,44 @@ namespace Meridian.UI
             row.Add(MakeLabel(label.ToUpperInvariant(), 10, GameTheme.TextDim));
             var spacer = new VisualElement(); spacer.style.flexGrow = 1; row.Add(spacer);
             row.Add(MakeLabel(value, 14, good ? GameTheme.Positive : GameTheme.Negative, bold: true));
-            panelBody.Add(row);
+            currentContainer.Add(row);
+        }
+
+        // A 0-100 index as a filled progress bar with the number overlaid — far more game-like
+        // than a raw decimal, and the fill keeps moving live while the panel is open. When
+        // `good` is given, the fill recolors green/red live too (same at-a-glance health signal
+        // StatColored/LiveStat give plain text rows) instead of staying a fixed ministry accent.
+        void StatBar(string label, Func<float> get, Color color, Func<bool> good = null)
+        {
+            var head = MakeLabel(label.ToUpperInvariant(), 10, GameTheme.TextDim);
+            head.style.marginBottom = 2;
+            currentContainer.Add(head);
+
+            var track = new VisualElement();
+            track.style.height = 14;
+            track.style.backgroundColor = new StyleColor(GameTheme.BgSliderTrack);
+            track.style.borderTopLeftRadius = 3; track.style.borderTopRightRadius = 3;
+            track.style.borderBottomLeftRadius = 3; track.style.borderBottomRightRadius = 3;
+            track.style.marginBottom = 6;
+            track.style.overflow = Overflow.Hidden;
+
+            float v0 = Mathf.Clamp(get(), 0f, 100f);
+            var fill = new VisualElement();
+            fill.style.position = Position.Absolute;
+            fill.style.left = 0; fill.style.top = 0; fill.style.bottom = 0;
+            fill.style.width = new Length(v0, LengthUnit.Percent);
+            fill.style.backgroundColor = new StyleColor(GameTheme.Muted(good == null ? color : (good() ? GameTheme.Positive : GameTheme.Negative), 0.25f));
+            fill.style.borderTopLeftRadius = 3; fill.style.borderBottomLeftRadius = 3;
+            track.Add(fill);
+
+            var val = MakeLabel($"{v0:0.0}", 10, GameTheme.TextPrimary, bold: true);
+            val.style.position = Position.Absolute;
+            val.style.left = 0; val.style.right = 0; val.style.top = 0; val.style.bottom = 0;
+            val.style.unityTextAlign = TextAnchor.MiddleCenter;
+            track.Add(val);
+
+            currentContainer.Add(track);
+            activeLiveBars.Add(new LiveBarBinding { Fill = fill, ValueLabel = val, Get = get, Good = good });
         }
 
         // Live variant: value re-reads every refresh tick while the panel is open, so numbers
@@ -951,7 +1124,7 @@ namespace Meridian.UI
             bool g = good?.Invoke() ?? true;
             var val = MakeLabel(get(), 14, good == null ? GameTheme.TextPrimary : (g ? GameTheme.Positive : GameTheme.Negative), bold: true);
             row.Add(val);
-            panelBody.Add(row);
+            currentContainer.Add(row);
             activeLiveStats.Add(new LiveStatBinding { ValueLabel = val, Get = get, Good = good });
         }
 
@@ -961,7 +1134,7 @@ namespace Meridian.UI
             var l = MakeLabel($"↳ {text}", 11, GameTheme.Accent);
             l.style.whiteSpace = WhiteSpace.Normal;
             l.style.marginTop = 4;
-            panelBody.Add(l);
+            currentContainer.Add(l);
         }
 
         void HelpText(string text)
@@ -969,7 +1142,7 @@ namespace Meridian.UI
             var l = MakeLabel(text, 10, GameTheme.TextDim);
             l.style.whiteSpace = WhiteSpace.Normal;
             l.style.marginTop = 4;
-            panelBody.Add(l);
+            currentContainer.Add(l);
         }
 
         void Divider()
@@ -978,7 +1151,7 @@ namespace Meridian.UI
             d.style.height = 1;
             d.style.marginTop = 8; d.style.marginBottom = 8;
             d.style.backgroundColor = new StyleColor(GameTheme.Border);
-            panelBody.Add(d);
+            currentContainer.Add(d);
         }
 
         static VisualElement Row()
@@ -1070,7 +1243,7 @@ namespace Meridian.UI
                 row.Add(removeBtn);
             }
 
-            panelBody.Add(row);
+            currentContainer.Add(row);
 
             // Position the thumb once the track has a resolved width (first layout pass).
             track.RegisterCallback<GeometryChangedEvent>(_ => PositionThumb(thumb, Mathf.InverseLerp(lo, hi, get())));
@@ -1154,9 +1327,15 @@ namespace Meridian.UI
             controlsRow.Add(continueBtn);
             startScreen.Add(controlsRow);
 
+            // Two columns: the country list on the left, a live preview card on the right that
+            // fills in when a country is clicked — you inspect a nation before governing it.
+            var contentRow = new VisualElement();
+            contentRow.style.flexDirection = FlexDirection.Row;
+            contentRow.style.flexGrow = 1;
+            startScreen.Add(contentRow);
+
             var listBox = new VisualElement();
             listBox.style.width = 420;
-            listBox.style.flexGrow = 1;
             listBox.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
             listBox.style.borderTopLeftRadius = 8; listBox.style.borderTopRightRadius = 8;
             listBox.style.borderBottomLeftRadius = 8; listBox.style.borderBottomRightRadius = 8;
@@ -1167,12 +1346,79 @@ namespace Meridian.UI
             listBox.style.borderBottomColor = new StyleColor(GameTheme.Border);
             listBox.style.paddingTop = 8; listBox.style.paddingBottom = 8;
             listBox.style.paddingLeft = 8; listBox.style.paddingRight = 8;
-            startScreen.Add(listBox);
+            contentRow.Add(listBox);
 
             var scroll = new ScrollView(ScrollViewMode.Vertical);
             scroll.style.flexGrow = 1;
             listBox.Add(scroll);
             startScreenList = scroll.contentContainer;
+
+            previewCard = new VisualElement();
+            previewCard.style.width = 300;
+            previewCard.style.marginLeft = 12;
+            previewCard.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
+            previewCard.style.borderTopLeftRadius = 8; previewCard.style.borderTopRightRadius = 8;
+            previewCard.style.borderBottomLeftRadius = 8; previewCard.style.borderBottomRightRadius = 8;
+            previewCard.style.borderLeftWidth = 3;
+            previewCard.style.borderLeftColor = new StyleColor(GameTheme.Accent);
+            previewCard.style.paddingLeft = 16; previewCard.style.paddingRight = 16;
+            previewCard.style.paddingTop = 14; previewCard.style.paddingBottom = 14;
+            previewCard.style.display = DisplayStyle.None;
+            previewCard.style.alignSelf = Align.FlexStart;
+            contentRow.Add(previewCard);
+        }
+
+        // Fills the preview card for a clicked country: the briefing before taking office.
+        void ShowCountryPreview(int idx)
+        {
+            previewIndex = idx;
+            previewCard.Clear();
+            previewCard.style.display = DisplayStyle.Flex;
+
+            var c = map.World.Countries[idx];
+            var e = map.Economy != null && idx < map.Economy.States.Count ? map.Economy.States[idx] : null;
+            var n = map.National != null && idx < map.National.States.Count ? map.National.States[idx] : null;
+
+            var name = MakeLabel(c.Name, 20, GameTheme.TextPrimary, bold: true);
+            previewCard.Add(name);
+            var region = MakeLabel($"{c.Continent} · {c.Subregion}", 11, GameTheme.TextDim);
+            region.style.marginBottom = 10;
+            previewCard.Add(region);
+
+            void PreviewStat(string label, string value)
+            {
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.marginBottom = 5;
+                row.Add(MakeLabel(label.ToUpperInvariant(), 10, GameTheme.TextDim));
+                var sp = new VisualElement(); sp.style.flexGrow = 1; row.Add(sp);
+                row.Add(MakeLabel(value, 13, GameTheme.TextPrimary, bold: true));
+                previewCard.Add(row);
+            }
+
+            PreviewStat("Population", $"{System.Math.Max(c.PopEst, 10_000L):n0}");
+            if (e != null)
+            {
+                PreviewStat("GDP", $"${e.Gdp:n1}B");
+                PreviewStat("GDP per capita", $"${e.GdpPerCapita:n0}");
+                PreviewStat("Trend growth", $"{e.BaseGrowthTarget:0.0}%/yr");
+            }
+            if (e != null && n != null)
+                PreviewStat("Military strength", $"{WarSystem.Strength(e, n):0.0}");
+
+            var hint = MakeLabel(
+                e != null && e.Gdp > 3000 ? "A heavyweight — global reach, global problems." :
+                e != null && e.Gdp > 300 ? "A serious middle power with room to climb." :
+                "A minnow among whales. The hardest, most interesting run.", 11, GameTheme.TextDim);
+            hint.style.whiteSpace = WhiteSpace.Normal;
+            hint.style.marginTop = 6; hint.style.marginBottom = 12;
+            previewCard.Add(hint);
+
+            int captured = idx;
+            var govern = MakeButton("TAKE OFFICE ▶", 14, GameTheme.BgButtonActive, GameTheme.BgButtonHover, GameTheme.TextPrimary,
+                () => BeginGame(captured, c.Name));
+            govern.style.height = 36;
+            previewCard.Add(govern);
         }
 
         // Country list depends on GeoJSON having finished loading (a few seconds after boot),
@@ -1199,8 +1445,9 @@ namespace Meridian.UI
                 var country = map.World.Countries[idx];
                 if (query.Length > 0 && !country.Name.ToLowerInvariant().Contains(query)) continue;
                 int capturedIdx = idx;
+                // Click = preview (the briefing on the right); TAKE OFFICE there confirms.
                 var row = MakeButton(country.Name, 13, GameTheme.BgPanel, GameTheme.BgButtonHover, GameTheme.TextPrimary,
-                    () => BeginGame(capturedIdx, country.Name), align: TextAnchor.MiddleLeft);
+                    () => ShowCountryPreview(capturedIdx), align: TextAnchor.MiddleLeft);
                 row.style.height = 30;
                 row.style.marginBottom = 2;
                 startScreenList.Add(row);
@@ -1361,6 +1608,9 @@ namespace Meridian.UI
             {
                 PlayerState.Reset();
                 map.RefreshCountryColors(); // back to the neutral palette until a new country is picked
+                previewCard.Clear();
+                previewCard.style.display = DisplayStyle.None;
+                previewIndex = -1;
                 gameOverScreen.style.display = DisplayStyle.None;
                 startScreen.style.display = DisplayStyle.Flex;
             });
@@ -1391,9 +1641,11 @@ namespace Meridian.UI
             }
         }
 
-        void ShowToast(string country, string message)
+        void ShowToast(string country, string message) => ShowToast(country, message, GameTheme.Accent);
+
+        void ShowToast(string country, string message, Color accent)
         {
-            if (activeToasts.Count >= 4)
+            if (activeToasts.Count >= 5)
             {
                 var oldest = activeToasts[0];
                 activeToasts.RemoveAt(0);
@@ -1403,7 +1655,7 @@ namespace Meridian.UI
             var box = new VisualElement();
             box.style.backgroundColor = new StyleColor(GameTheme.BgDropdown);
             box.style.borderLeftWidth = 3;
-            box.style.borderLeftColor = new StyleColor(GameTheme.Accent);
+            box.style.borderLeftColor = new StyleColor(accent);
             box.style.borderTopLeftRadius = 6; box.style.borderTopRightRadius = 6;
             box.style.borderBottomLeftRadius = 6; box.style.borderBottomRightRadius = 6;
             box.style.paddingLeft = 10; box.style.paddingRight = 10; box.style.paddingTop = 6; box.style.paddingBottom = 6;
@@ -1507,8 +1759,12 @@ namespace Meridian.UI
             CheckForNewEvents();
 
             // World headlines (war declarations, peaces, AI agreements) from the sim.
+            // War news gets the red edge; everything else the standard gold.
             while (WorldFeed.TryDequeue(out string src, out string msg))
-                ShowToast(src, msg);
+            {
+                bool warNews = msg.StartsWith("WAR") || msg.Contains("war ") || msg.Contains(" war") || msg.Contains("crushed") || msg.Contains("capitulat");
+                ShowToast(src, msg, warNews ? GameTheme.Negative : GameTheme.Accent);
+            }
 
             // Decision-event modal: visible exactly while a decision is pending, rebuilt once
             // per distinct event (not per refresh tick — the buttons hold closures).
@@ -1521,7 +1777,7 @@ namespace Meridian.UI
             }
             if (pendingEvent == null) builtForEvent = null;
 
-            dayLabel.text = $"Day {interaction.SimDay}";
+            dayLabel.text = DateString(interaction.SimDay);
 
             if (PlayerState.CountryIndex >= 0)
             {
@@ -1619,6 +1875,15 @@ namespace Meridian.UI
                     if (ls.Good != null)
                         ls.ValueLabel.style.color = ls.Good() ? GameTheme.Positive : GameTheme.Negative;
                 }
+
+                foreach (var lb in activeLiveBars)
+                {
+                    float v = Mathf.Clamp(lb.Get(), 0f, 100f);
+                    lb.Fill.style.width = new Length(v, LengthUnit.Percent);
+                    lb.ValueLabel.text = $"{v:0.0}";
+                    if (lb.Good != null)
+                        lb.Fill.style.backgroundColor = new StyleColor(GameTheme.Muted(lb.Good() ? GameTheme.Positive : GameTheme.Negative, 0.25f));
+                }
             }
         }
 
@@ -1627,6 +1892,11 @@ namespace Meridian.UI
             topStatLabels[i].text = text;
             topStatLabels[i].style.color = good ? GameTheme.Positive : GameTheme.Negative;
         }
+
+        // Day 0 of the simulation = January 1, 2026. Real dates read as a world, "Day 1382"
+        // reads as a spreadsheet.
+        static readonly DateTime Epoch = new DateTime(2026, 1, 1);
+        public static string DateString(long day) => Epoch.AddDays(day).ToString("MMM d, yyyy");
 
         // ============================== ELEMENT FACTORIES ==============================
 
