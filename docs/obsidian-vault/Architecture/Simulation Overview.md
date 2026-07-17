@@ -21,6 +21,8 @@ entire simulation as a dumb, complete JSON dump and get a bit-identical reload.
 7. [[History and World Feed|PlayerHistory]].`Record()` — one sample of the player's own numbers
 8. [[Decision Events]] `EventSystem.MaybeFire()` — for the player's country only; if one fires,
    the clock freezes here for the rest of the frame/until decided
+9. [[Buildable Infrastructure]] `InfrastructureSystem.TickAll(day)` — flips any route whose
+   construction day has arrived, toasts it, and triggers one map mesh rebuild
 
 Map coloring also refreshes at the end of this: see [[Map Modes and Coloring]].
 
@@ -35,6 +37,7 @@ Map coloring also refreshes at the end of this: see [[Map Modes and Coloring]].
 | [[World AI]] | Autonomous AI wars & trade agreements | [[War System]], [[Diplomacy System]] |
 | [[Decision Events]] | Random 2-3-choice player events | [[Economy System]], [[National State]] |
 | [[Player State and Elections]] | Which country the human plays, term/election state | [[National State]] (approval rating) |
+| [[Buildable Infrastructure]] | Player-built road/rail links between own cities | [[Economy System]] (treasury), [[Geo Pipeline\|City]] positions |
 | [[Save Load]] | JSON snapshot of the whole simulation | all of the above |
 | [[History and World Feed]] | Player sparkline history + cross-system headline queue | [[Economy System]], [[National State]] |
 

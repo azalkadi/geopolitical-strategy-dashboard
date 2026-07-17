@@ -75,6 +75,7 @@ namespace Meridian.Map
         public WarSystem Wars { get; private set; }
         public WorldAI WorldAI { get; private set; }
         public GeoWorldNames CountryNames { get; private set; }
+        public InfrastructureSystem Infrastructure { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -89,6 +90,7 @@ namespace Meridian.Map
         public GameObject BorderCrossingsRoot { get; private set; }
         public GameObject WaterCrossingsRoot { get; private set; }
         public GameObject WaterCrossingLinesRoot { get; private set; }
+        public GameObject PlayerInfrastructureRoot { get; private set; }
 
         public MapMode CurrentMode { get; private set; } = MapMode.Political;
 
@@ -167,6 +169,10 @@ namespace Meridian.Map
             CountryNames = new GeoWorldNames(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Name : "?");
             WorldAI = new WorldAI(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Continent : "");
 
+            // Player-buildable road/rail links — empty until the player actually builds one
+            // (or a save is loaded); see RebuildPlayerInfrastructure.
+            Infrastructure = new InfrastructureSystem();
+
             BuildCountryMeshes();
             BuildCountryBorders();
             BuildProvinceBorders();
@@ -176,6 +182,7 @@ namespace Meridian.Map
             BuildRoadsAndRailways();
             BuildBorderCrossingMarkers();
             BuildWaterCrossings();
+            RebuildPlayerInfrastructure();
 
             // Satellite imagery is the default view — the flat political fills are a toggle,
             // not the base map — but only if the basemap actually loaded; otherwise stay on
@@ -191,6 +198,8 @@ namespace Meridian.Map
             SaveLoad.Apply(save, Economy, National);
             Diplomacy = save.Diplomacy;
             Wars = save.Wars;
+            // Older saves predate player-buildable infrastructure and deserialize this as null.
+            Infrastructure = save.Infrastructure ?? new InfrastructureSystem();
 
             // Migration: saves written before population dynamics existed deserialize with
             // Population = 0 — reseed those from the geo data instead of simulating a
@@ -209,6 +218,7 @@ namespace Meridian.Map
                 }
             }
             RefreshCountryColors();
+            RebuildPlayerInfrastructure();
         }
 
         // Loads the satellite basemap (StreamingAssets/basemap/satellite.jpg) — the always-
@@ -448,6 +458,19 @@ namespace Meridian.Map
         // fully solid/continuous (so the existing joint-at-every-vertex fix still closes every
         // bend, same as roads) and drawing ties as a decorative overlay on top sidesteps that
         // mismatch entirely.
+        // Cartographic "casing" — a wider, dark base pass under the bright color pass — is what
+        // makes real road/rail map lines read as substantial infrastructure instead of a flat
+        // colored ribbon; the casing peeking out past the core's edges on both sides is the
+        // whole effect. One fixed dark color for both roads and railways (rather than a per-
+        // color darkened variant) since it needs to read as an outline/shadow under ANY core
+        // color, including railwayColor which is already near-black — a "darker than near-
+        // black" casing would be invisible, but a fixed dark-neutral casing still shows through.
+        static readonly Color CasingColor = new Color(0.04f, 0.05f, 0.07f, 0.65f);
+        const float CasingWidthMultiplier = 1.9f;
+        // Sits fractionally further from the camera than the core (more negative Z = closer,
+        // see the Z-ordering convention above) so the two passes never z-fight.
+        const float CasingZEpsilon = 0.002f;
+
         void BuildRoadsAndRailways()
         {
             RoadsRoot = BuildLineFeaturesRoot("Roads", World.Roads, roadColor, RoadZ, roadWidth);
@@ -461,6 +484,19 @@ namespace Meridian.Map
             root.transform.SetParent(transform, false);
             root.SetActive(false); // MapLayers reveals this once zoomed in enough
 
+            BuildLineMesh(root.transform, rootName + "_Casing", features, CasingColor, z + CasingZEpsilon, pixelHalfWidth * CasingWidthMultiplier);
+            BuildLineMesh(root.transform, rootName + "_Core", features, color, z, pixelHalfWidth);
+            return root;
+        }
+
+        // Builds one line-feature mesh (all features' lines merged into a single draw call) as
+        // a child of `parent`. Shared by both the casing and core passes, and by the railway
+        // core (which additionally interleaves tie marks — see BuildRailwaysRoot).
+        GameObject BuildLineMesh(Transform parent, string name, List<LineFeature> features, Color color, float z, float pixelHalfWidth)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+
             var verts = new List<Vector3>();
             var tris = new List<int>();
             var cols = new List<Color>();
@@ -468,9 +504,9 @@ namespace Meridian.Map
             foreach (var feat in features)
                 foreach (var line in feat.Lines)
                     AppendThickLine(verts, tris, cols, uvs, line, z, color);
-            if (verts.Count == 0) return root;
+            if (verts.Count == 0) return go;
 
-            var mesh = new Mesh { name = rootName };
+            var mesh = new Mesh { name = name };
             mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             mesh.SetVertices(verts);
             mesh.SetColors(cols);
@@ -478,24 +514,74 @@ namespace Meridian.Map
             mesh.SetTriangles(tris, 0);
             mesh.RecalculateBounds();
 
-            root.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var mr = root.AddComponent<MeshRenderer>();
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = MakeScreenLineMaterial(pixelHalfWidth);
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             mr.receiveShadows = false;
-            return root;
+            return go;
         }
 
-        // Railways: a solid line body (same joined-quad technique as roads) plus cross-tie tick
-        // marks at fixed arc-length spacing — the classic "railroad" cartography symbol — all in
-        // one mesh/material so ties automatically inherit the same constant-screen-pixel scaling
-        // as the line body (see AppendTie: tie dimensions are just larger multiples of the same
-        // per-vertex UV offset the line quads/joints already use, not a separate width control).
+        // Rebuilds the whole player-built road/rail mesh from Infrastructure.Routes — called
+        // once whenever a route completes (a rare event; at the scale a single game can produce
+        // — dozens, not thousands — a full rebuild from scratch is trivially cheap, no need for
+        // incremental append) and once after a save loads. Slightly bolder width and drawn a
+        // hair closer to the camera than natural roads/rail so a player's own construction
+        // visibly reads as "yours" even where it runs alongside/over existing infrastructure.
+        public void RebuildPlayerInfrastructure()
+        {
+            bool wasActive = PlayerInfrastructureRoot != null && PlayerInfrastructureRoot.activeSelf;
+            if (PlayerInfrastructureRoot != null) Destroy(PlayerInfrastructureRoot);
+            PlayerInfrastructureRoot = new GameObject("PlayerInfrastructure");
+            PlayerInfrastructureRoot.transform.SetParent(transform, false);
+
+            var roadFeatures = new List<LineFeature>();
+            var railFeatures = new List<LineFeature>();
+            if (Infrastructure != null)
+            {
+                foreach (var r in Infrastructure.Routes)
+                {
+                    if (!r.Completed) continue;
+                    if (r.FromCity < 0 || r.FromCity >= World.Cities.Count || r.ToCity < 0 || r.ToCity >= World.Cities.Count) continue;
+                    var line = new List<Vector2> { World.Cities[r.FromCity].Pos, World.Cities[r.ToCity].Pos };
+                    var feat = new LineFeature { Name = $"{r.FromName}-{r.ToName}", Lines = new List<List<Vector2>> { line } };
+                    (r.IsRailway ? railFeatures : roadFeatures).Add(feat);
+                }
+            }
+
+            const float playerZBias = -0.0005f; // closer to camera than the natural layer
+            const float playerWidthBoost = 1.15f;
+            if (roadFeatures.Count > 0)
+            {
+                BuildLineMesh(PlayerInfrastructureRoot.transform, "PlayerRoads_Casing", roadFeatures, CasingColor, RoadZ + CasingZEpsilon + playerZBias, roadWidth * CasingWidthMultiplier * playerWidthBoost);
+                BuildLineMesh(PlayerInfrastructureRoot.transform, "PlayerRoads_Core", roadFeatures, roadColor, RoadZ + playerZBias, roadWidth * playerWidthBoost);
+            }
+            if (railFeatures.Count > 0)
+            {
+                BuildLineMesh(PlayerInfrastructureRoot.transform, "PlayerRail_Casing", railFeatures, CasingColor, RailZ + CasingZEpsilon + playerZBias, railwayWidth * CasingWidthMultiplier * playerWidthBoost);
+                BuildLineMesh(PlayerInfrastructureRoot.transform, "PlayerRail_Core", railFeatures, railwayColor, RailZ + playerZBias, railwayWidth * playerWidthBoost);
+            }
+
+            PlayerInfrastructureRoot.SetActive(wasActive);
+        }
+
+        // Railways: a dark casing pass (see BuildLineFeaturesRoot), then a solid line body (same
+        // joined-quad technique as roads) plus cross-tie tick marks at fixed arc-length spacing
+        // — the classic "railroad" cartography symbol — sharing one mesh/material so ties
+        // automatically inherit the same constant-screen-pixel scaling as the line body (see
+        // AppendTie: tie dimensions are just larger multiples of the same per-vertex UV offset
+        // the line quads/joints already use, not a separate width control). Ties therefore have
+        // to stay in the CORE mesh at the core's pixelHalfWidth, not the wider casing pass.
         GameObject BuildRailwaysRoot(List<LineFeature> features, float z, float pixelHalfWidth)
         {
             var root = new GameObject("Railways");
             root.transform.SetParent(transform, false);
             root.SetActive(false);
+
+            BuildLineMesh(root.transform, "Railways_Casing", features, CasingColor, z + CasingZEpsilon, pixelHalfWidth * CasingWidthMultiplier);
+
+            var coreGo = new GameObject("Railways_Core");
+            coreGo.transform.SetParent(root.transform, false);
 
             var verts = new List<Vector3>();
             var tris = new List<int>();
@@ -511,7 +597,7 @@ namespace Meridian.Map
             }
             if (verts.Count == 0) return root;
 
-            var mesh = new Mesh { name = "Railways" };
+            var mesh = new Mesh { name = "Railways_Core" };
             mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             mesh.SetVertices(verts);
             mesh.SetColors(cols);
@@ -519,8 +605,8 @@ namespace Meridian.Map
             mesh.SetTriangles(tris, 0);
             mesh.RecalculateBounds();
 
-            root.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var mr = root.AddComponent<MeshRenderer>();
+            coreGo.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = coreGo.AddComponent<MeshRenderer>();
             mr.sharedMaterial = MakeScreenLineMaterial(pixelHalfWidth);
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             mr.receiveShadows = false;

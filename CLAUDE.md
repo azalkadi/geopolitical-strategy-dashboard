@@ -294,8 +294,9 @@ Everything below is built, launched, and verified via Player.log + visual checks
   inserted a line immediately after `Wars = save.Wars;` in `MapRenderer.ApplySave`. Resolved by
   keeping both (population migration guard, then `RefreshCountryColors()`). This is the
   scenario the "Session handoff" section above exists to prevent — always fetch first.
-- **Not yet done:** country flags in the UI; Task #17 (casing-style road/rail visuals +
-  in-game player-buildable road/rail infrastructure) — see stage 4 of the roadmap canvas.
+- **Stage 4 (roadmap) — 3 of 4 done, same session as the review pass below:** country flags,
+  casing-style road/rail visuals, and player-buildable infrastructure all shipped — see the new
+  session entry below. Still open: deeper war/attacking-other-countries expansion.
 - **Post-merge review pass (same session):** ran an 8-angle automated review over the merged
   diff (most verify sub-agents hit a session usage cap, so findings were hand-verified against
   the actual code instead). Confirmed and fixed 5 real bugs: (1) `MapCameraController` — with
@@ -320,3 +321,34 @@ Everything below is built, launched, and verified via Player.log + visual checks
   reuse findings (duplicated population-floor logic across 3 call sites; `Diplomacy.
   AgreementPartnersOf` hand-unpacking `PairKey`'s bit layout instead of a shared helper) were
   left as-is — cosmetic, no observed failure mode, low priority next to the roadmap's stage 4.
+- **Stage 4 features (same session, after the fixes above):**
+  - **Country flags**: `Assets/StreamingAssets/flags/{iso_a2}.png` — 237 small PNGs downloaded
+    from flagcdn.com (see `docs/obsidian-vault/Data Sources/Country Flags.md` for the sourcing/
+    override details), loaded and cached by the new `FlagLoader.cs`. Shown in the side panel
+    header, the start-screen country preview card, and every row of the start-screen country list.
+  - **Casing-style road/rail rendering**: `MapRenderer.cs`'s road/rail builders now do a two-pass
+    "casing" (a wider, dark base layer) + "core" (the existing bright color, on top) draw, the
+    standard cartographic-depth trick — refactored the old single-mesh `BuildLineFeaturesRoot`/
+    `BuildRailwaysRoot` into a shared `BuildLineMesh` helper reused by both passes (and by the
+    new player-infrastructure layer below). Verified this doesn't break road/rail click-to-select
+    first — `MapInteraction.TryPickRoad` hit-tests the raw `World.Roads` data, not the rendered
+    mesh, so restructuring the mesh hierarchy was safe.
+  - **Player-buildable infrastructure**: new `Sim/Infrastructure.cs` (`InfrastructureSystem`/
+    `BuiltRoute`) — pick two of your own cities in the Budget tab (`GameUIRoot.
+    DrawInfrastructureBuilder`), see a live distance/cost/duration estimate (real haversine
+    distance off the cities' Mercator positions converted back via `GeoMath.MercatorToLonLat`),
+    build a road or railway. Costs treasury immediately, takes real sim-days
+    (`MapInteraction.TickEconomy`'s daily loop ticks it, toasts completions via WorldFeed, and
+    calls the new `MapRenderer.RebuildPlayerInfrastructure()` — which reuses the casing/core
+    mesh helper above). Fully wired into save/load (`SaveGame.Infrastructure`, null-safe migration
+    for older saves). Verified end-to-end with a new `MERIDIAN_DIAG_INFRA=1` diagnostic (mirrors
+    the diplomacy/war diag pattern): a real run booked a 511km Berlin→Stuttgart road ($15.3B,
+    61-day build), and it completed exactly on schedule (day 91) with real mesh geometry
+    produced (`playerInfraMeshChildren=2`). A second run combined with `MERIDIAN_DIAG_SAVE=1`
+    confirmed an in-progress (not yet completed) route survives a save/load roundtrip.
+  - Obsidian vault updated to match: new `Architecture/Buildable Infrastructure.md` and
+    `Data Sources/Country Flags.md` pages, `Development Roadmap.canvas` stage 4 marked 3-of-4
+    done, `Simulation Overview.md`/`Meridian.md` cross-links added.
+  - Full headless compile + player build clean throughout; not yet visually screenshot-checked
+    (this dev machine's automation clicks are unreliable — see the hardware-flakiness note — so
+    verification leaned on Player.log diagnostics instead, same as everything else this session).

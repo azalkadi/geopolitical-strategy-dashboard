@@ -74,6 +74,10 @@ namespace Meridian.Map
             SetActive(map.PortsRoot, z < infrastructureBelow);
             SetActive(map.RoadsRoot, z < roadsBelow);
             SetActive(map.RailwaysRoot, z < railwaysBelow);
+            // Player-built roads/rail share the natural roads' threshold — it mixes both types
+            // in one GameObject (see MapRenderer.RebuildPlayerInfrastructure), and the wider of
+            // the two natural thresholds is the more useful default for "did I build anything".
+            SetActive(map.PlayerInfrastructureRoot, z < roadsBelow);
             SetActive(map.AirBasesRoot, z < strategicBelow);
             SetActive(map.OilPortsRoot, z < strategicBelow);
             SetActive(map.NuclearPlantsRoot, z < strategicBelow);

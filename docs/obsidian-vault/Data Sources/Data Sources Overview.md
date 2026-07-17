@@ -15,6 +15,7 @@ map data anywhere.
   border crossings: no public dataset exists for these, so they're either filtered out of
   existing data or hand-researched
 - [[Satellite Basemap]] — the offline whole-world background image plus live ESRI tile streaming
+- [[Country Flags]] — 237 offline flag icons, one per ISO A2 code in the dataset
 
 ## Scale, roughly
 258 countries · 4,596 provinces · 7,342 cities · 893 airports · 1,081 ports · ~34,130 road

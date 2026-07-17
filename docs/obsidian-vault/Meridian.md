@@ -62,6 +62,7 @@ graph TD
     Sim --> AI[World AI]
     Sim --> Events[Decision Events]
     Sim --> Player[Player State and Elections]
+    Sim --> Infra[Buildable Infrastructure]
     Sim --> Save[Save Load]
     Sim --> Hist[History and World Feed]
 
@@ -77,6 +78,7 @@ graph TD
     Data --> NE[Natural Earth Datasets]
     Data --> Cur[Curated Datasets]
     Data --> Sat[Satellite Basemap]
+    Data --> Flags[Country Flags]
 ```
 
 This vault maps the game from three angles. Pick whichever door matches what you're trying to
@@ -91,8 +93,8 @@ need:
 - [[UI System]] — the entire HUD, hand-built in UI Toolkit
 - [[Simulation Overview]] — the tree of Sim/ systems and how they tick together
   - [[Economy System]], [[National State]], [[Diplomacy System]], [[War System]],
-    [[World AI]], [[Decision Events]], [[Player State and Elections]], [[Save Load]],
-    [[History and World Feed]]
+    [[World AI]], [[Decision Events]], [[Player State and Elections]],
+    [[Buildable Infrastructure]], [[Save Load]], [[History and World Feed]]
 
 ## 🎮 [[Gameplay Overview|Game Design]] — how it plays
 - [[Gameplay Overview]] — the core loop
@@ -104,6 +106,7 @@ need:
 - [[Natural Earth Datasets]] — countries, provinces, cities, ports, airports, roads, railways
 - [[Curated Datasets]] — air bases, oil ports, nuclear plants, water crossings, border crossings
 - [[Satellite Basemap]] — the offline Blue Marble background + live ESRI tile streaming
+- [[Country Flags]] — 237 offline flag icons for the UI
 
 ---
 

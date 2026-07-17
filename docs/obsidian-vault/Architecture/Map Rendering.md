@@ -32,6 +32,8 @@ assuming — this list is illustrative, not authoritative.
 7. **Roads and railways** (`BuildRoadsAndRailways`) — see "Line rendering" below.
 8. **Border crossing markers** and **water crossings** (`BuildBorderCrossingMarkers`,
    `BuildWaterCrossings`) — see [[Curated Datasets]].
+9. **Player-built infrastructure** (`RebuildPlayerInfrastructure`) — starts empty, rebuilt
+   whenever a route completes or a save loads. See [[Buildable Infrastructure]].
 
 ## Constant-screen-size markers: `ScreenDot.shader`
 City/airport/port/etc. markers all use the same trick: every quad's 4 vertices sit at the

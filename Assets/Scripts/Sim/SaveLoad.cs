@@ -37,6 +37,7 @@ namespace Meridian.Sim
         public List<NationalState> Nationals;
         public DiplomacySystem Diplomacy;
         public WarSystem Wars;
+        public InfrastructureSystem Infrastructure;
 
         public Dictionary<string, float[]> History;
     }
@@ -47,7 +48,7 @@ namespace Meridian.Sim
 
         public static bool SaveExists() => File.Exists(SavePath);
 
-        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars)
+        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars, InfrastructureSystem infra)
         {
             try
             {
@@ -69,6 +70,7 @@ namespace Meridian.Sim
                     Nationals = nat.States,
                     Diplomacy = dip,
                     Wars = wars,
+                    Infrastructure = infra,
                     History = new Dictionary<string, float[]>
                     {
                         ["gdp"] = PlayerHistory.Gdp.ToArray(),

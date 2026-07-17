@@ -92,7 +92,7 @@ namespace Meridian.Map
         public bool SaveNow()
         {
             if (map?.Economy == null || map.National == null || map.Diplomacy == null || map.Wars == null) return false;
-            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars);
+            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure);
         }
 
         // Autosave: quitting mid-game shouldn't cost the player their run.
@@ -163,11 +163,23 @@ namespace Meridian.Map
                         WorldFeed.Push("World", headline);
                 }
 
+                if (map.Infrastructure != null)
+                {
+                    var justCompleted = map.Infrastructure.TickAll(simDay);
+                    if (justCompleted.Count > 0)
+                    {
+                        foreach (var r in justCompleted)
+                            WorldFeed.Push("Infrastructure", $"{(r.IsRailway ? "Railway" : "Road")} completed: {r.FromName} — {r.ToName}.");
+                        map.RebuildPlayerInfrastructure();
+                    }
+                }
+
                 CheckElection(simDay);
                 LogEconomyDiagnostic();
                 MaybeRunDiplomacyDiag();
                 MaybeRunWarDiag();
                 MaybeRunSaveDiag();
+                MaybeRunInfraDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -251,6 +263,60 @@ namespace Meridian.Map
             Debug.Log($"[dipdiag] denounce target={map.World.Countries[frostiest.index].Name}: rel {frostyRelBefore:0.0}->{map.Diplomacy.GetRelation(me, frostiest.index):0.0} approval {approvalBefore:0.0}->{myNat.ApprovalRating:0.0}");
 
             Debug.Log($"[dipdiag] cooldown check: canActAgain={map.Diplomacy.CanAct(me, friendliest.index, simDay)} (expect False right after acting)");
+        }
+
+        // Dev-only: MERIDIAN_DIAG_INFRA=1 books a road between the player's two biggest own
+        // cities at day 30, then watches for it to actually complete and produce map geometry —
+        // verifies the whole buildable-infrastructure loop (cost/duration booking, daily
+        // completion tick, mesh rebuild) from Player.log alone, same rationale as the other
+        // diag flags (automation clicks are unreliable on this dev machine; env-var + log
+        // verification is not, and this loop runs for real sim-days so it can't be checked with
+        // a single synchronous call the way the diplomacy self-test can).
+        bool infraDiagStarted;
+        bool infraDiagCompleteLogged;
+        int infraDiagRouteIndex = -1;
+        void MaybeRunInfraDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_INFRA") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.Infrastructure == null || map.World == null) return;
+
+            if (!infraDiagStarted && simDay >= 30)
+            {
+                infraDiagStarted = true;
+                string countryName = map.World.Countries[me].Name;
+                var myCities = new List<int>();
+                for (int i = 0; i < map.World.Cities.Count; i++)
+                    if (map.World.Cities[i].Country == countryName) myCities.Add(i);
+                if (myCities.Count < 2)
+                {
+                    Debug.Log($"[infradiag] {countryName} has fewer than 2 cities in the dataset — skipping test");
+                    return;
+                }
+                myCities.Sort((a, b) => map.World.Cities[b].PopMax.CompareTo(map.World.Cities[a].PopMax));
+                int from = myCities[0], to = myCities[1];
+                var lonlatA = GeoMath.MercatorToLonLat(map.World.Cities[from].Pos.x, map.World.Cities[from].Pos.y);
+                var lonlatB = GeoMath.MercatorToLonLat(map.World.Cities[to].Pos.x, map.World.Cities[to].Pos.y);
+                double dist = InfrastructureSystem.DistanceKm(lonlatA, lonlatB);
+
+                var myEcon = map.Economy.States[me];
+                double treasuryBefore = myEcon.Treasury;
+                infraDiagRouteIndex = map.Infrastructure.Routes.Count;
+                string msg = map.Infrastructure.Begin(from, to, map.World.Cities[from].Name, map.World.Cities[to].Name,
+                    false, me, myEcon, simDay, dist);
+                Debug.Log($"[infradiag] {msg} treasury {treasuryBefore:0.00}->{myEcon.Treasury:0.00} (expect a drop)");
+            }
+
+            if (infraDiagStarted && !infraDiagCompleteLogged && infraDiagRouteIndex >= 0 && infraDiagRouteIndex < map.Infrastructure.Routes.Count)
+            {
+                var route = map.Infrastructure.Routes[infraDiagRouteIndex];
+                if (route.Completed)
+                {
+                    infraDiagCompleteLogged = true;
+                    int meshChildren = map.PlayerInfrastructureRoot != null ? map.PlayerInfrastructureRoot.transform.childCount : 0;
+                    Debug.Log($"[infradiag] route completed day {simDay} (scheduled {route.CompletionDay}) playerInfraMeshChildren={meshChildren} (expect >0)");
+                }
+            }
         }
 
         // Dev-only: MERIDIAN_DIAG_WAR=1 declares a war for the player at day 40 against the

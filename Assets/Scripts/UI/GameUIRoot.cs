@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Meridian.Geo;
 using Meridian.Map;
 using Meridian.Sim;
 
@@ -61,6 +62,7 @@ namespace Meridian.UI
         VisualElement sidePanel;
         VisualElement sidePanelShadow;
         Label panelTitle;
+        Image panelFlag;
         Label panelSubtitle;
         VisualElement panelBody;
         int builtForSelected = -2;
@@ -401,6 +403,11 @@ namespace Meridian.UI
             var headerRow = new VisualElement();
             headerRow.style.flexDirection = FlexDirection.Row;
             headerRow.style.alignItems = Align.Center;
+            panelFlag = new Image();
+            panelFlag.style.width = 22; panelFlag.style.height = 16;
+            panelFlag.style.marginRight = 6;
+            panelFlag.style.display = DisplayStyle.None;
+            headerRow.Add(panelFlag);
             panelTitle = MakeLabel("", 16, GameTheme.TextPrimary, bold: true);
             headerRow.Add(panelTitle);
             var titleSpacer = new VisualElement();
@@ -475,6 +482,9 @@ namespace Meridian.UI
             var c = map.World.Countries[sel];
             panelTitle.text = $"{c.Name}  ({c.IsoA3})";
             panelSubtitle.text = $"{c.Continent} · {c.Subregion} · Pop {c.PopEst:n0}";
+            var flagTex = FlagLoader.Get(c.Name, c.IsoA2);
+            panelFlag.style.display = flagTex != null ? DisplayStyle.Flex : DisplayStyle.None;
+            if (flagTex != null) panelFlag.image = flagTex;
 
             var e = map.Economy != null && sel < map.Economy.States.Count ? map.Economy.States[sel] : null;
             var n = map.National != null && sel < map.National.States.Count ? map.National.States[sel] : null;
@@ -644,6 +654,112 @@ namespace Meridian.UI
                 AddSparkline("Treasury ($B)", PlayerHistory.Treasury, GameTheme.Accent);
                 EndCard();
             }
+
+            DrawInfrastructureBuilder(interaction.Selected, e);
+        }
+
+        // Lets the player connect two of their own cities with a new road or railway, live,
+        // mid-game — cost/duration are distance-driven (InfrastructureSystem), construction
+        // takes real sim-days, and the segment renders on the map (MapRenderer.
+        // RebuildPlayerInfrastructure) once MapInteraction's daily tick marks it complete.
+        // Own-country only: building infrastructure abroad isn't a thing here.
+        void DrawInfrastructureBuilder(int countryIdx, EconomyState e)
+        {
+            if (countryIdx != PlayerState.CountryIndex || map.Infrastructure == null) return;
+
+            var cityIndices = new List<int>();
+            string countryName = map.World.Countries[countryIdx].Name;
+            for (int i = 0; i < map.World.Cities.Count; i++)
+                if (map.World.Cities[i].Country == countryName) cityIndices.Add(i);
+            if (cityIndices.Count < 2) return; // nothing to connect
+
+            // Biggest cities first — the ones a player is actually likely to want to link.
+            cityIndices.Sort((a, b) => map.World.Cities[b].PopMax.CompareTo(map.World.Cities[a].PopMax));
+            var cityNames = cityIndices.ConvertAll(i => map.World.Cities[i].Name);
+
+            StartCard();
+            SectionHeader("BUILD INFRASTRUCTURE");
+            HelpText("Connect two of your own cities with a permanent new road or railway. Costs treasury up front and takes real sim-days to finish.");
+
+            var fromDropdown = new DropdownField("From", cityNames, 0);
+            var toDropdown = new DropdownField("To", cityNames, cityNames.Count > 1 ? 1 : 0);
+            StyleDropdown(fromDropdown);
+            StyleDropdown(toDropdown);
+            currentContainer.Add(fromDropdown);
+            currentContainer.Add(toDropdown);
+
+            var estimateLabel = MakeLabel("", 11, GameTheme.TextDim);
+            estimateLabel.style.whiteSpace = WhiteSpace.Normal;
+            estimateLabel.style.marginTop = 2; estimateLabel.style.marginBottom = 6;
+            currentContainer.Add(estimateLabel);
+
+            (int from, int to) ResolveSelection()
+            {
+                int f = cityIndices[Mathf.Max(0, cityNames.IndexOf(fromDropdown.value))];
+                int t = cityIndices[Mathf.Max(0, cityNames.IndexOf(toDropdown.value))];
+                return (f, t);
+            }
+
+            double DistanceOf(int fromCity, int toCity)
+            {
+                var a = GeoMath.MercatorToLonLat(map.World.Cities[fromCity].Pos.x, map.World.Cities[fromCity].Pos.y);
+                var b = GeoMath.MercatorToLonLat(map.World.Cities[toCity].Pos.x, map.World.Cities[toCity].Pos.y);
+                return InfrastructureSystem.DistanceKm(a, b);
+            }
+
+            void UpdateEstimate()
+            {
+                var (from, to) = ResolveSelection();
+                if (from == to) { estimateLabel.text = "Pick two different cities."; return; }
+                double dist = DistanceOf(from, to);
+                double roadCost = InfrastructureSystem.EstimateCost(dist, false);
+                double railCost = InfrastructureSystem.EstimateCost(dist, true);
+                long days = InfrastructureSystem.EstimateDays(dist);
+                estimateLabel.text = $"{dist:0} km · Road ${roadCost:0.0}B · Rail ${railCost:0.0}B · {days} days to build";
+            }
+            UpdateEstimate();
+            fromDropdown.RegisterValueChangedCallback(_ => UpdateEstimate());
+            toDropdown.RegisterValueChangedCallback(_ => UpdateEstimate());
+
+            void SubmitBuild(bool rail)
+            {
+                var (from, to) = ResolveSelection();
+                if (from == to) { ShowToast("System", "Pick two different cities."); return; }
+                double dist = DistanceOf(from, to);
+                string msg = map.Infrastructure.Begin(from, to, map.World.Cities[from].Name, map.World.Cities[to].Name,
+                    rail, countryIdx, e, interaction.SimDay, dist);
+                ShowToast(countryName, msg);
+            }
+
+            var btnRow = Row();
+            var roadBtn = MakeButton("BUILD ROAD", 12, GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextPrimary, () => SubmitBuild(false));
+            var railBtn = MakeButton("BUILD RAILWAY", 12, GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextPrimary, () => SubmitBuild(true));
+            roadBtn.style.flexGrow = 1; roadBtn.style.height = 30; roadBtn.style.marginRight = 4;
+            railBtn.style.flexGrow = 1; railBtn.style.height = 30;
+            btnRow.Add(roadBtn); btnRow.Add(railBtn);
+            currentContainer.Add(btnRow);
+
+            var mine = map.Infrastructure.Routes.FindAll(r => r.OwnerCountryIndex == countryIdx);
+            if (mine.Count > 0)
+            {
+                Divider();
+                foreach (var r in mine)
+                {
+                    string status = r.Completed ? "COMPLETE" : $"ready day {r.CompletionDay}";
+                    Stat($"{(r.IsRailway ? "Rail" : "Road")}: {r.FromName} → {r.ToName}", status);
+                }
+            }
+
+            EndCard();
+        }
+
+        static void StyleDropdown(DropdownField dd)
+        {
+            dd.style.marginBottom = 6;
+            dd.style.color = GameTheme.TextPrimary;
+            dd.style.backgroundColor = new StyleColor(GameTheme.BgSliderTrack);
+            dd.labelElement.style.color = GameTheme.TextDim;
+            dd.labelElement.style.fontSize = 10;
         }
 
         void DrawTrade(EconomyState e)
@@ -1379,8 +1495,20 @@ namespace Meridian.UI
             var e = map.Economy != null && idx < map.Economy.States.Count ? map.Economy.States[idx] : null;
             var n = map.National != null && idx < map.National.States.Count ? map.National.States[idx] : null;
 
+            var nameRow = new VisualElement();
+            nameRow.style.flexDirection = FlexDirection.Row;
+            nameRow.style.alignItems = Align.Center;
+            var flagTex = FlagLoader.Get(c.Name, c.IsoA2);
+            if (flagTex != null)
+            {
+                var flagImg = new Image { image = flagTex };
+                flagImg.style.width = 32; flagImg.style.height = 24;
+                flagImg.style.marginRight = 8;
+                nameRow.Add(flagImg);
+            }
             var name = MakeLabel(c.Name, 20, GameTheme.TextPrimary, bold: true);
-            previewCard.Add(name);
+            nameRow.Add(name);
+            previewCard.Add(nameRow);
             var region = MakeLabel($"{c.Continent} · {c.Subregion}", 11, GameTheme.TextDim);
             region.style.marginBottom = 10;
             previewCard.Add(region);
@@ -1450,6 +1578,14 @@ namespace Meridian.UI
                     () => ShowCountryPreview(capturedIdx), align: TextAnchor.MiddleLeft);
                 row.style.height = 30;
                 row.style.marginBottom = 2;
+                var flagTex = FlagLoader.Get(country.Name, country.IsoA2);
+                if (flagTex != null)
+                {
+                    var flagImg = new Image { image = flagTex, pickingMode = PickingMode.Ignore };
+                    flagImg.style.width = 20; flagImg.style.height = 15;
+                    flagImg.style.marginRight = 8;
+                    row.Insert(0, flagImg);
+                }
                 startScreenList.Add(row);
             }
         }
