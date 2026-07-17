@@ -84,10 +84,11 @@ namespace Meridian.UI
         class SliderBinding
         {
             public VisualElement Thumb;
-            public Label ValueLabel;
+            public FloatField ValueField;
             public Func<float> Get;
             public float Lo, Hi;
             public bool Dragging;
+            public bool Editing;
         }
 
         // A stat row whose value keeps updating while the panel stays open (war scores,
@@ -548,6 +549,8 @@ namespace Meridian.UI
         {
             StartCard();
             SectionHeader("CORE TAXES & RATES");
+            if (e.HasRealTaxProfile)
+                HelpText("Seeded from this country's real headline tax rates — click any value below to type an exact number, or drag to adjust.");
             AddSlider("Income tax", () => e.TaxIncome, 0f, 60f, v => e.TaxIncome = v);
             AddSlider("Corporate tax", () => e.TaxCorporate, 0f, 60f, v => e.TaxCorporate = v);
             AddSlider("VAT", () => e.TaxVat, 0f, 40f, v => e.TaxVat = v);
@@ -753,6 +756,19 @@ namespace Meridian.UI
             EndCard();
         }
 
+        // First slice of the Government/Legislature vision pillar — see CountryProfiles.cs.
+        // "Unclassified" is shown honestly for the ~220 countries without curated real data
+        // yet, same pattern as Economy's "(placeholder baseline)" tag.
+        static string GovernmentLabel(GovernmentType g) => g switch
+        {
+            GovernmentType.AbsoluteMonarchy => "Absolute Monarchy",
+            GovernmentType.ConstitutionalMonarchy => "Constitutional Monarchy",
+            GovernmentType.PresidentialRepublic => "Presidential Republic",
+            GovernmentType.ParliamentaryRepublic => "Parliamentary Republic",
+            GovernmentType.OneServiceState => "One-Party State",
+            _ => "Unclassified (not yet researched)",
+        };
+
         static void StyleDropdown(DropdownField dd)
         {
             dd.style.marginBottom = 6;
@@ -792,6 +808,7 @@ namespace Meridian.UI
             StartCard();
             SectionHeader("POLITICS");
             if (n == null) { HelpText("No data."); EndCard(); return; }
+            Stat("Government", GovernmentLabel(n.Government));
             StatBar("Approval rating", () => n.ApprovalRating, GameTheme.Accent, () => n.ApprovalRating >= 50f);
             if (interaction.Selected == PlayerState.CountryIndex)
             {
@@ -1309,10 +1326,19 @@ namespace Meridian.UI
             thumb.style.borderBottomColor = new StyleColor(GameTheme.Shade(GameTheme.Accent));
             track.Add(thumb);
 
-            var valueLabel = MakeLabel($"{get():0.0}", 11, GameTheme.Accent, bold: true);
-            valueLabel.style.width = 42;
+            // FloatField, not a plain Label — lets the player click the number and type an
+            // exact value directly, rather than only being able to drag-approximate one.
+            var valueField = new FloatField { value = get(), isDelayed = true };
+            valueField.style.width = 48;
+            valueField.style.unityFontStyleAndWeight = FontStyle.Bold;
+            valueField.style.color = GameTheme.Accent;
+            valueField.style.backgroundColor = new StyleColor(Color.clear);
+            valueField.style.borderLeftWidth = 0; valueField.style.borderRightWidth = 0;
+            valueField.style.borderTopWidth = 0; valueField.style.borderBottomWidth = 0;
+            valueField.style.marginLeft = 0; valueField.style.marginRight = 0;
+            valueField.style.paddingLeft = 2; valueField.style.paddingRight = 2;
 
-            var binding = new SliderBinding { Thumb = thumb, ValueLabel = valueLabel, Get = get, Lo = lo, Hi = hi };
+            var binding = new SliderBinding { Thumb = thumb, ValueField = valueField, Get = get, Lo = lo, Hi = hi };
             activeSliders.Add(binding);
 
             void ApplyFromPointer(Vector2 localPos)
@@ -1323,8 +1349,21 @@ namespace Meridian.UI
                 float v = Mathf.Lerp(lo, hi, t);
                 set(v);
                 PositionThumb(thumb, t);
-                valueLabel.text = $"{v:0.0}";
+                valueField.SetValueWithoutNotify(v);
             }
+
+            valueField.RegisterValueChangedCallback(evt =>
+            {
+                float v = Mathf.Clamp(evt.newValue, lo, hi);
+                set(v);
+                PositionThumb(thumb, Mathf.InverseLerp(lo, hi, v));
+                if (v != evt.newValue) valueField.SetValueWithoutNotify(v);
+            });
+            // Suppress the live refresh tick's SetValueWithoutNotify while the field has focus —
+            // otherwise a value keystrokes away from committing (isDelayed) gets clobbered by
+            // the next 100ms refresh before the player finishes typing.
+            valueField.RegisterCallback<FocusInEvent>(_ => binding.Editing = true);
+            valueField.RegisterCallback<FocusOutEvent>(_ => binding.Editing = false);
 
             track.RegisterCallback<PointerDownEvent>(evt =>
             {
@@ -1344,7 +1383,7 @@ namespace Meridian.UI
             });
 
             row.Add(track);
-            row.Add(valueLabel);
+            row.Add(valueField);
 
             if (onRemove != null)
             {
@@ -1997,10 +2036,10 @@ namespace Meridian.UI
             {
                 foreach (var s in activeSliders)
                 {
-                    if (s.Dragging) continue;
+                    if (s.Dragging || s.Editing) continue;
                     float v = s.Get();
                     PositionThumb(s.Thumb, Mathf.InverseLerp(s.Lo, s.Hi, v));
-                    s.ValueLabel.text = $"{v:0.0}";
+                    s.ValueField.SetValueWithoutNotify(v);
                 }
                 // Charts pick up the day's new samples on the same cadence as everything else.
                 foreach (var chart in activeSparklines) chart.MarkDirtyRepaint();

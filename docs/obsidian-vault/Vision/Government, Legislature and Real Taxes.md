@@ -8,6 +8,18 @@ The core of [[Vision Overview|the vision]]. Currently every country has the same
 politics (one `ApprovalRating` number, no parties, no regime type) and the same generic tax
 sliders regardless of what that country actually does in reality. This is the fix.
 
+> **Status (2026-07-17): first slice shipped.** `Sim/CountryProfiles.cs` — real `GovernmentType`
+> + real headline tax rates (VAT/corporate confidently, income tax as an honest single-lever
+> approximation of a real progressive system — see the file's own precision note) for ~35
+> major/well-known countries, keyed by ISO A3. `EconomyState.Seed`/`NationalSystem.Seed` apply
+> it automatically; unlisted countries keep the old generic simulated defaults. Verified live:
+> starting as Saudi Arabia seeds income=0%, corporate=20%, VAT=15%, tariff=5% exactly. Every
+> slider (not just tax) now also supports clicking the value and typing an exact number
+> (`FloatField`, `GameUIRoot.AddSlider`) instead of only dragging. **Still open, in priority
+> order:** real named political parties per country, the actual bill-proposal → vote/decree →
+> enactment pipeline, freedom-of-speech/religion/internet levers, regime-change mechanics with
+> realistic (not moralized) AI-driven outcomes.
+
 ## Regime types
 Every country needs a real `GovernmentType` — at minimum: **absolute monarchy** (Saudi Arabia),
 **constitutional monarchy** (UK, Jordan, most of the GCC's smaller states), **presidential
@@ -57,11 +69,15 @@ and the outcome modeling for this need to reflect that real, uncomfortable nuanc
 morality slider — this was stated explicitly as a requirement, not a suggestion.
 
 ## Where this plugs into existing code
-- `Sim/NationalState.cs` — needs `GovernmentType`, replaces/extends the single `ApprovalRating`
-  with per-party support.
-- `Sim/Economy.cs` — real per-country tax seeding needs a data source (similar research effort
-  to how [[Curated Datasets]] were hand-researched), not a formula.
-- `Sim/Diplomacy.cs`/[[World AI]] — regime-change reactions are a form of relation shock, same
-  channel as denounce/war, but internationally broadcast rather than bilateral.
-- New: a Legislature/Bills system (`Sim/Legislature.cs`?) — the actual proposal → vote →
-  enactment pipeline, plus the UI in the Politics tab to browse/propose/customize bills.
+- ✅ `Sim/CountryProfiles.cs` — the real government-type + tax data source, hand-researched
+  (same research-effort pattern as [[Curated Datasets]], not a formula), ~35 countries.
+- ✅ `Sim/NationalState.cs` — has `GovernmentType` now, still just `ApprovalRating` for the
+  actual politics number — per-party support is still open.
+- ✅ `Sim/Economy.cs` — `EconomyState.Seed` applies `CountryProfiles` tax rates when present.
+- ✅ `GameUIRoot.AddSlider` — click-and-type numeric entry (`FloatField`), not drag-only.
+- ⬜ `Sim/Diplomacy.cs`/[[World AI]] — regime-change reactions as a relation shock, same channel
+  as denounce/war but internationally broadcast rather than bilateral. Not started.
+- ⬜ New: a Legislature/Bills system (`Sim/Legislature.cs`?) — the actual proposal → vote →
+  enactment pipeline, real named parties, plus the UI in the Politics tab to browse/propose/
+  customize bills. This is the big remaining piece — everything shipped so far is the data
+  foundation it needs, not the mechanic itself.

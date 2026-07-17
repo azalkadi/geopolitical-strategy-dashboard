@@ -352,3 +352,32 @@ Everything below is built, launched, and verified via Player.log + visual checks
   - Full headless compile + player build clean throughout; not yet visually screenshot-checked
     (this dev machine's automation clicks are unreliable — see the hardware-flakiness note — so
     verification leaned on Player.log diagnostics instead, same as everything else this session).
+- **Vision capture + first realism slice (same session, immediately after):** the player gave a
+  long, comprehensive vision for how deep Meridian should go politically/economically/militarily
+  — real governments and legislatures with named parties, real tax data, sector/company-level
+  economy, the real 2026 conflict map + terrorism + military realism, supranational unions
+  (EU/GCC/UN), and a long list of map/UI realism asks — and pushed back that the roadmap's
+  "Done" labels on stages 1-3 overclaimed depth (fair; relabeled to "Core built"). All of it is
+  captured in `docs/obsidian-vault/Vision/` (a Vision Overview + 6 pillar pages), tracked as
+  Tasks #20-25, and the roadmap has a new stage 4.5 for it. Started on the highest-leverage
+  piece — regime type gates almost everything else:
+  - New `Sim/CountryProfiles.cs` — real `GovernmentType` (absolute/constitutional monarchy,
+    presidential/parliamentary republic, one-party state) + real headline tax rates (VAT/
+    corporate with high confidence; income tax as an honest single-lever approximation of real
+    progressive systems, documented as such) for ~35 major/well-known countries, keyed by ISO
+    A3. Not exhaustive — same "hand-researched, not a formula" honesty as the existing Curated
+    Datasets. `EconomyState.Seed`/`NationalSystem.Seed` (now takes the country list, not just a
+    count) apply it automatically; unlisted countries keep the old generic defaults.
+  - `GameUIRoot.AddSlider` — every slider (tax, spending, interest rate, all of them) now uses
+    a `FloatField` instead of a plain label, so the player can click the value and type an exact
+    number instead of only drag-approximating one. Added focus-tracking (`SliderBinding.
+    Editing`) so the 100ms live-refresh tick doesn't clobber a value mid-keystroke.
+  - Politics tab shows the country's `GovernmentType` (honestly labeled "Unclassified (not yet
+    researched)" for the ~220 countries without curated data yet, same pattern as Economy's
+    "(placeholder baseline)" tag); tax section shows a note when rates came from real data.
+  - Verified live: starting as Saudi Arabia produces `taxes=[income=0.0 corp=20.0 vat=15.0
+    tariff=5.0]` in the existing `[econdiag]` log line — exactly the real curated profile.
+  - **This is a first slice, not the full pillar** — the actual bill-proposal/vote/decree
+    pipeline and real named political parties are still open (Task #20). Committed docs and
+    this slice separately (`39eeb43` docs-only, code commit follows) so the vision capture
+    survives even if the code needs iteration.

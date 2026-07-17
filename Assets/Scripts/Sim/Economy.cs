@@ -29,6 +29,7 @@ namespace Meridian.Sim
         public uint Rng;
         public string LastWhy;             // null == None
         public bool HasRealBaseline;       // false when GDP/pop were placeholders
+        public bool HasRealTaxProfile;     // true when seeded from CountryProfiles' real curated rates
 
         // Player-defined taxes beyond the four core levers — freely add/rename/rate/remove
         // (e.g. "Plastic Bag Tax"). Narrower in scope than the core levers, so each one carries
@@ -103,6 +104,11 @@ namespace Meridian.Sim
                 gdpPerCapita < 15_000.0 ? 3.0f :
                 gdpPerCapita < 30_000.0 ? 2.0f : 1.2f;
 
+            // Real headline tax rates for a curated set of countries (see CountryProfiles) —
+            // the generic 25/22/15/5 figures below are the simulated fallback for everywhere
+            // else, not a claim that they're accurate for a specific real country.
+            var profile = CountryProfiles.Get(c.IsoA3);
+
             var state = new EconomyState
             {
                 Gdp = gdp,
@@ -110,15 +116,16 @@ namespace Meridian.Sim
                 BaseGrowthTarget = baseGrowth,
                 Unemployment = 7.0f,
                 Inflation = 2.5f,
-                TaxIncome = 25.0f,
-                TaxCorporate = 22.0f,
-                TaxVat = 15.0f,
-                TaxTariff = 5.0f,
+                TaxIncome = profile?.TaxIncome ?? 25.0f,
+                TaxCorporate = profile?.TaxCorporate ?? 22.0f,
+                TaxVat = profile?.TaxVat ?? 15.0f,
+                TaxTariff = profile?.TaxTariff ?? 5.0f,
                 InterestRate = 4.0f,
                 Treasury = 0.0,
                 Rng = HashSeed(c.IsoA3, salt),
                 LastWhy = null,
                 HasRealBaseline = hasReal,
+                HasRealTaxProfile = profile != null,
                 Population = System.Math.Max(c.PopEst, 10_000L),
                 PopulationGrowth = 1.0f,
             };

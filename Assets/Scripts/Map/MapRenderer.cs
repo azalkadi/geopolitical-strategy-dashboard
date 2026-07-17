@@ -158,7 +158,7 @@ namespace Meridian.Map
             Debug.Log($"[map] seeded {Economy.States.Count} country economies");
 
             // Politics/Military/Diplomacy/Society/Technology — derived indices, ticked alongside Economy.
-            National = NationalSystem.Seed(World.Countries.Count);
+            National = NationalSystem.Seed(World.Countries);
 
             // Bilateral relations for every country pair, seeded from real geography.
             Diplomacy = DiplomacySystem.Seed(World.Countries);

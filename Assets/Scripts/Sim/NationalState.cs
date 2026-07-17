@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Meridian.Geo;
 
 namespace Meridian.Sim
 {
@@ -18,7 +19,13 @@ namespace Meridian.Sim
         public float ResearchSpending;      // Technology: % of GDP, adjustable lever
         public float InnovationIndex;       // Technology: 0-100, drifts toward a spending/GDP-driven target
 
-        public static NationalState Seed() => new NationalState
+        // Real government type for a curated set of countries (see CountryProfiles); the first
+        // slice of the "Government, Legislature and Real Taxes" vision pillar — see
+        // docs/obsidian-vault/Vision/Government, Legislature and Real Taxes.md. Unspecified
+        // everywhere a real classification hasn't been researched yet.
+        public GovernmentType Government;
+
+        public static NationalState Seed(GovernmentType government = GovernmentType.Unspecified) => new NationalState
         {
             ApprovalRating = 50f,
             DefenseSpending = 2.0f,
@@ -27,6 +34,7 @@ namespace Meridian.Sim
             PublicMood = 50f,
             ResearchSpending = 1.5f,
             InnovationIndex = 40f,
+            Government = government,
         };
 
         // Advances one simulated day. gdpRankPercentile in [0,1], 1 == largest economy in the
@@ -69,10 +77,14 @@ namespace Meridian.Sim
     {
         public List<NationalState> States = new();
 
-        public static NationalSystem Seed(int count)
+        public static NationalSystem Seed(IReadOnlyList<Country> countries)
         {
             var sys = new NationalSystem();
-            for (int i = 0; i < count; i++) sys.States.Add(NationalState.Seed());
+            foreach (var c in countries)
+            {
+                var profile = CountryProfiles.Get(c.IsoA3);
+                sys.States.Add(NationalState.Seed(profile?.Government ?? GovernmentType.Unspecified));
+            }
             return sys;
         }
 
