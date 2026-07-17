@@ -36,6 +36,14 @@ stages left to right, from the geo/rendering foundation through to a tagged v1.0
 stage marked done / next / planned / milestone. The per-session delta (what actually shipped
 since the roadmap was last touched) lives in `CLAUDE.md` at the repo root, not here.
 
+## 🌟 [[Vision Overview|The Vision]] — where this is all headed
+
+The three boards above describe the game **as it stands**. [[Vision Overview|Open the Vision
+folder]] for the long-term ambition instead: real per-country governments and legislatures with
+actual named political parties, real seeded tax data, a sector/company-level economy, the real
+2026 conflict map plus terrorism and military realism, supranational unions (EU/GCC/UN), and a
+long list of map/UI realism asks. This is a marathon, not a sprint — see the roadmap's stage 4.5.
+
 ## Vault map
 
 The diagram below is a different tree — this is how *the documentation itself* is organized,
@@ -79,6 +87,14 @@ graph TD
     Data --> Cur[Curated Datasets]
     Data --> Sat[Satellite Basemap]
     Data --> Flags[Country Flags]
+
+    Root --> Vis[Vision Overview]
+    Vis --> VisGov[Government, Legislature and Real Taxes]
+    Vis --> VisEcon[Economic Sectors and Companies]
+    Vis --> VisMil[Conflicts, Terrorism and Military Realism]
+    Vis --> VisUnion[Supranational Unions]
+    Vis --> VisUI[Map and UI Realism]
+    Vis --> VisData[Data Accuracy Audit]
 ```
 
 This vault maps the game from three angles. Pick whichever door matches what you're trying to
