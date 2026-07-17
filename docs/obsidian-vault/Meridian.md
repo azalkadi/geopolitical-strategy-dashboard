@@ -26,7 +26,10 @@ raises your Approval Rating (Politics), or that a war (Military) drains your Tre
 (Economy). [[Feature Relationships.canvas|Open Feature Relationships]] for the cross-cutting
 picture: one colored group per ministry, with labeled arrows only for connections that cross
 between **different** ministries — same-ministry relationships are left out since the tree
-already covers those.
+already covers those. **Scroll down on that same board** for the 🔮 Vision Layer — every pillar
+from [[Vision Overview|the realism vision]] as the same kind of relationship map, wired into
+the built systems above it (including connections implied by context, not just stated
+outright), so the whole game — built and planned — reads as one connected system in one place.
 
 ## 🗓️ [[Development Roadmap.canvas|Development Roadmap]]
 
