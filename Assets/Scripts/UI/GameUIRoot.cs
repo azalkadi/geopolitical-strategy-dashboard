@@ -172,14 +172,18 @@ namespace Meridian.UI
             bar.pickingMode = PickingMode.Position;
             bar.style.position = Position.Absolute;
             bar.style.left = 0; bar.style.right = 0; bar.style.top = 0; bar.style.height = 36;
-            bar.style.backgroundColor = new StyleColor(GameTheme.BgTop);
-            bar.style.borderBottomWidth = 1;
-            bar.style.borderBottomColor = new StyleColor(GameTheme.Border);
+            UIVisuals.ApplyVerticalGradient(bar, GameTheme.Tint(GameTheme.BgTop, 0.10f), GameTheme.Shade(GameTheme.BgTop, 0.08f));
+            bar.style.borderBottomWidth = 2;
+            bar.style.borderBottomColor = new StyleColor(new Color(GameTheme.Accent.r, GameTheme.Accent.g, GameTheme.Accent.b, 0.55f));
             bar.style.flexDirection = FlexDirection.Row;
             bar.style.alignItems = Align.Center;
             bar.style.paddingLeft = 10; bar.style.paddingRight = 10;
             root.Add(bar);
             topBarRoot = bar;
+
+            var emblem = MakeLabel("◆", 12, GameTheme.Accent);
+            emblem.style.marginRight = 6;
+            bar.Add(emblem);
 
             var title = MakeLabel("MERIDIAN", 14, GameTheme.Accent, bold: true);
             title.style.letterSpacing = 2f;
@@ -350,7 +354,7 @@ namespace Meridian.UI
             float left = Mathf.Clamp(btnRect.x + btnRect.width * 0.5f - 105f, 4f, Screen.width - 214f);
             dd.style.left = left;
             dd.style.bottom = 46; // just above the ministry bar
-            dd.style.backgroundColor = new StyleColor(GameTheme.BgDropdown);
+            UIVisuals.ApplyPanelChrome(dd, GameTheme.BgDropdown);
             dd.style.borderTopLeftRadius = 6; dd.style.borderTopRightRadius = 6;
             dd.style.borderBottomLeftRadius = 6; dd.style.borderBottomRightRadius = 6;
             dd.style.paddingTop = 6; dd.style.paddingBottom = 6; dd.style.paddingLeft = 4; dd.style.paddingRight = 4;
@@ -400,7 +404,7 @@ namespace Meridian.UI
             sidePanel.style.position = Position.Absolute;
             sidePanel.style.right = 10; sidePanel.style.top = 44; sidePanel.style.bottom = 48;
             sidePanel.style.width = 330;
-            sidePanel.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
+            UIVisuals.ApplyPanelChrome(sidePanel, GameTheme.BgPanel);
             sidePanel.style.borderTopLeftRadius = 6; sidePanel.style.borderTopRightRadius = 6;
             sidePanel.style.borderBottomLeftRadius = 6; sidePanel.style.borderBottomRightRadius = 6;
             sidePanel.style.borderLeftWidth = 3;
@@ -456,11 +460,13 @@ namespace Meridian.UI
         void StartCard()
         {
             var card = new VisualElement();
-            card.style.backgroundColor = new StyleColor(GameTheme.BgCard);
+            UIVisuals.ApplyPanelChrome(card, GameTheme.BgCard);
             card.style.borderTopLeftRadius = 6; card.style.borderTopRightRadius = 6;
             card.style.borderBottomLeftRadius = 6; card.style.borderBottomRightRadius = 6;
             card.style.borderLeftWidth = 2;
             card.style.borderLeftColor = new StyleColor(GameTheme.Muted(UIState.ActiveCategory.Accent(), 0.35f));
+            card.style.borderBottomWidth = 1;
+            card.style.borderBottomColor = new StyleColor(GameTheme.Shade(GameTheme.BgCard, 0.55f));
             card.style.paddingLeft = 10; card.style.paddingRight = 10;
             card.style.paddingTop = 8; card.style.paddingBottom = 8;
             card.style.marginBottom = 8;
@@ -1719,7 +1725,7 @@ namespace Meridian.UI
             minimapRoot.style.bottom = 10;
             minimapRoot.style.width = MinimapW;
             minimapRoot.style.height = MinimapH;
-            minimapRoot.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
+            UIVisuals.ApplyPanelChrome(minimapRoot, GameTheme.BgPanel);
             minimapRoot.style.borderTopWidth = 1; minimapRoot.style.borderBottomWidth = 1;
             minimapRoot.style.borderLeftWidth = 1; minimapRoot.style.borderRightWidth = 1;
             var borderColor = new StyleColor(GameTheme.Accent);
@@ -1817,7 +1823,7 @@ namespace Meridian.UI
             contextMenu = new VisualElement();
             contextMenu.style.position = Position.Absolute;
             contextMenu.style.width = ContextMenuWidth;
-            contextMenu.style.backgroundColor = new StyleColor(GameTheme.BgDropdown);
+            UIVisuals.ApplyPanelChrome(contextMenu, GameTheme.BgDropdown);
             contextMenu.style.borderTopWidth = 1; contextMenu.style.borderBottomWidth = 1;
             contextMenu.style.borderLeftWidth = 1; contextMenu.style.borderRightWidth = 1;
             var borderColor = new StyleColor(GameTheme.Accent);
@@ -1934,21 +1940,50 @@ namespace Meridian.UI
             startScreen.pickingMode = PickingMode.Position;
             startScreen.style.position = Position.Absolute;
             startScreen.style.left = 0; startScreen.style.right = 0; startScreen.style.top = 0; startScreen.style.bottom = 0;
-            startScreen.style.backgroundColor = new StyleColor(new Color(0.03f, 0.04f, 0.06f, 0.94f));
+            UIVisuals.ApplyVerticalGradient(startScreen, new Color(0.05f, 0.07f, 0.10f, 0.96f), new Color(0.02f, 0.025f, 0.04f, 0.98f));
             startScreen.style.alignItems = Align.Center;
             startScreen.style.paddingTop = 50; startScreen.style.paddingBottom = 40;
             root.Add(startScreen);
 
+            // Cinematic vignette over the gradient — darkens the corners so the centered title/
+            // list reads as the visual focus instead of a flat wall of color behind it.
+            var vignette = new Image();
+            vignette.pickingMode = PickingMode.Ignore;
+            vignette.style.position = Position.Absolute;
+            vignette.style.left = 0; vignette.style.right = 0; vignette.style.top = 0; vignette.style.bottom = 0;
+            vignette.scaleMode = ScaleMode.StretchToFill;
+            vignette.image = UIVisuals.Vignette();
+            startScreen.Add(vignette);
+
+            var titleRow = new VisualElement();
+            titleRow.style.flexDirection = FlexDirection.Row;
+            titleRow.style.alignItems = Align.Center;
+            titleRow.style.justifyContent = Justify.Center;
+            var titleEmblem = MakeLabel("◆", 22, GameTheme.Accent);
+            titleEmblem.style.marginRight = 10;
+            titleRow.Add(titleEmblem);
             var title = MakeLabel("MERIDIAN", 40, GameTheme.Accent, bold: true);
             title.style.unityTextAlign = TextAnchor.MiddleCenter;
             title.style.letterSpacing = 6f;
-            startScreen.Add(title);
+            titleRow.Add(title);
+            var titleEmblem2 = MakeLabel("◆", 22, GameTheme.Accent);
+            titleEmblem2.style.marginLeft = 10;
+            titleRow.Add(titleEmblem2);
+            startScreen.Add(titleRow);
 
+            // Double rule (bright hairline + a wider, dimmer band under it) instead of one flat
+            // line — the same "engraved nameplate" trim used on cards/panels, scaled up for a
+            // title treatment.
             var rule = new VisualElement();
-            rule.style.width = 120; rule.style.height = 1;
-            rule.style.marginTop = 8; rule.style.marginBottom = 8;
+            rule.style.width = 160; rule.style.height = 1;
+            rule.style.marginTop = 10;
             rule.style.backgroundColor = new StyleColor(GameTheme.Accent);
             startScreen.Add(rule);
+            var ruleDim = new VisualElement();
+            ruleDim.style.width = 90; ruleDim.style.height = 1;
+            ruleDim.style.marginTop = 3; ruleDim.style.marginBottom = 8;
+            ruleDim.style.backgroundColor = new StyleColor(new Color(GameTheme.Accent.r, GameTheme.Accent.g, GameTheme.Accent.b, 0.4f));
+            startScreen.Add(ruleDim);
 
             var subtitle = MakeLabel("SELECT A MEMBER STATE TO GOVERN", 12, GameTheme.TextDim);
             subtitle.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -2193,7 +2228,7 @@ namespace Meridian.UI
 
             var box = new VisualElement();
             box.style.width = 520;
-            box.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
+            UIVisuals.ApplyPanelChrome(box, GameTheme.BgPanel);
             box.style.borderTopLeftRadius = 8; box.style.borderTopRightRadius = 8;
             box.style.borderBottomLeftRadius = 8; box.style.borderBottomRightRadius = 8;
             box.style.borderLeftWidth = 3; box.style.borderLeftColor = new StyleColor(GameTheme.Accent);
@@ -2331,7 +2366,7 @@ namespace Meridian.UI
             }
 
             var box = new VisualElement();
-            box.style.backgroundColor = new StyleColor(GameTheme.BgDropdown);
+            UIVisuals.ApplyPanelChrome(box, GameTheme.BgDropdown);
             box.style.borderLeftWidth = 3;
             box.style.borderLeftColor = new StyleColor(accent);
             box.style.borderTopLeftRadius = 6; box.style.borderTopRightRadius = 6;
@@ -2639,7 +2674,6 @@ namespace Meridian.UI
         static VisualElement MakeButton(string text, int fontSize, Color bg, Color hoverBg, Color textColor, Action onClick, TextAnchor align = TextAnchor.MiddleCenter)
         {
             var btn = new VisualElement();
-            btn.style.backgroundColor = new StyleColor(bg);
             btn.style.borderTopLeftRadius = 3; btn.style.borderTopRightRadius = 3;
             btn.style.borderBottomLeftRadius = 3; btn.style.borderBottomRightRadius = 3;
             btn.style.borderBottomWidth = 2;
@@ -2648,11 +2682,23 @@ namespace Meridian.UI
             btn.style.alignItems = Align.Center;
             btn.style.flexDirection = FlexDirection.Row;
             if (align == TextAnchor.MiddleLeft) btn.style.paddingLeft = 8;
-            // Smooth color fade + a small, restrained scale nudge on hover/press — a lift, not a bounce.
+            // Smooth fade + a small, restrained scale nudge on hover/press — a lift, not a bounce.
+            // background-color itself no longer animates (SetButtonColor swaps a gradient texture
+            // instead, which can't cross-fade), but the border and scale transitions still read
+            // as a smooth state change.
             btn.style.transitionProperty = new List<StylePropertyName>
-                { new StylePropertyName("background-color"), new StylePropertyName("border-bottom-color"), new StylePropertyName("scale") };
+                { new StylePropertyName("border-bottom-color"), new StylePropertyName("scale") };
             btn.style.transitionDuration = new List<TimeValue>
-                { new TimeValue(120, TimeUnit.Millisecond), new TimeValue(120, TimeUnit.Millisecond), new TimeValue(90, TimeUnit.Millisecond) };
+                { new TimeValue(120, TimeUnit.Millisecond), new TimeValue(90, TimeUnit.Millisecond) };
+
+            // Thin top highlight — the button's own "beveled nameplate" edge, on top of the
+            // gradient SetButtonColor lays down below.
+            var topHighlight = new VisualElement();
+            topHighlight.pickingMode = PickingMode.Ignore;
+            topHighlight.style.position = Position.Absolute;
+            topHighlight.style.left = 0; topHighlight.style.right = 0; topHighlight.style.top = 0; topHighlight.style.height = 1;
+            topHighlight.style.backgroundColor = new StyleColor(new Color(1f, 1f, 1f, 0.14f));
+            btn.Add(topHighlight);
 
             var label = MakeLabel(text, fontSize, textColor);
             label.style.unityTextAlign = align;
@@ -2660,6 +2706,7 @@ namespace Meridian.UI
             label.pickingMode = PickingMode.Ignore;
             btn.Add(label);
             btn.userData = label; // Refresh() reads this back to recolor text on active/hover state
+            SetButtonColor(btn, bg);
 
             btn.RegisterCallback<PointerEnterEvent>(_ =>
             {
@@ -2679,12 +2726,14 @@ namespace Meridian.UI
             return btn;
         }
 
-        // Sets the fill only — the thin gold bottom rim is a constant nameplate-trim accent
-        // (set once in MakeButton), not a shade of the fill, so it stays a steady gold line
-        // across every state (default/hover/active/muted) instead of shifting with the button color.
+        // A top-lit vertical gradient instead of a flat fill — the single shared factory behind
+        // every clickable element in the game, so this one change is what makes buttons across
+        // the whole interface read as "carved nameplate" instead of "HTML <button>". The thin
+        // gold bottom rim (set once in MakeButton) stays a constant nameplate-trim accent, not a
+        // shade of the fill, so it stays a steady gold line across every state.
         static void SetButtonColor(VisualElement btn, Color c)
         {
-            btn.style.backgroundColor = new StyleColor(c);
+            UIVisuals.ApplyVerticalGradient(btn, GameTheme.Tint(c, 0.22f), GameTheme.Shade(c, 0.16f));
         }
     }
 }

@@ -36,6 +36,10 @@ namespace Meridian.UI
         public static Color Shade(Color c, float amount = 0.35f) =>
             new Color(c.r * (1f - amount), c.g * (1f - amount), c.b * (1f - amount), c.a);
 
+        // The lightening counterpart to Shade — mixes toward white instead of black. Used to
+        // build the "top-lit" half of a panel/button's vertical gradient (see UIVisuals).
+        public static Color Tint(Color c, float amount = 0.25f) => Color.Lerp(c, Color.white, amount);
+
         // A deep, muted-but-still-tinted version of a vivid color — used for a button's resting
         // state so the ministry bar reads as a row of distinctly colored (not uniform gray)
         // buttons even before you hover or select one.

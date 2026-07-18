@@ -74,6 +74,31 @@ visibly, impact effects — but it's fundamentally a Map and UI ask as much as a
 isn't one ticket, it's a standard to hold every future UI addition to: game-like presentation
 (iconography, motion, feedback) over spreadsheet-like presentation (rows of plain stats), even
 where the underlying data is the same.
+> [!success] Status: ✅ First full pass shipped — "remake the UI, make it look like a game not
+> an HTML website." Every panel/button in the game was flat-color rectangles before this; now:
+> - New `UIVisuals.cs` — procedural texture generation (no external art assets, same approach as
+>   the satellite/flag pipelines): cached 1×2 vertical-gradient textures and a radial vignette,
+>   generated once per color pair and reused.
+> - `GameUIRoot.MakeButton`/`SetButtonColor` (the single shared factory behind every clickable
+>   element in the game — top bar, ministry bar, dropdowns, side-panel actions, context menu,
+>   event modal, start screen) now renders a top-lit gradient plus a 1px inner highlight instead
+>   of a flat fill — one change that cascades a "carved nameplate" look across the entire
+>   interface for free.
+> - `StartCard`/side panel/minimap/context menu/toasts/event modal all gained the same panel
+>   chrome (`UIVisuals.ApplyPanelChrome`): a subtle top-lit gradient off their own base color
+>   plus a bevel highlight/seam, instead of a flat rectangle.
+> - Top bar: richer gradient, a thicker high-alpha gold trim line (was a nearly-invisible 1px
+>   border), a small ◆ emblem beside the title.
+> - Start screen: the flat 94%-opacity black overlay is now a real gradient plus a radial
+>   vignette overlay (darkens the corners so the centered title/list reads as the focus), a
+>   double gold rule under the title, and emblems flanking "MERIDIAN".
+> - **Verified visually**: full headless build, launched windowed, real screenshots captured
+>   (not just log inspection, since this is a purely visual change) of both the start screen
+>   (gradient/vignette/gold rules/gradient list rows all rendering correctly) and the in-game HUD
+>   (top bar trim, gradient ministry-bar buttons, minimap) — plus `Player.log` shows zero
+>   exceptions across the run.
+> - Still open: tiered/representational city-road-rail icons, train/cargo movement, port-rail
+>   visualization, deeper city/province interaction — the remaining, larger builds in this pillar.
 
 ## Where this plugs into existing code
 - Right-click menu: new interaction path in `MapInteraction.cs`, alongside the existing

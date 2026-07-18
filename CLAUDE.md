@@ -548,3 +548,37 @@ Everything below is built, launched, and verified via Player.log + visual checks
     from the user).
   - Still open in this pillar: tiered/representational city/road/rail icons, train/cargo movement
     visuals, port-rail supply-chain visualization, city/province click-interaction depth.
+- **"Remake the UI, make it look like a game not a website" — full visual chrome pass:** direct
+  response to the complaint that the interface reads as flat HTML rather than a game HUD. New
+  `Assets/Scripts/UI/UIVisuals.cs`: procedural 1×2 vertical-gradient textures and a radial
+  vignette texture, generated once per color pair and cached (no external art — same technique
+  already used for the satellite basemap/flags). `GameTheme` gained `Tint()` (the lightening
+  counterpart to the existing `Shade()`).
+  - `GameUIRoot.MakeButton`/`SetButtonColor` — the single shared factory behind every clickable
+    element in the entire game — now paints a top-lit gradient plus a 1px inner highlight
+    instead of a flat color fill. Because it's the one shared factory, this single change
+    cascades across the top bar, ministry bar, dropdowns, side-panel action buttons, the new
+    context menu, the event modal, and the start screen all at once.
+  - `StartCard()` (every side-panel section), the side panel root, the minimap, the context
+    menu, toasts, and the event modal all gained `UIVisuals.ApplyPanelChrome` — the same top-lit
+    gradient + bevel-highlight treatment applied to panels instead of buttons.
+  - Top bar: richer gradient, a thicker high-alpha gold trim line (was a barely-visible 1px
+    border at 0.22 alpha), a small ◆ emblem beside the title.
+  - Start screen: flat 94%-opacity black overlay replaced with a real vertical gradient plus a
+    radial vignette overlay (darkens the corners so the centered title/country list reads as the
+    visual focus), a double gold rule under the title (bright hairline + dimmer wide band), and
+    ◆ emblems flanking "MERIDIAN".
+  - Fixed one deprecation warning along the way: `IStyle.unityBackgroundScaleMode` is obsolete in
+    Unity 6000.5 — `UIVisuals.ApplyVerticalGradient` uses `style.backgroundSize`/
+    `backgroundRepeat` instead.
+  - **Verified visually, not just via log** (this is a purely visual change, so log-only
+    verification wouldn't actually confirm it worked): full headless build (`errors=0,
+    warnings=12`, back to the pre-existing `FindObjectOfType` baseline), launched windowed, real
+    screenshots captured via a PowerShell `System.Drawing` capture + `Read` — confirmed the
+    start screen's gradient/vignette/gold double-rule/gradient country-list rows, and the
+    in-game HUD's top-bar trim, gradient ministry-bar buttons, and minimap all render correctly.
+    `Player.log` also shows zero exceptions across both runs.
+  - Not yet touched: this pass is chrome/depth (gradients, bevels, trim) across existing panels,
+    not new iconography or layout restructuring — tiered map icons, train movement, and deeper
+    city/province interaction (still open in this pillar, see above) are a separate, larger body
+    of work.
