@@ -522,3 +522,29 @@ Everything below is built, launched, and verified via Player.log + visual checks
   - Still open in this pillar: right-click context menu, tiered/representational city/road/rail
     icons, train/cargo movement visuals, port-rail supply-chain visualization, city/province
     click-interaction depth.
+- **Right-click context menu (same "game looking UI" push, next piece):** `MapInteraction.cs`
+  gained `TryHitCountry` — the point-in-polygon country hit-test refactored out of the existing
+  left-click handler so both left-click select and the new right-click path share it — plus
+  `HandleRightClick`/`ContextMenuCountry`/`ContextMenuScreenPos`/`CloseContextMenu`. Left-clicking
+  the map (not the menu) now also closes any open context menu, so it can't linger stale over the
+  wrong country. New `GameUIRoot.BuildContextMenu`/`RebuildContextMenu`: a small popup at the
+  cursor showing the country name, an "Open Ministry Panel" action always, and — only for a
+  foreign country while actually playing — Declare War / Send Foreign Aid / Sign Trade Agreement
+  / Denounce Publicly, gated by the exact same `WarSystem.CanDeclare`/`DiplomacySystem.CanAct`/
+  `HasAgreement`/`AgreementThreshold` checks the Diplomacy and Military tabs already use, and
+  calling the same `Wars.Declare`/`Diplomacy.SendAid`/`SignAgreement`/`Denounce` methods — a
+  second entry point onto existing game logic, not a duplicate implementation of it. Rebuilds
+  only when the target country changes (`contextMenuBuiltFor` diff-check, same pattern as
+  `billsStamp`), hidden until a game is in progress.
+  - New `MERIDIAN_DIAG_CONTEXTMENU=1` diagnostic (mirrors every other diag flag on this
+    automation-hostile dev machine): opens the menu on a foreign country at day 45 — driving
+    `GameUIRoot`'s real `Refresh()`/`RebuildContextMenu` path, including the full war/aid/trade/
+    denounce button-build branch — then closes it at day 47. **Verified live**: full headless
+    build (`errors=0`), launched with `MERIDIAN_AUTOSTART=1 MERIDIAN_DIAG_CONTEXTMENU=1`,
+    `Player.log` shows both `[ctxmenudiag]` lines (`opened context menu for Malaysia (target=1)`,
+    `closed context menu, ContextMenuCountry=-1 (expect -1)`) and zero exceptions across the
+    entire run. Not yet verified: an actual manual right-click/mouse test of the popup's
+    positioning and click targets (same automation caveat as the minimap — worth a manual pass
+    from the user).
+  - Still open in this pillar: tiered/representational city/road/rail icons, train/cargo movement
+    visuals, port-rail supply-chain visualization, city/province click-interaction depth.

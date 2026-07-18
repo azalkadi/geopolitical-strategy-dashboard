@@ -14,7 +14,15 @@ Right-clicking a country should open an action menu — declare war, propose tra
 else makes sense contextually — instead of every action living only inside the side panel tabs.
 This is a faster, more game-like interaction model than "select country → open ministry → find
 button."
-> [!info] Status: ⚪ Planned — next up in this pillar.
+> [!success] Status: ✅ Built. `MapInteraction.HandleRightClick`/`TryHitCountry` (the country
+> hit-test refactored out of the existing left-click select) detects a right-click and exposes
+> `ContextMenuCountry`/`ContextMenuScreenPos`; `GameUIRoot.BuildContextMenu`/`RebuildContextMenu`
+> renders a small popup at the cursor with "Open Ministry Panel" plus — for a foreign country,
+> while playing — Declare War / Send Aid / Sign Trade Agreement / Denounce, each calling the
+> exact same `WarSystem`/`DiplomacySystem` methods the Diplomacy and Military tabs already use
+> (no duplicated game logic, just a second entry point). Verified live via a new
+> `MERIDIAN_DIAG_CONTEXTMENU=1` flag (opens the menu on a foreign country at day 45, closes it at
+> day 47) — `Player.log` shows both diag lines and zero exceptions through the whole run.
 
 ## Minimap
 A small overlay in the corner of the screen showing the whole world; clicking a spot on it pans

@@ -112,6 +112,7 @@ namespace Meridian.Map
                 TickEconomy();
             HandleKeyboard();
             HandleClickSelect();
+            HandleRightClick();
         }
 
         float speedBeforePause = 1f;
@@ -185,6 +186,7 @@ namespace Meridian.Map
                 MaybeRunSaveDiag();
                 MaybeRunInfraDiag();
                 MaybeRunBillsDiag();
+                MaybeRunContextMenuDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -428,6 +430,38 @@ namespace Meridian.Map
             }
         }
 
+        // Dev-only: MERIDIAN_DIAG_CONTEXTMENU=1 exercises the right-click context menu's state
+        // plumbing without needing real mouse input (this dev machine's pixel-click automation
+        // is unreliable — same rationale as every other diag flag). Opens the menu on a foreign
+        // country at day 45 (GameUIRoot's next Refresh tick then rebuilds the popup — including
+        // its war/aid/trade/denounce action buttons, which reuse the exact same
+        // DiplomacySystem/WarSystem calls MERIDIAN_DIAG_DIPLOMACY/WAR already verify — so any
+        // NullReferenceException there surfaces in Player.log), then closes it two days later to
+        // exercise the hide path too.
+        bool contextMenuDiagOpened, contextMenuDiagClosed;
+        void MaybeRunContextMenuDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_CONTEXTMENU") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.World == null || map.World.Countries.Count < 2) return;
+
+            if (!contextMenuDiagOpened && simDay >= 45)
+            {
+                contextMenuDiagOpened = true;
+                int target = (me + 1) % map.World.Countries.Count;
+                ContextMenuCountry = target;
+                ContextMenuScreenPos = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                Debug.Log($"[ctxmenudiag] opened context menu for {map.World.Countries[target].Name} (target={target})");
+            }
+
+            if (contextMenuDiagOpened && !contextMenuDiagClosed && simDay >= 47)
+            {
+                contextMenuDiagClosed = true;
+                CloseContextMenu();
+                Debug.Log($"[ctxmenudiag] closed context menu, ContextMenuCountry={ContextMenuCountry} (expect -1)");
+            }
+        }
+
         // Dev-only: MERIDIAN_DIAG_INFRA=1 books a road between the player's two biggest own
         // cities at day 30, then watches for it to actually complete and produce map geometry —
         // verifies the whole buildable-infrastructure loop (cost/duration booking, daily
@@ -614,7 +648,7 @@ namespace Meridian.Map
         // thresholds here), so you can't select something you can't currently see on screen.
         void HandleClickSelect()
         {
-            if (Input.GetMouseButtonDown(0)) { pressPos = Input.mousePosition; pressed = !PointerOverUI(Input.mousePosition); }
+            if (Input.GetMouseButtonDown(0)) { pressPos = Input.mousePosition; pressed = !PointerOverUI(Input.mousePosition); if (pressed) ContextMenuCountry = -1; }
             if (!(Input.GetMouseButtonUp(0) && pressed)) return;
             pressed = false;
             // Only a click (not a pan-drag) if the pointer barely moved.
@@ -678,22 +712,50 @@ namespace Meridian.Map
                 }
             }
 
+            if (TryHitCountry(mouseScreen, out int countryIdx))
+            {
+                ClearFeatureSelection();
+                selected = countryIdx;
+            }
+        }
+
+        // Shared point-in-polygon country hit-test, used by both left-click select and the
+        // right-click context menu — a click that lands on no country's rings (open ocean, or a
+        // landmass gap in the dataset) returns false rather than falling back to anything.
+        bool TryHitCountry(Vector3 mouseScreen, out int index)
+        {
             Vector3 w = cam.ScreenToWorldPoint(mouseScreen);
             Vector2 lonlat = new Vector2(w.x, w.y);
             for (int i = 0; i < map.World.Countries.Count; i++)
             {
                 var c = map.World.Countries[i];
                 if (!GeoMath.BboxContains(c.BboxMin, c.BboxMax, lonlat)) continue;
-                bool inside = false;
                 foreach (var ring in c.OuterRings)
-                    if (GeoMath.PointInRing(lonlat, ring)) { inside = true; break; }
-                if (inside)
                 {
-                    ClearFeatureSelection();
-                    selected = i;
-                    break;
+                    if (GeoMath.PointInRing(lonlat, ring))
+                    {
+                        index = i;
+                        return true;
+                    }
                 }
             }
+            index = -1;
+            return false;
+        }
+
+        // Right-click-anywhere context menu — a faster path to war/aid/trade/denounce actions
+        // than "select country -> open ministry tab -> find the button". Purely state here;
+        // GameUIRoot owns rendering the popup and reads this each refresh tick.
+        public int ContextMenuCountry { get; private set; } = -1;
+        public Vector2 ContextMenuScreenPos { get; private set; }
+        public void CloseContextMenu() => ContextMenuCountry = -1;
+
+        void HandleRightClick()
+        {
+            if (!Input.GetMouseButtonDown(1)) return;
+            if (PointerOverUI(Input.mousePosition)) return; // let the UI's own right-click (if any) handle it
+            ContextMenuCountry = TryHitCountry(Input.mousePosition, out int idx) ? idx : -1;
+            ContextMenuScreenPos = Input.mousePosition;
         }
 
         bool TryPickNearestPoint(List<Vector2> positions, Vector3 mouseScreen, float pixelRadius, out int index)

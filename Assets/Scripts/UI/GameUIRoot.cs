@@ -37,6 +37,10 @@ namespace Meridian.UI
         VisualElement minimapViewport;
         Image minimapImage;
 
+        // --- right-click context menu ---
+        VisualElement contextMenu;
+        int contextMenuBuiltFor = -2; // -2 = never built; distinct from -1 (closed)
+
         // --- top bar ---
         VisualElement topBarRoot;
         Label dayLabel;
@@ -155,6 +159,7 @@ namespace Meridian.UI
             BuildGameOverScreen();
             BuildEventModal();
             BuildMinimap();
+            BuildContextMenu();
 
             root.schedule.Execute(Refresh).Every(100);
         }
@@ -1800,6 +1805,127 @@ namespace Meridian.UI
             minimapViewport.style.height = Mathf.Max(2f, bottom - top);
         }
 
+        // ============================== RIGHT-CLICK CONTEXT MENU ==============================
+        // Faster path to the same war/aid/trade/denounce actions the Diplomacy/Military tabs
+        // already expose (DrawBilateralDiplomacy / DrawWarTab) — this popup calls the exact same
+        // WarSystem/DiplomacySystem methods rather than duplicating game logic, it's purely an
+        // alternate entry point.
+        const float ContextMenuWidth = 220f;
+
+        void BuildContextMenu()
+        {
+            contextMenu = new VisualElement();
+            contextMenu.style.position = Position.Absolute;
+            contextMenu.style.width = ContextMenuWidth;
+            contextMenu.style.backgroundColor = new StyleColor(GameTheme.BgDropdown);
+            contextMenu.style.borderTopWidth = 1; contextMenu.style.borderBottomWidth = 1;
+            contextMenu.style.borderLeftWidth = 1; contextMenu.style.borderRightWidth = 1;
+            var borderColor = new StyleColor(GameTheme.Accent);
+            contextMenu.style.borderTopColor = borderColor; contextMenu.style.borderBottomColor = borderColor;
+            contextMenu.style.borderLeftColor = borderColor; contextMenu.style.borderRightColor = borderColor;
+            contextMenu.style.paddingTop = 6; contextMenu.style.paddingBottom = 6;
+            contextMenu.style.paddingLeft = 6; contextMenu.style.paddingRight = 6;
+            contextMenu.style.display = DisplayStyle.None;
+            root.Add(contextMenu);
+        }
+
+        void UpdateContextMenu()
+        {
+            int target = interaction.ContextMenuCountry;
+            if (target != contextMenuBuiltFor)
+            {
+                contextMenuBuiltFor = target;
+                RebuildContextMenu(target);
+            }
+        }
+
+        void RebuildContextMenu(int target)
+        {
+            contextMenu.Clear();
+            if (target < 0 || map.World == null || target >= map.World.Countries.Count)
+            {
+                contextMenu.style.display = DisplayStyle.None;
+                return;
+            }
+
+            // Screen space is bottom-left origin; UI panel space is top-left — same conversion
+            // MapInteraction.PointerOverUI uses. Clamp so the menu can't render off-screen when
+            // right-clicking near an edge.
+            Vector2 screenPos = interaction.ContextMenuScreenPos;
+            float panelX = Mathf.Clamp(screenPos.x, 0, Screen.width - ContextMenuWidth);
+            float panelY = Mathf.Clamp(Screen.height - screenPos.y, 0, Screen.height - 40);
+            contextMenu.style.left = panelX;
+            contextMenu.style.top = panelY;
+            contextMenu.style.display = DisplayStyle.Flex;
+
+            var country = map.World.Countries[target];
+            var titleLabel = MakeLabel(country.Name.ToUpperInvariant(), 12, GameTheme.Accent, bold: true);
+            titleLabel.style.marginBottom = 6; titleLabel.style.letterSpacing = 0.5f;
+            contextMenu.Add(titleLabel);
+
+            void AddAction(string text, Color bg, Color hover, Action onClick)
+            {
+                var btn = MakeButton(text, 12, bg, hover, GameTheme.TextPrimary, () =>
+                {
+                    onClick();
+                    interaction.CloseContextMenu();
+                }, align: TextAnchor.MiddleLeft);
+                btn.style.height = 28; btn.style.marginTop = 4;
+                contextMenu.Add(btn);
+            }
+
+            AddAction("Open Ministry Panel", GameTheme.BgButton, GameTheme.BgButtonHover, () =>
+                interaction.SelectCountry(target));
+
+            int me = PlayerState.CountryIndex;
+            if (PlayerState.State == GameState.Playing && me >= 0 && target != me
+                && map.Diplomacy != null && map.Wars != null)
+            {
+                var dip = map.Diplomacy;
+                var wars = map.Wars;
+
+                if (wars.CanDeclare(me, target, dip))
+                {
+                    AddAction("⚔ Declare War", GameTheme.Muted(GameTheme.Negative, 0.35f), GameTheme.Negative, () =>
+                    {
+                        wars.Declare(me, target, interaction.SimDay, dip, map.National);
+                        ShowToast(PlayerState.CountryName, $"War declared on {country.Name}. The world is watching.");
+                        builtForCategory = (NationCategory)(-1);
+                    });
+                }
+
+                if (dip.CanAct(me, target, interaction.SimDay))
+                {
+                    var myEcon = map.Economy.States[me];
+                    var myNat = map.National.States[me];
+                    var theirEcon = map.Economy.States[target];
+                    float rel = dip.GetRelation(me, target);
+
+                    AddAction($"Send Foreign Aid (${System.Math.Max(0.2, myEcon.Gdp * 0.0005):0.0}B)",
+                        GameTheme.BgButton, GameTheme.BgButtonHover, () =>
+                    {
+                        ShowToast(PlayerState.CountryName, dip.SendAid(me, target, myEcon, myNat, interaction.SimDay));
+                        builtForCategory = (NationCategory)(-1);
+                    });
+
+                    if (!dip.HasAgreement(me, target) && rel >= DiplomacySystem.AgreementThreshold)
+                    {
+                        AddAction("Sign Trade Agreement", GameTheme.BgButton, GameTheme.BgButtonHover, () =>
+                        {
+                            string result = dip.SignAgreement(me, target, myEcon, theirEcon, interaction.SimDay);
+                            if (result != null) { ShowToast(PlayerState.CountryName, result); builtForCategory = (NationCategory)(-1); }
+                        });
+                    }
+
+                    AddAction("Denounce Publicly", GameTheme.Muted(GameTheme.Negative, 0.4f), GameTheme.Negative, () =>
+                    {
+                        ShowToast(PlayerState.CountryName, dip.Denounce(me, target, myNat, interaction.SimDay));
+                        builtForCategory = (NationCategory)(-1);
+                    });
+                }
+            }
+        }
+
         // ============================== START SCREEN ==============================
 
         void BuildStartScreen()
@@ -2306,10 +2432,12 @@ namespace Meridian.UI
                 dropdownLayer.Clear();
                 if (sidePanel != null) sidePanel.style.display = DisplayStyle.None;
                 if (sidePanelShadow != null) sidePanelShadow.style.display = DisplayStyle.None;
+                if (contextMenu != null) contextMenu.style.display = DisplayStyle.None;
                 return;
             }
 
             UpdateMinimap();
+            UpdateContextMenu();
             CheckForNewEvents();
 
             // World headlines (war declarations, peaces, AI agreements) from the sim.
