@@ -27,6 +27,19 @@ namespace Meridian.Map
         Vector3 dragOriginWorld;
         bool dragging;
 
+        // Exposed for the minimap (GameUIRoot) — read the current view to draw the viewport
+        // rectangle, and jump the camera on a minimap click. ClampPosition runs every Update()
+        // regardless of how position was set, so PanTo doesn't need to re-clamp itself.
+        public Vector2 CenterXY => new Vector2(transform.position.x, transform.position.y);
+        public float OrthoSize => cam != null ? cam.orthographicSize : maxOrthoSize;
+        public float Aspect => cam != null ? cam.aspect : 1f;
+        public void PanTo(Vector2 worldXY)
+        {
+            var p = transform.position;
+            p.x = worldXY.x; p.y = worldXY.y;
+            transform.position = p;
+        }
+
         void Awake()
         {
             cam = GetComponent<Camera>();

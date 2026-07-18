@@ -489,3 +489,36 @@ Everything below is built, launched, and verified via Player.log + visual checks
   - Still open: sector output composing GDP (a real new economic model, not started), ongoing
     ownership-based revenue, manpower allocation (a separate axis entirely), only 13 countries
     curated, AI countries don't propose ownership bills.
+- **"A game looking UI" (Vision Pillar 5 started — bigger flags + minimap):** direct response to
+  the standing complaint that the UI "looks like it came from ChatGPT or Claude."
+  - Flags: re-fetched all 237 `Assets/StreamingAssets/flags/*.png` at 96×72 (2x the original
+    48×36, verified via PIL). Display sizes doubled in `GameUIRoot.cs`: side-panel header flag
+    22×16→40×28, start-screen preview-card flag 32×24→64×46, start-screen list-row flag
+    20×15→30×22 (row height 30→36) — each gained a `GameTheme.Border`-colored 1px border so the
+    flag reads as a distinct plate rather than a loose image.
+  - Minimap: new `GameUIRoot.BuildMinimap()` — bottom-left corner (the only screen corner not
+    already claimed; toasts own top-left, the side panel owns top-right), showing
+    `MapRenderer.SatelliteTexture` (the same equirectangular basemap the 3D world already loads)
+    inside a bordered panel, with a live viewport-rectangle overlay and click-to-pan.
+    `MapCameraController` gained `CenterXY`/`OrthoSize`/`Aspect` read-only properties and a
+    `PanTo(Vector2)` method for this. The one real technical wrinkle: the minimap image is plain
+    linear-latitude but the camera/world are Web Mercator — every UV↔world conversion
+    (`WorldToMinimapUV`/`MinimapUVToWorld`) routes latitude through
+    `GeoMath.MercatorToLonLat`/`LonLatToMercator` (longitude is linear in both spaces, no
+    conversion needed) so the viewport rectangle stays correctly aligned away from the equator,
+    where a fixed Mercator-degree view height corresponds to a different real latitude span than
+    it does at the equator (matches the same `(lat+90)/180` convention `BuildSatelliteQuad`
+    already uses for the 3D basemap's own V coordinate). Updated once per 100ms `Refresh()` tick
+    via `UpdateMinimap()`; hidden until a game is actually in progress (same `hudDisplay` gate as
+    the top bar/ministry bar).
+  - **Verified**: `Tools\build.ps1 -Mode compile` clean, `-Mode build` succeeded
+    (errors=0, warnings=12), launched the built `.exe` with `MERIDIAN_AUTOSTART` and let the full
+    sim boot (258 countries/4596 provinces/7342 cities, satellite basemap, roads/rail, diplomacy)
+    for ~15s — `Player.log` shows zero exceptions/NullReferenceExceptions through the whole boot
+    and several sim ticks, confirming the new minimap/flag code paths don't throw. Not yet
+    verified: an actual on-screen click test of the minimap's click-to-pan (this dev machine's
+    computer-use/pixel-click automation is unreliable per longstanding note — worth a manual
+    click-test from the user, or a targeted env-var diagnostic if a bug is ever suspected here).
+  - Still open in this pillar: right-click context menu, tiered/representational city/road/rail
+    icons, train/cargo movement visuals, port-rail supply-chain visualization, city/province
+    click-interaction depth.

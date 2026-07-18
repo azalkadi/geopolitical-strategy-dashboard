@@ -14,15 +14,27 @@ Right-clicking a country should open an action menu — declare war, propose tra
 else makes sense contextually — instead of every action living only inside the side panel tabs.
 This is a faster, more game-like interaction model than "select country → open ministry → find
 button."
+> [!info] Status: ⚪ Planned — next up in this pillar.
 
 ## Minimap
 A small overlay in the corner of the screen showing the whole world; clicking a spot on it pans
-the main camera there. Standard strategy-game furniture Meridian doesn't have yet.
+the main camera there. Standard strategy-game furniture Meridian didn't have.
+> [!success] Status: ✅ Built. Bottom-left corner (`GameUIRoot.BuildMinimap`), showing the same
+> equirectangular satellite basemap `MapRenderer` already loads (`MapRenderer.SatelliteTexture`),
+> with a live viewport rectangle and click-to-pan (`MapCameraController.PanTo`). The one real
+> technical wrinkle: the minimap image is plain linear-latitude but the camera/world are Mercator
+> — every UV↔world conversion routes latitude through `GeoMath.MercatorToLonLat`/
+> `LonLatToMercator` (longitude needs no conversion, it's linear in both spaces) so the viewport
+> rectangle lines up correctly even away from the equator, where a Mercator-degree view height
+> corresponds to a different real latitude span than at the equator.
 
 ## Bigger, clearer flags
-[[Country Flags|Flags]] exist now but are small — make them bigger/more prominent so it's
-unmistakable which country you're playing, especially given how much of the identity of "which
-nation am I" this game hangs on.
+[[Country Flags|Flags]] exist now — make them bigger/more prominent so it's unmistakable which
+country you're playing, especially given how much of the identity of "which nation am I" this
+game hangs on.
+> [!success] Status: ✅ Built. Source PNGs re-fetched at 96×72 (2x the original 48×36) for all 237
+> flags; display sizes doubled in the side panel header, start-screen preview card, and
+> start-screen country list, each with a subtle border so the flag reads as a distinct plate.
 
 ## Camera should never show the void beyond the map
 Explicitly confirmed as *fixed and working* in this same session (see

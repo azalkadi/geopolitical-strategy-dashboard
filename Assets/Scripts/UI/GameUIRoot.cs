@@ -27,8 +27,15 @@ namespace Meridian.UI
 
         MapRenderer map;
         MapInteraction interaction;
+        MapCameraController camController;
         UIDocument doc;
         VisualElement root;
+
+        // --- minimap ---
+        const float MinimapW = 220f, MinimapH = 110f;
+        VisualElement minimapRoot;
+        VisualElement minimapViewport;
+        Image minimapImage;
 
         // --- top bar ---
         VisualElement topBarRoot;
@@ -118,6 +125,7 @@ namespace Meridian.UI
         {
             map = FindObjectOfType<MapRenderer>();
             interaction = FindObjectOfType<MapInteraction>();
+            camController = FindObjectOfType<MapCameraController>();
 
             // A PanelSettings created purely at runtime via CreateInstance never gets the ICU
             // text-shaping data UI Toolkit's Advanced Text Generation needs — that data is only
@@ -146,6 +154,7 @@ namespace Meridian.UI
             BuildStartScreen();
             BuildGameOverScreen();
             BuildEventModal();
+            BuildMinimap();
 
             root.schedule.Execute(Refresh).Every(100);
         }
@@ -406,8 +415,12 @@ namespace Meridian.UI
             headerRow.style.flexDirection = FlexDirection.Row;
             headerRow.style.alignItems = Align.Center;
             panelFlag = new Image();
-            panelFlag.style.width = 22; panelFlag.style.height = 16;
-            panelFlag.style.marginRight = 6;
+            panelFlag.style.width = 40; panelFlag.style.height = 28;
+            panelFlag.style.marginRight = 8;
+            panelFlag.style.borderTopWidth = 1; panelFlag.style.borderBottomWidth = 1;
+            panelFlag.style.borderLeftWidth = 1; panelFlag.style.borderRightWidth = 1;
+            panelFlag.style.borderTopColor = panelFlag.style.borderBottomColor =
+                panelFlag.style.borderLeftColor = panelFlag.style.borderRightColor = new StyleColor(GameTheme.Border);
             panelFlag.style.display = DisplayStyle.None;
             headerRow.Add(panelFlag);
             panelTitle = MakeLabel("", 16, GameTheme.TextPrimary, bold: true);
@@ -1684,6 +1697,109 @@ namespace Meridian.UI
             root.Add(toastLayer);
         }
 
+        // ============================== MINIMAP ==============================
+        // Bottom-left — the only screen corner not already claimed (toasts: left:10,top:44;
+        // side panel: right:10,top:44). Shows the same equirectangular satellite basemap texture
+        // MapRenderer builds for the 3D world (MapRenderer.SatelliteTexture), NOT a Mercator
+        // reprojection of it — the image itself is plain linear-latitude, so UV<->world
+        // conversions below route every latitude through GeoMath.MercatorToLonLat/LonLatToMercator
+        // (longitude needs no conversion, it's linear in both spaces) rather than treating the
+        // minimap as a scaled copy of Mercator world space, which would misplace the viewport
+        // rectangle vertically everywhere except the equator.
+        void BuildMinimap()
+        {
+            minimapRoot = new VisualElement();
+            minimapRoot.style.position = Position.Absolute;
+            minimapRoot.style.left = 10;
+            minimapRoot.style.bottom = 10;
+            minimapRoot.style.width = MinimapW;
+            minimapRoot.style.height = MinimapH;
+            minimapRoot.style.backgroundColor = new StyleColor(GameTheme.BgPanel);
+            minimapRoot.style.borderTopWidth = 1; minimapRoot.style.borderBottomWidth = 1;
+            minimapRoot.style.borderLeftWidth = 1; minimapRoot.style.borderRightWidth = 1;
+            var borderColor = new StyleColor(GameTheme.Accent);
+            minimapRoot.style.borderTopColor = borderColor; minimapRoot.style.borderBottomColor = borderColor;
+            minimapRoot.style.borderLeftColor = borderColor; minimapRoot.style.borderRightColor = borderColor;
+            minimapRoot.style.overflow = Overflow.Hidden;
+            minimapRoot.pickingMode = PickingMode.Position;
+            minimapRoot.style.display = DisplayStyle.None; // shown once a game is in progress
+            root.Add(minimapRoot);
+
+            minimapImage = new Image();
+            minimapImage.style.position = Position.Absolute;
+            minimapImage.style.left = 0; minimapImage.style.top = 0;
+            minimapImage.style.right = 0; minimapImage.style.bottom = 0;
+            minimapImage.scaleMode = ScaleMode.StretchToFill;
+            minimapImage.pickingMode = PickingMode.Ignore;
+            minimapRoot.Add(minimapImage);
+
+            minimapViewport = new VisualElement();
+            minimapViewport.pickingMode = PickingMode.Ignore;
+            minimapViewport.style.position = Position.Absolute;
+            minimapViewport.style.borderTopWidth = 2; minimapViewport.style.borderBottomWidth = 2;
+            minimapViewport.style.borderLeftWidth = 2; minimapViewport.style.borderRightWidth = 2;
+            var vpColor = new StyleColor(GameTheme.TextPrimary);
+            minimapViewport.style.borderTopColor = vpColor; minimapViewport.style.borderBottomColor = vpColor;
+            minimapViewport.style.borderLeftColor = vpColor; minimapViewport.style.borderRightColor = vpColor;
+            minimapViewport.style.backgroundColor = new StyleColor(new Color(1f, 1f, 1f, 0.08f));
+            minimapRoot.Add(minimapViewport);
+
+            minimapRoot.RegisterCallback<PointerDownEvent>(OnMinimapPointerDown);
+        }
+
+        void OnMinimapPointerDown(PointerDownEvent evt)
+        {
+            if (camController == null) return;
+            float w = minimapRoot.resolvedStyle.width;
+            float h = minimapRoot.resolvedStyle.height;
+            if (w <= 0f || h <= 0f) return;
+            float u = Mathf.Clamp01(evt.localPosition.x / w);
+            float v = Mathf.Clamp01(evt.localPosition.y / h);
+            camController.PanTo(MinimapUVToWorld(u, v));
+        }
+
+        // v is TOP-DOWN (0 = north pole, 1 = south pole) to match how a UI Toolkit Image
+        // element displays a Texture2D on screen (matches BuildSatelliteQuad's row orientation).
+        static Vector2 WorldToMinimapUV(Vector2 worldXY)
+        {
+            Vector2 lonLat = GeoMath.MercatorToLonLat(worldXY.x, worldXY.y);
+            float u = (lonLat.x + 180f) / 360f;
+            float v = (90f - lonLat.y) / 180f;
+            return new Vector2(u, v);
+        }
+
+        static Vector2 MinimapUVToWorld(float u, float v)
+        {
+            float lon = u * 360f - 180f;
+            float lat = 90f - v * 180f;
+            return GeoMath.LonLatToMercator(lon, lat);
+        }
+
+        void UpdateMinimap()
+        {
+            if (minimapRoot == null) return;
+            if (minimapImage.image == null && map != null && map.SatelliteTexture != null)
+                minimapImage.image = map.SatelliteTexture;
+            if (camController == null) return;
+
+            Vector2 center = camController.CenterXY;
+            float halfH = camController.OrthoSize;
+            float halfW = halfH * camController.Aspect;
+
+            Vector2 uvNW = WorldToMinimapUV(new Vector2(center.x - halfW, center.y + halfH));
+            Vector2 uvSE = WorldToMinimapUV(new Vector2(center.x + halfW, center.y - halfH));
+
+            float left = Mathf.Clamp01(uvNW.x) * MinimapW;
+            float top = Mathf.Clamp01(uvNW.y) * MinimapH;
+            float right = Mathf.Clamp01(uvSE.x) * MinimapW;
+            float bottom = Mathf.Clamp01(uvSE.y) * MinimapH;
+
+            minimapViewport.style.left = left;
+            minimapViewport.style.top = top;
+            minimapViewport.style.width = Mathf.Max(2f, right - left);
+            minimapViewport.style.height = Mathf.Max(2f, bottom - top);
+        }
+
         // ============================== START SCREEN ==============================
 
         void BuildStartScreen()
@@ -1798,8 +1914,12 @@ namespace Meridian.UI
             if (flagTex != null)
             {
                 var flagImg = new Image { image = flagTex };
-                flagImg.style.width = 32; flagImg.style.height = 24;
-                flagImg.style.marginRight = 8;
+                flagImg.style.width = 64; flagImg.style.height = 46;
+                flagImg.style.marginRight = 10;
+                flagImg.style.borderTopWidth = 1; flagImg.style.borderBottomWidth = 1;
+                flagImg.style.borderLeftWidth = 1; flagImg.style.borderRightWidth = 1;
+                flagImg.style.borderTopColor = flagImg.style.borderBottomColor =
+                    flagImg.style.borderLeftColor = flagImg.style.borderRightColor = new StyleColor(GameTheme.Border);
                 nameRow.Add(flagImg);
             }
             var name = MakeLabel(c.Name, 20, GameTheme.TextPrimary, bold: true);
@@ -1872,14 +1992,14 @@ namespace Meridian.UI
                 // Click = preview (the briefing on the right); TAKE OFFICE there confirms.
                 var row = MakeButton(country.Name, 13, GameTheme.BgPanel, GameTheme.BgButtonHover, GameTheme.TextPrimary,
                     () => ShowCountryPreview(capturedIdx), align: TextAnchor.MiddleLeft);
-                row.style.height = 30;
+                row.style.height = 36;
                 row.style.marginBottom = 2;
                 var flagTex = FlagLoader.Get(country.Name, country.IsoA2);
                 if (flagTex != null)
                 {
                     var flagImg = new Image { image = flagTex, pickingMode = PickingMode.Ignore };
-                    flagImg.style.width = 20; flagImg.style.height = 15;
-                    flagImg.style.marginRight = 8;
+                    flagImg.style.width = 30; flagImg.style.height = 22;
+                    flagImg.style.marginRight = 10;
                     row.Insert(0, flagImg);
                 }
                 startScreenList.Add(row);
@@ -2180,6 +2300,7 @@ namespace Meridian.UI
             topBarRoot.style.display = hudDisplay;
             ministryBarRoot.style.display = hudDisplay;
             toastLayer.style.display = hudDisplay;
+            if (minimapRoot != null) minimapRoot.style.display = hudDisplay;
             if (!playing)
             {
                 dropdownLayer.Clear();
@@ -2188,6 +2309,7 @@ namespace Meridian.UI
                 return;
             }
 
+            UpdateMinimap();
             CheckForNewEvents();
 
             // World headlines (war declarations, peaces, AI agreements) from the sim.

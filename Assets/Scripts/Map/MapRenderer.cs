@@ -98,6 +98,9 @@ namespace Meridian.Map
         Material borderMaterial;
         readonly List<GameObject> countryFillObjects = new();
         GameObject satelliteGo;
+        // Exposed for the minimap (GameUIRoot) — reuses the already-loaded basemap instead of
+        // rendering/loading a second copy just for a small corner overlay.
+        public Texture2D SatelliteTexture { get; private set; }
         // Indexed by country index (same order as World.Countries) so RefreshCountryColors can
         // recolor an individual country's fill/border without rebuilding its geometry — null
         // entries are countries whose mesh/outline was empty and never got a GameObject at all.
@@ -265,6 +268,7 @@ namespace Meridian.Map
             tex.filterMode = FilterMode.Trilinear;
             tex.anisoLevel = 9;
             var mat = new Material(shader) { mainTexture = tex };
+            SatelliteTexture = tex;
 
             // The source image is a plain equirectangular (linear-in-latitude) photo — a single
             // flat quad would place it at the wrong Y everywhere except the equator now that
