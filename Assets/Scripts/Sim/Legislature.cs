@@ -18,7 +18,7 @@ namespace Meridian.Sim
     // All public fields / parameterless types so SaveLoad's dumb-complete Newtonsoft dump
     // round-trips the whole system (see Sim/SaveLoad.cs).
 
-    public enum BillKind { IncomeTax, CorporateTax, Vat, Tariff }
+    public enum BillKind { IncomeTax, CorporateTax, Vat, Tariff, FreedomSpeech, FreedomReligion, FreedomInternet }
 
     public enum BillStatus { Pending, Passed, Rejected }
 
@@ -51,8 +51,14 @@ namespace Meridian.Sim
             BillKind.IncomeTax => "Income tax",
             BillKind.CorporateTax => "Corporate tax",
             BillKind.Vat => "VAT",
-            _ => "Tariffs",
+            BillKind.Tariff => "Tariffs",
+            BillKind.FreedomSpeech => "Freedom of speech",
+            BillKind.FreedomReligion => "Freedom of religion",
+            _ => "Internet freedom",
         };
+
+        public bool IsFreedom => Kind == BillKind.FreedomSpeech || Kind == BillKind.FreedomReligion || Kind == BillKind.FreedomInternet;
+        public bool IsTightening => IsFreedom && NewValue < OldValue;
     }
 
     public class LegislatureSystem
@@ -130,18 +136,28 @@ namespace Meridian.Sim
         }
 
         // Ideology model: economic-left parties back tax raises (funding the state), economic-
-        // right parties back cuts — plus a deterministic per-party-per-bill wrinkle so the same
-        // party isn't perfectly predictable on every bill (centrist parties in particular swing
-        // on the specifics). lean in [-1 left .. +1 right].
+        // right parties back cuts. Freedom bills reuse the same single EconLean axis as a coarse
+        // proxy for a social lib-conservative axis this sim hasn't curated yet (a known
+        // simplification, documented in the Vision page) — left backs expanding freedoms,
+        // right backs tightening. Either way there's a deterministic per-party-per-bill wrinkle
+        // so the same party isn't perfectly predictable on every bill (centrist parties in
+        // particular swing on the specifics). lean in [-1 left .. +1 right].
         static bool PartySupports(PartyProfile p, Bill bill)
         {
-            float direction = bill.NewValue < bill.OldValue ? 1f : -1f; // +1 == a cut
             float wrinkle = (Hash($"{p.Name}|{bill.Kind}|{bill.ProposedDay}") % 1000u) / 1000f * 0.5f - 0.25f;
-            return p.EconLean * direction + wrinkle > 0f;
+            if (bill.IsFreedom)
+            {
+                float direction = bill.NewValue > bill.OldValue ? 1f : -1f; // +1 == expanding freedom
+                return -p.EconLean * direction + wrinkle > 0f;
+            }
+            float taxDirection = bill.NewValue < bill.OldValue ? 1f : -1f; // +1 == a cut
+            return p.EconLean * taxDirection + wrinkle > 0f;
         }
 
         // Resolves any bill whose day has come. Returns headlines (empty list most days).
-        public List<string> TickAll(long day, EconomySystem econ, GeoWorldNames names)
+        // `nat` is optional (callers that only ever propose tax bills can pass null); freedom
+        // bills are a no-op without it.
+        public List<string> TickAll(long day, EconomySystem econ, NationalSystem nat, GeoWorldNames names)
         {
             List<string> headlines = null;
             foreach (var b in Bills)
@@ -151,9 +167,9 @@ namespace Meridian.Sim
                 if (b.IsDecree)
                 {
                     b.Status = BillStatus.Passed;
-                    Apply(b, econ);
+                    Apply(b, econ, nat);
                     (headlines ??= new List<string>()).Add(
-                        $"{names.Name(b.CountryIndex)}: {b.KindLabel} is now {b.NewValue:0.0}% by decree.");
+                        $"{names.Name(b.CountryIndex)}: {b.KindLabel} is now {b.NewValue:0.0}{Unit(b)} by decree.");
                     continue;
                 }
 
@@ -165,23 +181,44 @@ namespace Meridian.Sim
                 if (yes > 0.5f)
                 {
                     b.Status = BillStatus.Passed;
-                    Apply(b, econ);
+                    Apply(b, econ, nat);
                     (headlines ??= new List<string>()).Add(
-                        $"{names.Name(b.CountryIndex)}: bill passes {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} is now {b.NewValue:0.0}%.");
+                        $"{names.Name(b.CountryIndex)}: bill passes {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} is now {b.NewValue:0.0}{Unit(b)}.");
                 }
                 else
                 {
                     b.Status = BillStatus.Rejected;
                     (headlines ??= new List<string>()).Add(
-                        $"{names.Name(b.CountryIndex)}: bill defeated {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} stays {b.OldValue:0.0}%.");
+                        $"{names.Name(b.CountryIndex)}: bill defeated {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} stays {b.OldValue:0.0}{Unit(b)}.");
                 }
             }
             return headlines ?? Empty;
         }
         static readonly List<string> Empty = new();
+        static string Unit(Bill b) => b.IsFreedom ? "" : "%";
 
-        static void Apply(Bill b, EconomySystem econ)
+        static void Apply(Bill b, EconomySystem econ, NationalSystem nat)
         {
+            if (b.IsFreedom)
+            {
+                if (nat == null || b.CountryIndex < 0 || b.CountryIndex >= nat.States.Count) return;
+                var n = nat.States[b.CountryIndex];
+                switch (b.Kind)
+                {
+                    case BillKind.FreedomSpeech: n.FreedomSpeech = b.NewValue; break;
+                    case BillKind.FreedomReligion: n.FreedomReligion = b.NewValue; break;
+                    case BillKind.FreedomInternet: n.FreedomInternet = b.NewValue; break;
+                }
+                // Real international reaction: tightening freedoms costs standing, expanding
+                // them earns a little back — see docs/obsidian-vault/Vision/Government,
+                // Legislature and Real Taxes.md's "freedoms as real levers with real
+                // consequences" requirement. Asymmetric on purpose (losing standing is easy,
+                // earning it back is slow), same spirit as real reputational politics.
+                float delta = b.NewValue - b.OldValue;
+                n.InternationalStanding = Clampf(n.InternationalStanding + (delta < 0 ? delta * 0.3f : delta * 0.08f), 0f, 100f);
+                return;
+            }
+
             if (b.CountryIndex < 0 || b.CountryIndex >= econ.States.Count) return;
             var e = econ.States[b.CountryIndex];
             switch (b.Kind)
@@ -192,6 +229,8 @@ namespace Meridian.Sim
                 case BillKind.Tariff: e.TaxTariff = b.NewValue; break;
             }
         }
+
+        static float Clampf(float v, float lo, float hi) => v < lo ? lo : (v > hi ? hi : v);
 
         static uint Hash(string s)
         {

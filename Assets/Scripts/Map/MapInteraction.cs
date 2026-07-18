@@ -175,7 +175,7 @@ namespace Meridian.Map
                 }
 
                 if (map.Legislature != null)
-                    foreach (var headline in map.Legislature.TickAll(simDay, map.Economy, map.CountryNames))
+                    foreach (var headline in map.Legislature.TickAll(simDay, map.Economy, map.National, map.CountryNames))
                         WorldFeed.Push("Parliament", headline);
 
                 CheckElection(simDay);
@@ -279,6 +279,10 @@ namespace Meridian.Map
         bool billsDiagProposed;
         bool billsDiagResolved;
         int billsDiagBillId = -1;
+        bool billsDiagFreedomProposed;
+        bool billsDiagFreedomResolved;
+        int billsDiagFreedomBillId = -1;
+        float billsDiagStandingBefore;
         void MaybeRunBillsDiag()
         {
             if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_BILLS") == null) return;
@@ -311,6 +315,37 @@ namespace Meridian.Map
                     var e = map.Economy.States[me];
                     Debug.Log($"[billsdiag] day {simDay}: bill resolved {b.Status} yesShare={b.YesShare * 100f:0}% " +
                               $"corpTaxNow={e.TaxCorporate:0.0} (expected {(b.Status == BillStatus.Passed ? b.NewValue : b.OldValue):0.0})");
+                }
+            }
+
+            // Second phase: a freedom-tightening bill, once the tax bill is out of the way —
+            // verifies the freedom bill type applies to NationalState (not EconomyState) and
+            // that tightening actually costs international standing on enactment.
+            if (billsDiagResolved && !billsDiagFreedomProposed)
+            {
+                billsDiagFreedomProposed = true;
+                var n = map.National.States[me];
+                var profile = CountryProfiles.Get(map.World.Countries[me].IsoA3);
+                float target = System.Math.Max(0f, n.FreedomSpeech - 20f);
+                billsDiagStandingBefore = n.InternationalStanding;
+                string headline = map.Legislature.Propose(me, map.World.Countries[me].Name,
+                    profile?.Government ?? GovernmentType.Unspecified, profile?.Parties,
+                    BillKind.FreedomSpeech, n.FreedomSpeech, target, simDay);
+                var bill = map.Legislature.Bills[map.Legislature.Bills.Count - 1];
+                billsDiagFreedomBillId = bill.Id;
+                Debug.Log($"[billsdiag] day {simDay}: proposed freedom-of-speech tightening {n.FreedomSpeech:0}->{target:0} " +
+                          $"path={(bill.IsDecree ? "DECREE" : "VOTE")} standingBefore={billsDiagStandingBefore:0.0} — {headline}");
+            }
+
+            if (billsDiagFreedomProposed && !billsDiagFreedomResolved && billsDiagFreedomBillId >= 0)
+            {
+                foreach (var b in map.Legislature.Bills)
+                {
+                    if (b.Id != billsDiagFreedomBillId || b.Status == BillStatus.Pending) continue;
+                    billsDiagFreedomResolved = true;
+                    var n = map.National.States[me];
+                    Debug.Log($"[billsdiag] day {simDay}: freedom bill resolved {b.Status} freedomSpeechNow={n.FreedomSpeech:0} " +
+                              $"standing {billsDiagStandingBefore:0.0}->{n.InternationalStanding:0.0} (expect a drop if Passed)");
                 }
             }
         }

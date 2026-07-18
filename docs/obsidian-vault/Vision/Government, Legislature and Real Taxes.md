@@ -96,12 +96,17 @@ requirement, not a suggestion.
 - ⬜ `Sim/Diplomacy.cs`/[[World AI]] — regime-change reactions as a relation shock, same channel
   as denounce/war but internationally broadcast rather than bilateral. Not started.
 - ✅ `Sim/Legislature.cs` — the proposal → vote/decree → enactment pipeline is LIVE for the
-  four core tax levers, with real named parties (~20 curated multi-party countries) voting by
-  ideology and seat share, decree paths for monarchies/one-party states, headlines for the
-  fight and the outcome, parliament + bill-docket UI in the Politics tab, and save/load.
-  Verified both paths live: a USA corporate-tax raise died 49–51 on party lines (Democrats
-  for, Republicans against); a Saudi royal decree enacted automatically after 5 days. See
-  [[Legislature and Bills]] for the full architecture.
+  four core tax levers AND the three freedom levers, with real named parties (~20 curated
+  multi-party countries) voting by ideology and seat share, decree paths for monarchies/
+  one-party states, headlines for the fight and the outcome, parliament + bill-docket + a
+  dedicated FREEDOMS card in the Politics tab, and save/load. Verified all live: a USA
+  corporate-tax raise died 49–51 on party lines (Democrats for, Republicans against); a Saudi
+  royal decree enacted automatically after 5 days; a USA freedom-of-speech tightening bill
+  passed 51–49 (Republicans for, Democrats against — matching the ideology model) and
+  correctly cost international standing on enactment (56.9→53.2). See
+  [[Legislature and Bills]] for the full architecture and its documented simplifications.
 - ⬜ Still open within the pillar: AI countries legislating on their own, elections reshuffling
-  seat shares, lobbying/whipping, bill scope beyond tax law (spending, freedoms, regime
-  change), and per-party approval replacing the single ApprovalRating number.
+  seat shares, lobbying/whipping, bill scope beyond tax+freedoms (spending, regime change),
+  a real second (social) party-ideology axis instead of reusing economic lean, per-country
+  researched freedom baselines instead of a government-type-bucket heuristic, and per-party
+  approval replacing the single ApprovalRating number.

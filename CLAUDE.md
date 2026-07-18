@@ -411,3 +411,25 @@ Everything below is built, launched, and verified via Player.log + visual checks
   - Still open in the pillar (Task #20): AI countries legislating, elections reshuffling seat
     shares, lobbying, bill scope beyond tax law (spending/freedoms/regime change), per-party
     approval.
+- **Freedoms extended into the bill pipeline (next block — "dev based on Feature Relationships",
+  i.e. build the next connected node on the canvas):** `NationalState` gained `FreedomSpeech`/
+  `FreedomReligion`/`FreedomInternet` (0-100, seeded from a `GovernmentType` bucket heuristic —
+  monarchies/one-party lower, established republics higher — not per-country researched data).
+  `BillKind` extended with the three freedom kinds; `Legislature.Apply` now branches on
+  `Bill.IsFreedom` to write to `NationalState` instead of `EconomyState`, and **tightening a
+  freedom costs `InternationalStanding` on enactment, loosening earns a little back**
+  (asymmetric on purpose) — the real international-reaction requirement from the Vision page,
+  not just a number. Party voting on freedom bills reuses the same `EconLean` axis as tax bills
+  (left backs expanding, right backs tightening) as a documented coarse proxy for a social axis
+  not yet curated separately. New Politics › FREEDOMS card (`GameUIRoot.DrawFreedoms`) reuses
+  the generic `DrawTaxLever` propose-a-bill UX for any `BillKind`, not just taxes; foreign
+  countries see freedoms read-only.
+  - `MERIDIAN_DIAG_BILLS=1` now runs a second phase after the tax bill resolves: proposes a
+    freedom-of-speech tightening bill and logs the standing delta. **Verified live as USA**:
+    Republicans (51% seats) backed tightening, Democrats opposed — passed 51–49, standing
+    dropped 56.9→53.2 on enactment, exactly matching the ideology model and the standing-
+    consequence design.
+  - Canvas updated: `v_bills`/`v_freedoms` flipped to ✅ Built in Feature Relationships.canvas,
+    the standing-consequence edge annotated with the verified numbers.
+  - Still open: spending/regime-change bill scope, AI legislating, elections reshuffling seats,
+    a real social-ideology axis, per-country freedom research.

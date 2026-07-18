@@ -888,6 +888,7 @@ namespace Meridian.UI
             }
             EndCard();
 
+            DrawFreedoms(n);
             DrawParliament();
 
             if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Approval.Count >= 2)
@@ -899,6 +900,30 @@ namespace Meridian.UI
                 HelpText("The whole term at a glance — this chart is what the election is really about.");
                 EndCard();
             }
+        }
+
+        // Civil liberties as real bill-driven levers (own country only) — tightening any of
+        // these costs international standing the moment the bill actually enacts (see
+        // Legislature.Apply), not just cosmetically. Foreign countries show them read-only.
+        void DrawFreedoms(NationalState n)
+        {
+            bool own = interaction.Selected == PlayerState.CountryIndex && map.Legislature != null;
+            StartCard();
+            SectionHeader("FREEDOMS");
+            if (own)
+            {
+                HelpText("Tightening any of these costs international standing once the bill takes effect; loosening earns a little back.");
+                DrawTaxLever("Speech", BillKind.FreedomSpeech, () => n.FreedomSpeech, 0f, 100f, v => n.FreedomSpeech = v, true);
+                DrawTaxLever("Religion", BillKind.FreedomReligion, () => n.FreedomReligion, 0f, 100f, v => n.FreedomReligion = v, true);
+                DrawTaxLever("Internet", BillKind.FreedomInternet, () => n.FreedomInternet, 0f, 100f, v => n.FreedomInternet = v, true);
+            }
+            else
+            {
+                Stat("Speech", $"{n.FreedomSpeech:0}");
+                Stat("Religion", $"{n.FreedomReligion:0}");
+                Stat("Internet", $"{n.FreedomInternet:0}");
+            }
+            EndCard();
         }
 
         // Real party composition (any curated multi-party country) + the player's bill docket.

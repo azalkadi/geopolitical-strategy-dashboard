@@ -25,17 +25,42 @@ namespace Meridian.Sim
         // everywhere a real classification hasn't been researched yet.
         public GovernmentType Government;
 
-        public static NationalState Seed(GovernmentType government = GovernmentType.Unspecified) => new NationalState
+        // Civil liberties — speech, religion, internet — each 0-100 (0 = totally restricted,
+        // 100 = fully free). Proposed as bills through LegislatureSystem, same as taxes; see
+        // docs/obsidian-vault/Vision/Government, Legislature and Real Taxes.md. No per-country
+        // real index is curated yet (that's its own Freedom-House-scale research project) —
+        // seeded from a government-type bucket instead, an honest coarse heuristic, not a claim
+        // of researched accuracy for any specific country.
+        public float FreedomSpeech;
+        public float FreedomReligion;
+        public float FreedomInternet;
+
+        public static NationalState Seed(GovernmentType government = GovernmentType.Unspecified)
         {
-            ApprovalRating = 50f,
-            DefenseSpending = 2.0f,
-            ReadinessIndex = 50f,
-            InternationalStanding = 50f,
-            PublicMood = 50f,
-            ResearchSpending = 1.5f,
-            InnovationIndex = 40f,
-            Government = government,
-        };
+            float baseFreedom = government switch
+            {
+                GovernmentType.OneServiceState => 15f,
+                GovernmentType.AbsoluteMonarchy => 25f,
+                GovernmentType.PresidentialRepublic => 60f,
+                GovernmentType.ConstitutionalMonarchy => 65f,
+                GovernmentType.ParliamentaryRepublic => 70f,
+                _ => 50f,
+            };
+            return new NationalState
+            {
+                ApprovalRating = 50f,
+                DefenseSpending = 2.0f,
+                ReadinessIndex = 50f,
+                InternationalStanding = 50f,
+                PublicMood = 50f,
+                ResearchSpending = 1.5f,
+                InnovationIndex = 40f,
+                Government = government,
+                FreedomSpeech = baseFreedom,
+                FreedomReligion = baseFreedom,
+                FreedomInternet = baseFreedom,
+            };
+        }
 
         // Advances one simulated day. gdpRankPercentile in [0,1], 1 == largest economy in the
         // world this tick (see NationalSystem.TickAll, which computes it once across all countries).
