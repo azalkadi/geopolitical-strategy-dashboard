@@ -10,17 +10,31 @@ per-sector visibility. The ask is to make the economy legible as real industries
 manpower and real ownership, not one number that goes up or down.
 
 ## Sectors
-The economy should break down into real industries — oil, agriculture (including sub-sectors
-like fruit specifically named), manufacturing, tech, services, and whatever else a serious
-economic model needs. Each sector should be inspectable on its own: the player should be able
-to see every company operating in a given sector (e.g. "show me every company in the oil
-sector").
+The player named oil, agriculture (with fruit specifically called out as a sub-sector), as
+examples of wanting the economy broken into real industries — the fuller real taxonomy that
+points at:
+- **Energy**: oil & gas, renewables, nuclear power generation (distinct from nuclear *weapons*
+  programs in [[Conflicts, Terrorism and Military Realism]] — same underlying technology, very
+  different game system).
+- **Agriculture**: crops (with real sub-sectors like fruit, grain, etc.), livestock, fisheries,
+  forestry.
+- **Manufacturing**: heavy industry, automotive, electronics/semiconductors, textiles.
+- **Technology**: software, telecom, biotech.
+- **Finance**: banking, insurance.
+- **Services**: tourism, retail, logistics.
+- **Mining**: metals, rare earths (increasingly geopolitically significant in reality).
+- **Construction / real estate.**
+- **Defense industry**: arms manufacturing — the natural supplier side of
+  [[Conflicts, Terrorism and Military Realism|the military equipment pillar]].
+- **Healthcare / pharma.**
+
+Each sector should be inspectable on its own: the player should be able to see every company
+operating in a given sector (e.g. "show me every company in the oil sector").
 
 ## Companies, and public/private/mixed ownership
 Individual companies exist within a sector, and the player can set each one's ownership model —
 fully public (state-owned), fully private, or mixed. This is a real, consequential lever (state
-ownership vs. privatization is a real policy axis for [[Government, Legislature and Real
-Taxes|bills]] to touch), not flavor text.
+ownership vs. privatization is a real policy axis for [[Government, Legislature and Real Taxes|bills]] to touch), not flavor text.
 
 ## Manpower allocation
 The player should be able to directly edit how much manpower/labor goes into healthcare,

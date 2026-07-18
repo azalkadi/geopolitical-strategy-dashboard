@@ -21,12 +21,22 @@ sliders regardless of what that country actually does in reality. This is the fi
 > realistic (not moralized) AI-driven outcomes.
 
 ## Regime types
-Every country needs a real `GovernmentType` — at minimum: **absolute monarchy** (Saudi Arabia),
-**constitutional monarchy** (UK, Jordan, most of the GCC's smaller states), **presidential
-republic with multi-party legislature** (USA), **parliamentary multi-party republic** (most of
-Europe), **one-party state** (China, North Korea), **military/transitional government** (covers
-real unstable cases). This isn't cosmetic — it decides how bills get enacted (below) and what
-freedoms (below) mean politically.
+Every country needs a real `GovernmentType` — the player named Saudi Arabia, the UK/GCC, and
+the USA as examples of the pattern, not the exhaustive list. The real category, with more real
+examples per bucket:
+- **Absolute monarchy**: Saudi Arabia, UAE, Qatar, Oman, Brunei, Eswatini.
+- **Constitutional monarchy**: UK, Jordan, Kuwait, Bahrain, Morocco, Spain, the Netherlands,
+  Sweden, Norway, Japan.
+- **Presidential republic** (multi-party legislature, directly-elected head of state/government
+  split from it varies): USA, Brazil, Mexico, South Korea, Indonesia, Turkey, France
+  (semi-presidential — a real hybrid case worth its own nuance later, not forced into one bucket).
+- **Parliamentary republic**: Germany, Italy, India, Israel, most of continental Europe.
+- **One-party state**: China, North Korea, Vietnam, Cuba, Eritrea.
+- **Military/transitional government**: covers real unstable/interim cases (varies year to year
+  by definition — this bucket should stay a live judgment call, not a fixed list).
+
+This isn't cosmetic — it decides how bills get enacted (below) and what freedoms (below) mean
+politically.
 
 ## Real political parties, not a generic slider
 Named, real parties per country, each with an actual ideological position (economic left-right,
@@ -54,19 +64,27 @@ and there are more tax types in reality than the current four core levers (incom
 VAT/tariff) — unemployment insurance tax is one named example, there will be others per country.
 
 ## Freedoms as real levers with real consequences
-Freedom of speech, freedom of religion, freedom of the internet — each independently
-adjustable, tightening or loosening. These should feed [[National State]]'s indices (approval,
-international standing) and **draw real international reaction**: tightening freedoms as a
-democracy should cost you standing and possibly trigger AI-country response, not be a free
-slider.
+The player named freedom of speech, religion, and internet access — the real civil-liberties
+axis (the kind Freedom House-style indices actually track) is a bit wider: press freedom,
+freedom of assembly, and judicial independence are the same category and worth the same
+treatment. Each independently adjustable, tightening or loosening. These should feed [[National State]]'s indices (approval, international standing) and **draw real international reaction**:
+tightening freedoms as a democracy should cost you standing and possibly trigger AI-country
+response, not be a free slider.
 
 ## Regime change, and the world reacting realistically
 The player should be able to convert a country's regime type (e.g. democratic → monarchy) — and
 the world should genuinely react, not just tick a number. Critically: **the simulation shouldn't
-assume monarchy = bad, democracy = good.** Some real monarchies are stable and successful (the
-GCC states); some real democratic transitions failed (Iraq, Libya, Tunisia, Syria). [[World AI]]
-and the outcome modeling for this need to reflect that real, uncomfortable nuance, not a simple
-morality slider — this was stated explicitly as a requirement, not a suggestion.
+assume monarchy = bad, democracy = good.** The player named the GCC states as successful
+monarchies and Iraq/Libya/Tunisia/Syria as failed democratic transitions — the fuller real
+picture on both sides matters for the outcome modeling to be honest rather than a coin flip:
+- **Stable/successful monarchies beyond the GCC**: Jordan, Morocco, Bhutan.
+- **Democratic transitions that succeeded**: South Korea, Indonesia, Ghana, post-Franco Spain.
+- **Transitions/collapses that struggled beyond the four named**: Yemen, Sudan, Afghanistan.
+
+[[World AI]] and the outcome modeling for this need to reflect that real, uncomfortable nuance —
+governance quality, institutional strength, and external pressure predict outcomes far better
+than regime type alone — not a simple morality slider. This was stated explicitly as a
+requirement, not a suggestion.
 
 ## Where this plugs into existing code
 - ✅ `Sim/CountryProfiles.cs` — the real government-type + tax data source, hand-researched

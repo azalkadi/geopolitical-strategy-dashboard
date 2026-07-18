@@ -27,8 +27,7 @@ wars/agreements only ever happen through their own deliberate action (see [[War 
 [[Diplomacy Mechanics]]), never assigned to them by this autonomous system.
 
 ## Output
-Returns headline strings, which the caller (`MapInteraction.TickEconomy`, see [[Camera and
-Input]]) pushes onto [[History and World Feed|WorldFeed]] for the toast UI to surface.
+Returns headline strings, which the caller (`MapInteraction.TickEconomy`, see [[Camera and Input]]) pushes onto [[History and World Feed|WorldFeed]] for the toast UI to surface.
 
 ## Consumers
 - [[Camera and Input]] — calls `Tick()` once per simulated day alongside `WarSystem.TickAll`

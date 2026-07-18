@@ -4,7 +4,7 @@ tags: [architecture, sim]
 
 # Simulation Overview
 
-`Assets/Scripts/Sim/` — nine files, each a mostly-independent system, all ticked together once
+`Assets/Scripts/Sim/` — twelve files, each a mostly-independent system, all ticked together once
 per simulated day from `MapInteraction.TickEconomy()` (see [[Camera and Input]]). Every state
 class uses **plain public fields**, deliberately — it means [[Save Load]] can serialize the
 entire simulation as a dumb, complete JSON dump and get a bit-identical reload.

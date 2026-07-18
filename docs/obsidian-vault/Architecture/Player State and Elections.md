@@ -33,8 +33,7 @@ else touches. There's no separate hidden "win" stat.
 ## Consumers
 - Almost everything reads `PlayerState.CountryIndex` to know "which country is the player's":
   [[Economy System]]/[[National State]] diagnostics, [[Decision Events]] (fires only for this
-  country), [[World AI]] (excludes this country from AI pair selection), [[Map Modes and
-  Coloring]] (relation coloring is *relative to* this country)
+  country), [[World AI]] (excludes this country from AI pair selection), [[Map Modes and Coloring]] (relation coloring is *relative to* this country)
 - [[UI System]] — `BeginGame`/`ContinueSavedGame` set it; the top bar's player badge and the
   game-over screen read `LastResultMessage`/`TermsServed`
 - [[Save Load]] — every `PlayerState` field is part of the save

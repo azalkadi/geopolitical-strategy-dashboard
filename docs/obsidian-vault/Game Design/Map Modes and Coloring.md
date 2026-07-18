@@ -27,6 +27,5 @@ fill layer is gone.
 
 ## When colors update
 Once per simulated day, as part of the normal tick — relations drift constantly (baseline decay,
-[[World AI|AI activity]], your own [[Diplomacy Mechanics|diplomacy actions]], [[War
-Mechanics|war]] fallout), so the map stays current without needing a manual refresh. It also
+[[World AI|AI activity]], your own [[Diplomacy Mechanics|diplomacy actions]], [[War Mechanics|war]] fallout), so the map stays current without needing a manual refresh. It also
 repaints instantly the moment you start a new game, load a save, or hit PLAY AGAIN.

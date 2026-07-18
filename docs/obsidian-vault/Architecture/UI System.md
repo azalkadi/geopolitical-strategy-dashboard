@@ -60,6 +60,5 @@ for how a click resolves to one of these four feature types.
 
 ## Consumers / dependencies
 Reads from everything: `MapRenderer` (World/Economy/National/Wars/Diplomacy/CountryNames/
-CurrentMode), `MapInteraction` (Selected/SimDay/daysPerSecond), and every [[Simulation
-Overview|Sim/ system]] directly for display and player actions (tax sliders, diplomacy buttons,
+CurrentMode), `MapInteraction` (Selected/SimDay/daysPerSecond), and every [[Simulation Overview|Sim/ system]] directly for display and player actions (tax sliders, diplomacy buttons,
 war declarations, event choices).

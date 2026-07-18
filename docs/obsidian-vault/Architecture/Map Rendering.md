@@ -24,8 +24,7 @@ assuming — this list is illustrative, not authoritative.
    there's no fill to look at there).
 3. **Province borders** (`BuildProvinceBorders`) — 4,596 of them under one gated root; Unity
    frustum-culls the individual meshes once the root is active.
-4. **City markers** (`BuildCityMarkers`) — one combined mesh per `CityTier`, so [[Camera and
-   Input|MapLayers]] can reveal finer tiers as you zoom in.
+4. **City markers** (`BuildCityMarkers`) — one combined mesh per `CityTier`, so [[Camera and Input|MapLayers]] can reveal finer tiers as you zoom in.
 5. **Satellite basemap quad** (`BuildSatelliteQuad`) — see [[Satellite Basemap]].
 6. **Infrastructure markers** (`BuildInfrastructureMarkers`) — airports, ports, air bases, oil
    ports, nuclear plants. See [[Curated Datasets]].

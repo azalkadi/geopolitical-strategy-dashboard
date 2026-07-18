@@ -6,8 +6,7 @@ tags: [architecture, sim]
 
 `Assets/Scripts/Sim/Events.cs` — every 150-360 simulated days, the player's country faces a
 random 2-3-choice situation (corruption scandal, catastrophic flooding, banking crisis, etc.)
-with concrete, immediate effects on [[Economy System|EconomyState]]/[[National
-State|NationalState]]. **The sim clock pauses** while a decision is pending — checked by
+with concrete, immediate effects on [[Economy System|EconomyState]]/[[National State|NationalState]]. **The sim clock pauses** while a decision is pending — checked by
 `MapInteraction` (see [[Camera and Input]]) before ticking any further days.
 
 ## Data shape

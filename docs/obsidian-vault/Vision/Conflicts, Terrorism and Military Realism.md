@@ -10,27 +10,57 @@ game in the real current conflict map and add depth [[War System|the current war
 doesn't have: terrorism, base types, real equipment, and nuclear proliferation.
 
 ## Real 2026 scenario conflicts
-The game should start with the real conflicts that exist right now baked in, not a blank slate:
-Russia–Ukraine, Iran (its regional posture/conflicts), Israel–Palestine, Syria's internal
-situation. These aren't just flavor — a 2026 scenario start should seed [[War System|active
-wars]] and [[Diplomacy System|depressed relations]] matching reality, so the world feels like
-*this* world, not a generic one. "This is how the game will be fun — this is a geopolitical
-game" was said explicitly as the reasoning.
+The game should start with the real conflicts that exist right now baked in, not a blank slate.
+The player named Russia–Ukraine, Iran, Israel–Palestine, and Syria as examples — the reasoning
+("this is a geopolitical game, this is how it'll be fun") applies to the real conflict map as a
+whole, not just those four. A 2026 scenario start should seed [[War System|active wars]]/tension
+and [[Diplomacy System|depressed relations]] matching reality across every rough category of
+real current conflict, not one flat list:
+
+- **Major interstate war**: Russia–Ukraine.
+- **Regional power posture / proxy tension**: Iran's regional footprint, Israel–Iran tension,
+  Israel–Palestine, the broader Israel–Hezbollah/Lebanon axis.
+- **Civil war / internal fragmentation**: Syria, Sudan, Yemen, Myanmar.
+- **Insurgency-driven instability** (feeds directly into the terrorism mechanic below rather
+  than interstate war): the Sahel region (Mali, Burkina Faso, Niger), Somalia, Nigeria's
+  northeast.
+- **Frozen or unresolved territorial disputes**: Armenia–Azerbaijan (Nagorno-Karabakh),
+  India–Pakistan (Kashmir), the Korean DMZ.
+- **Great-power competition backdrop** (tension without open war): Taiwan Strait / US–China,
+  South China Sea territorial claims.
+
+Seeding this breadth — not just four countries — is what makes the world feel like *this* world
+rather than a generic one with a few hot spots painted on.
 
 ## Terrorism as an internal mechanic
-Distinct from interstate [[War System|war]]: a terrorist organization can exist and grow
-*inside* a country (the example given: a terror org growing inside Saudi Arabia). The player
+Distinct from interstate [[War System|war]]: a terrorist/insurgent organization can exist and
+grow *inside* a country (the example given: an org growing inside Saudi Arabia). The player
 needs ways to fight it internally — options to attack/degrade the organization — and the
 organization itself needs to be a real threat: capable of attacking places, attacking
 businesses, not just a passive stat. This is a new system, not a reskin of interstate war.
 
+Model this by **type/region**, not by naming specific real active organizations — the real
+insurgency-driven instability zones named above (Sahel jihadist insurgencies, Somalia,
+Nigeria's northeast, and similar real patterns elsewhere) are the honest reference for what
+"growing internal threat" should feel like, without the game needing to model any specific real
+group's actual current operational details.
+
 ## Bases, equipment, and nuclear realism
 - **Base types**: air bases, naval bases, ground bases, and *foreign* bases (a country hosting
   another country's military presence — real and geopolitically significant, e.g. US bases
-  abroad).
-- **Real equipment**: named real hardware (F-35s, F-16s, missile classes distinguished by
-  speed/type — "fast missiles, low missiles" was the phrasing) instead of an abstract
-  `ReadinessIndex` number.
+  abroad). A [[Supranational Unions|military alliance]] membership (NATO-style) is the natural
+  reason a foreign base exists on allied soil, not an isolated fact.
+- **Real equipment, by category** — the player named F-35s/F-16s and "fast missiles, low
+  missiles" as examples of wanting named real hardware instead of an abstract `ReadinessIndex`
+  number; the fuller real taxonomy this points at:
+  - **Fighter aircraft, by generation**: 5th-gen (F-35, J-20, Su-57), 4.5-gen (F-16, Rafale,
+    Eurofighter Typhoon, Gripen), legacy (MiG-29, F-4-era airframes still in service in some
+    air forces).
+  - **Missiles, by class**: ballistic (short/medium/intercontinental range), cruise,
+    hypersonic, and air-defense/interceptor systems — distinct roles, not one "missile" stat.
+  - **Naval**: aircraft carriers, destroyers, frigates, and submarines (conventional vs.
+    nuclear-powered — a real, consequential distinction for range/stealth).
+  - **Ground**: main battle tanks, artillery, and modern air-defense networks.
 - **Intel fog of war**: the player should only know what their "secret services" would
   plausibly know about another country's military — not full omniscient data on everyone,
   general/public data otherwise.

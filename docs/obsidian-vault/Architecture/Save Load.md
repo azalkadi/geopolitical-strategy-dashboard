@@ -5,8 +5,7 @@ tags: [architecture, sim]
 # Save Load
 
 `Assets/Scripts/Sim/SaveLoad.cs` — a whole-simulation JSON snapshot written to
-`Application.persistentDataPath/meridian_save.json`. Since every [[Simulation Overview|Sim/
-system]] uses plain public fields, this is a **dumb, complete serialization** — a loaded game is
+`Application.persistentDataPath/meridian_save.json`. Since every [[Simulation Overview|Sim/ system]] uses plain public fields, this is a **dumb, complete serialization** — a loaded game is
 bit-identical to one that was never quit. Geography itself is never saved (it reloads fresh from
 `StreamingAssets` every launch via [[Geo Pipeline]]) — only mutable simulation state is
 persisted.

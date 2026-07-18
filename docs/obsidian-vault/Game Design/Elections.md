@@ -17,8 +17,7 @@ for the code.
 
 ## What actually moves your approval rating
 Everything you do, indirectly: [[Economy Mechanics|economic]] performance (growth, unemployment,
-inflation), your choices in [[Decision Events|decision events]], [[Diplomacy
-Mechanics|denouncing]] a rival (a quick, cheap boost), and how a [[War Mechanics|war]] you're
+inflation), your choices in [[Decision Events|decision events]], [[Diplomacy Mechanics|denouncing]] a rival (a quick, cheap boost), and how a [[War Mechanics|war]] you're
 in goes. There's no separate campaigning mechanic — good governance *is* the campaign.
 
 ## Game over and replay

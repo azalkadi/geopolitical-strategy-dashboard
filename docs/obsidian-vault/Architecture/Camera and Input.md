@@ -25,9 +25,7 @@ per-frame `Update()`:
 ### 1. The sim clock
 `TickEconomy()` accumulates `daysPerSecond * Time.deltaTime` and advances whole simulated days,
 each of which: ticks [[Economy System]], [[National State]], [[Diplomacy System]]
-(`TickAll`), [[War System]] and [[World AI]] (pushing headlines to [[History and World
-Feed|WorldFeed]]), checks for an election ([[Elections]]), records [[History and World
-Feed|PlayerHistory]], and calls `EventSystem.MaybeFire` for a [[Decision Events|decision event]].
+(`TickAll`), [[War System]] and [[World AI]] (pushing headlines to [[History and World Feed|WorldFeed]]), checks for an election ([[Elections]]), records [[History and World Feed|PlayerHistory]], and calls `EventSystem.MaybeFire` for a [[Decision Events|decision event]].
 **The clock freezes** whenever `PlayerState.State != Playing` (start/game-over screens) or a
 decision event is pending — the world waits for the head of state.
 

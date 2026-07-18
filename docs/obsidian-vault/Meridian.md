@@ -41,11 +41,12 @@ since the roadmap was last touched) lives in `CLAUDE.md` at the repo root, not h
 
 ## 🌟 [[Vision Overview|The Vision]] — where this is all headed
 
-The three boards above describe the game **as it stands**. [[Vision Overview|Open the Vision
-folder]] for the long-term ambition instead: real per-country governments and legislatures with
+The three boards above describe the game **as it stands**. [[Vision Overview|Open the Vision folder]] for the long-term ambition instead: real per-country governments and legislatures with
 actual named political parties, real seeded tax data, a sector/company-level economy, the real
-2026 conflict map plus terrorism and military realism, supranational unions (EU/GCC/UN), and a
-long list of map/UI realism asks. This is a marathon, not a sprint — see the roadmap's stage 4.5.
+2026 conflict map plus terrorism and military realism, the full spectrum of real multilateral
+organizations (unions, military alliances, cartels, regional blocs — EU/GCC/UN were examples,
+not the list), and a long list of map/UI realism asks. This is a marathon, not a sprint — see
+the roadmap's stage 4.5.
 
 ## Vault map
 

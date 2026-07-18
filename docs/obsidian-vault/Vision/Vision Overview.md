@@ -4,10 +4,16 @@ tags: [vision, game-design]
 
 # Vision Overview
 
-Captured 2026-07-17, verbatim from a long voice-driven design session. This is the **long-term
+Captured 2026-07-17 from a long voice-driven design session. This is the **long-term
 ambition** for Meridian — not a sprint, a marathon the player intends to keep pushing deeper
 indefinitely. The [[Development Roadmap.canvas|roadmap canvas]]'s stage 4.5 tracks this pillar
 at the build-order level; this folder is where the actual design content lives.
+
+**Reading rule for this whole folder** (added at the player's explicit correction): things the
+player named — EU/GCC/UN, F-35s/F-16s, oil/fruit sectors, the four conflicts — were **examples
+of a pattern, not exhaustive lists**. Every pillar page generalizes from the named examples to
+the full real category and its real distinct functions; when building, implement the category,
+not just the named instances.
 
 > "I want this game to be super fucking realistic, like crazy realistic, and you can fulfill
 > your passion about politics in this game." — the player, on why this matters to them
@@ -26,11 +32,15 @@ a realistic detail).
    of generic sliders.
 2. [[Economic Sectors and Companies]] — the economy as real industries and real companies, not
    one GDP number. Public/private/mixed ownership, per-sector manpower you can reallocate.
-3. [[Conflicts, Terrorism and Military Realism]] — the real 2026 conflict map (Iran, Russia-
-   Ukraine, Israel-Palestine, Syria), internal terrorism as a mechanic, realistic military
-   equipment/bases/nuclear programs, and combat visuals (missiles, strikes).
-4. [[Supranational Unions]] — the EU, GCC, UN, and federal internal structure (US states) as
-   their own governance layers above individual countries.
+3. [[Conflicts, Terrorism and Military Realism]] — the real 2026 conflict map across every
+   category (interstate war, proxy tension, civil wars, insurgencies, frozen disputes,
+   great-power competition — Iran/Russia-Ukraine/Israel-Palestine/Syria were the named
+   examples), internal terrorism as a mechanic, realistic military equipment/bases/nuclear
+   programs, and combat visuals (missiles, strikes).
+4. [[Supranational Unions]] — the full spectrum of real multilateral organizations by
+   *function*: political/economic unions (EU, GCC), military alliances (NATO), regional blocs
+   (ASEAN, AU, Arab League), cartels (OPEC+), the UN, informal blocs (BRICS) — plus federal
+   internal structure (US states) as the inverse layer inside one country.
 5. [[Map and UI Realism]] — right-click context actions, a minimap, tiered city/infrastructure
    icons that actually look like what they represent, city/province click interactions, train
    and cargo movement, bigger flags, and an overall "looks like a real game" polish bar.
