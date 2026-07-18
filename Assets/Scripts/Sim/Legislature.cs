@@ -18,7 +18,7 @@ namespace Meridian.Sim
     // All public fields / parameterless types so SaveLoad's dumb-complete Newtonsoft dump
     // round-trips the whole system (see Sim/SaveLoad.cs).
 
-    public enum BillKind { IncomeTax, CorporateTax, Vat, Tariff, FreedomSpeech, FreedomReligion, FreedomInternet, RegimeChange }
+    public enum BillKind { IncomeTax, CorporateTax, Vat, Tariff, FreedomSpeech, FreedomReligion, FreedomInternet, RegimeChange, CompanyOwnership }
 
     public enum BillStatus { Pending, Passed, Rejected }
 
@@ -46,6 +46,8 @@ namespace Meridian.Sim
         public List<BillStance> Stances = new();
         public float YesShare;          // filled at resolution (vote path)
         public GovernmentType? NewGovernment; // only set for RegimeChange bills
+        public int CompanyIndex = -1;         // only set for CompanyOwnership bills
+        public string CompanyName = "";       // denormalized for display — the index stays authoritative for Apply
 
         public string KindLabel => Kind switch
         {
@@ -56,12 +58,19 @@ namespace Meridian.Sim
             BillKind.FreedomSpeech => "Freedom of speech",
             BillKind.FreedomReligion => "Freedom of religion",
             BillKind.FreedomInternet => "Internet freedom",
+            BillKind.CompanyOwnership => $"{CompanyName} ownership",
             _ => "Regime change",
         };
 
         public bool IsFreedom => Kind == BillKind.FreedomSpeech || Kind == BillKind.FreedomReligion || Kind == BillKind.FreedomInternet;
         public bool IsTightening => IsFreedom && NewValue < OldValue;
         public bool IsRegimeChange => Kind == BillKind.RegimeChange;
+        public bool IsCompanyOwnership => Kind == BillKind.CompanyOwnership;
+        // CompanyOwnership encodes the Ownership enum as a float (0=Public,1=Mixed,2=Private)
+        // in Old/NewValue so it can reuse the same vote/decree pipeline every other numeric
+        // bill uses instead of a fourth special-cased path.
+        public Ownership OldOwnership => (Ownership)(int)OldValue;
+        public Ownership NewOwnership => (Ownership)(int)NewValue;
     }
 
     public class LegislatureSystem
@@ -92,9 +101,11 @@ namespace Meridian.Sim
         // Proposes a change and returns the headline to push. Caller has already checked
         // PendingFor (one open bill per lever at a time) and clamped newValue to the lever's
         // legal range. countryName/govType are for flavor only — the structural decision
-        // (vote vs. decree) is "does this country have real parties data".
+        // (vote vs. decree) is "does this country have real parties data". companyIndex/
+        // companyName are only meaningful for BillKind.CompanyOwnership (see Bill.CompanyIndex).
         public string Propose(int countryIndex, string countryName, GovernmentType gov,
-                              List<PartyProfile> parties, BillKind kind, float oldValue, float newValue, long day)
+                              List<PartyProfile> parties, BillKind kind, float oldValue, float newValue, long day,
+                              int companyIndex = -1, string companyName = "")
         {
             var bill = new Bill
             {
@@ -104,6 +115,8 @@ namespace Meridian.Sim
                 OldValue = oldValue,
                 NewValue = newValue,
                 ProposedDay = day,
+                CompanyIndex = companyIndex,
+                CompanyName = companyName,
             };
 
             if (parties == null || parties.Count == 0)
@@ -117,7 +130,7 @@ namespace Meridian.Sim
                     GovernmentType.OneServiceState => "Party leadership directive issued",
                     _ => "Executive order drafted",
                 };
-                return $"{how}: {bill.KindLabel} {oldValue:0.0}% → {newValue:0.0}% (takes effect in {DecreeDays} days).";
+                return $"{how}: {bill.KindLabel} {Fmt(bill, oldValue)} → {Fmt(bill, newValue)} (takes effect in {DecreeDays} days).";
             }
 
             bill.DecisionDay = day + VoteDays;
@@ -136,8 +149,16 @@ namespace Meridian.Sim
                 backers != null && opponents != null ? $"{backers} back it; {opponents} vow to fight it." :
                 backers != null ? $"{backers} back it; no organized opposition." :
                 "No party is willing to sponsor it.";
-            return $"{countryName}'s legislature takes up a bill: {bill.KindLabel} {oldValue:0.0}% → {newValue:0.0}%. {fight}";
+            return $"{countryName}'s legislature takes up a bill: {bill.KindLabel} {Fmt(bill, oldValue)} → {Fmt(bill, newValue)}. {fight}";
         }
+
+        // Shared value formatter for headlines — ownership bills show the real word
+        // (Public/Mixed/Private), everything else shows a percentage (freedoms are 0-100
+        // indices, formatted without the "%" — see Unit()).
+        static string Fmt(Bill b, float value) =>
+            b.IsCompanyOwnership ? OwnershipLabel((Ownership)(int)value) : $"{value:0.0}{Unit(b)}";
+
+        static string OwnershipLabel(Ownership o) => o switch { Ownership.Public => "Public", Ownership.Mixed => "Mixed", _ => "Private" };
 
         // Regime change: converting a country's own government type — categorically different
         // from ordinary policy, so it deliberately bypasses the party-vote branch entirely (a
@@ -199,9 +220,27 @@ namespace Meridian.Sim
                 float direction = bill.NewValue > bill.OldValue ? 1f : -1f; // +1 == expanding freedom
                 return -p.EconLean * direction + wrinkle > 0f;
             }
+            if (bill.IsCompanyOwnership)
+            {
+                // Real, uncontroversial partisan pattern: economic-right parties back
+                // privatizing (moving toward Private), economic-left back nationalizing
+                // (moving toward Public) — the same sign convention as tax cuts, since
+                // privatization IS a shrink-the-state move in the same sense a tax cut is.
+                float direction = bill.NewValue > bill.OldValue ? 1f : -1f; // +1 == toward Private
+                return p.EconLean * direction + wrinkle > 0f;
+            }
             float taxDirection = bill.NewValue < bill.OldValue ? 1f : -1f; // +1 == a cut
             return p.EconLean * taxDirection + wrinkle > 0f;
         }
+
+        // Convenience wrapper for CompanyOwnership bills — encodes the enum as the float scale
+        // Propose already understands (0=Public,1=Mixed,2=Private) so ownership changes get the
+        // exact same vote-or-decree pipeline as every other bill for free.
+        public string ProposeOwnershipChange(int countryIndex, string countryName, GovernmentType gov,
+                                             List<PartyProfile> parties, int companyIndex, string companyName,
+                                             Ownership oldOwnership, Ownership newOwnership, long day) =>
+            Propose(countryIndex, countryName, gov, parties, BillKind.CompanyOwnership,
+                    (float)(int)oldOwnership, (float)(int)newOwnership, day, companyIndex, companyName);
 
         // Resolves any bill whose day has come. Returns headlines (empty list most days).
         // `nat` is optional (callers that only ever propose tax bills can pass null); freedom
@@ -222,7 +261,7 @@ namespace Meridian.Sim
                             $"{names.Name(b.CountryIndex)} completes its transition to {GovLabel(b.NewGovernment ?? GovernmentType.Unspecified)}.");
                     else
                         (headlines ??= new List<string>()).Add(
-                            $"{names.Name(b.CountryIndex)}: {b.KindLabel} is now {b.NewValue:0.0}{Unit(b)} by decree.");
+                            $"{names.Name(b.CountryIndex)}: {b.KindLabel} is now {Fmt(b, b.NewValue)} by decree.");
                     continue;
                 }
 
@@ -236,13 +275,13 @@ namespace Meridian.Sim
                     b.Status = BillStatus.Passed;
                     Apply(b, econ, nat);
                     (headlines ??= new List<string>()).Add(
-                        $"{names.Name(b.CountryIndex)}: bill passes {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} is now {b.NewValue:0.0}{Unit(b)}.");
+                        $"{names.Name(b.CountryIndex)}: bill passes {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} is now {Fmt(b, b.NewValue)}.");
                 }
                 else
                 {
                     b.Status = BillStatus.Rejected;
                     (headlines ??= new List<string>()).Add(
-                        $"{names.Name(b.CountryIndex)}: bill defeated {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} stays {b.OldValue:0.0}{Unit(b)}.");
+                        $"{names.Name(b.CountryIndex)}: bill defeated {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} stays {Fmt(b, b.OldValue)}.");
                 }
             }
             return headlines ?? Empty;
@@ -292,6 +331,25 @@ namespace Meridian.Sim
 
             if (b.CountryIndex < 0 || b.CountryIndex >= econ.States.Count) return;
             var e = econ.States[b.CountryIndex];
+
+            if (b.IsCompanyOwnership)
+            {
+                if (b.CompanyIndex < 0 || b.CompanyIndex >= e.Companies.Count) return;
+                var company = e.Companies[b.CompanyIndex];
+                // A real, one-time buyout-or-sale cash flow, sized by the company's approximate
+                // real output (see Sim/Companies.cs) — nationalizing costs the state a buyout,
+                // privatizing raises a real one-time windfall. Doesn't yet add an ongoing
+                // dividend/tax stream tied to the new ownership (that's real future work, see
+                // docs/obsidian-vault/Architecture/Legislature and Bills.md's open items) — kept
+                // out of this slice specifically to avoid touching EconomyState.Tick's core GDP
+                // formula until sector output composing GDP is properly designed.
+                float oldStake = StateStake(b.OldOwnership);
+                float newStake = StateStake(b.NewOwnership);
+                e.Treasury += (oldStake - newStake) * company.OutputBillions * 0.4;
+                company.Ownership = b.NewOwnership;
+                return;
+            }
+
             switch (b.Kind)
             {
                 case BillKind.IncomeTax: e.TaxIncome = b.NewValue; break;
@@ -300,6 +358,10 @@ namespace Meridian.Sim
                 case BillKind.Tariff: e.TaxTariff = b.NewValue; break;
             }
         }
+
+        // 1 = fully state-owned, 0 = fully private — how much of the company's value the state
+        // holds a claim to, for sizing the buyout-vs-sale transaction above.
+        static float StateStake(Ownership o) => o switch { Ownership.Public => 1f, Ownership.Mixed => 0.5f, _ => 0f };
 
         static float Clampf(float v, float lo, float hi) => v < lo ? lo : (v > hi ? hi : v);
 

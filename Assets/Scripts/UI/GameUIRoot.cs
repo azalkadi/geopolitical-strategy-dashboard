@@ -864,7 +864,76 @@ namespace Meridian.UI
                     Stat(map.World.Countries[p].Name, $"+{DiplomacySystem.AgreementExportBonus * 100:0.0}% exports");
                 EndCard();
             }
+
+            DrawCompanies(e);
         }
+
+        // First slice of the "Economic Sectors and Companies" vision pillar — real named
+        // companies (see Sim/Companies.cs), curated for ~13 major countries. Own country only
+        // gets ownership-change controls (routed through the same bill pipeline as taxes —
+        // privatizing/nationalizing is legislation, see Legislature.ProposeOwnershipChange);
+        // foreign countries see the roster read-only. Silently absent for uncurated countries.
+        void DrawCompanies(EconomyState e)
+        {
+            if (e.Companies.Count == 0) return;
+            int sel = interaction.Selected;
+            bool own = sel == PlayerState.CountryIndex && map.Legislature != null;
+
+            StartCard();
+            SectionHeader($"COMPANIES ({e.Companies.Count})");
+            for (int i = 0; i < e.Companies.Count; i++)
+            {
+                var c = e.Companies[i];
+                if (!own)
+                {
+                    Stat($"{c.Name} · {c.SectorLabel}", c.OwnershipLabel);
+                    continue;
+                }
+
+                int ci = i; // local copy for the closure below
+                var pending = map.Legislature.PendingFor(PlayerState.CountryIndex, BillKind.CompanyOwnership);
+                bool thisPending = pending != null && pending.CompanyIndex == ci;
+
+                var row = Row();
+                row.style.marginTop = 4;
+                row.style.alignItems = Align.Center;
+                var lbl = MakeLabel($"{c.Name} · {c.SectorLabel}", 11, GameTheme.TextDim);
+                lbl.style.width = 140;
+                row.Add(lbl);
+                var spacer = new VisualElement(); spacer.style.flexGrow = 1; row.Add(spacer);
+
+                if (thisPending)
+                {
+                    row.Add(MakeLabel($"→ {LeanOwnershipLabel(pending.NewOwnership)} on {DateString(pending.DecisionDay)}", 11, GameTheme.Accent, bold: true));
+                }
+                else
+                {
+                    var options = new List<string> { "Public", "Mixed", "Private" };
+                    var dropdown = new DropdownField(options, (int)c.Ownership);
+                    dropdown.style.width = 110;
+                    StyleDropdown(dropdown);
+                    dropdown.RegisterValueChangedCallback(evt =>
+                    {
+                        var target = evt.newValue switch { "Public" => Ownership.Public, "Mixed" => Ownership.Mixed, _ => Ownership.Private };
+                        if (target == c.Ownership) return;
+                        var profile = CountryProfiles.Get(map.World.Countries[sel].IsoA3);
+                        string headline = map.Legislature.ProposeOwnershipChange(sel, map.World.Countries[sel].Name,
+                            profile?.Government ?? GovernmentType.Unspecified, profile?.Parties,
+                            ci, c.Name, c.Ownership, target, interaction.SimDay);
+                        WorldFeed.Push("Parliament", headline);
+                        builtForCategory = (NationCategory)(-1);
+                    });
+                    row.Add(dropdown);
+                }
+                currentContainer.Add(row);
+            }
+            HelpText(own
+                ? "Nationalizing costs the treasury a real buyout; privatizing raises a real one-time windfall — sized by the company's approximate real scale."
+                : "Read-only — this isn't your country.");
+            EndCard();
+        }
+
+        static string LeanOwnershipLabel(Ownership o) => o switch { Ownership.Public => "Public", Ownership.Mixed => "Mixed", _ => "Private" };
 
         void DrawPolitics(NationalState n)
         {
@@ -2216,7 +2285,7 @@ namespace Meridian.UI
             // (the docket's status lines) — same rationale as warStamp above.
             int billsStamp = 0;
             if (map.Legislature != null && PlayerState.CountryIndex >= 0 &&
-                (UIState.ActiveCategory == NationCategory.Economy || UIState.ActiveCategory == NationCategory.Politics))
+                (UIState.ActiveCategory == NationCategory.Economy || UIState.ActiveCategory == NationCategory.Politics || UIState.ActiveCategory == NationCategory.Trade))
             {
                 foreach (var b in map.Legislature.BillsOf(PlayerState.CountryIndex))
                     billsStamp = billsStamp * 31 + b.Id * 3 + (int)b.Status;

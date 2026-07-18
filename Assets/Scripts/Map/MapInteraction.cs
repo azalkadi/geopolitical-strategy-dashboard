@@ -287,6 +287,10 @@ namespace Meridian.Map
         bool billsDiagRegimeResolved;
         int billsDiagRegimeBillId = -1;
         float billsDiagRegimeStandingBefore;
+        bool billsDiagCompanyProposed;
+        bool billsDiagCompanyResolved;
+        int billsDiagCompanyBillId = -1;
+        double billsDiagTreasuryBefore;
         void MaybeRunBillsDiag()
         {
             if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_BILLS") == null) return;
@@ -378,6 +382,48 @@ namespace Meridian.Map
                     var n = map.National.States[me];
                     Debug.Log($"[billsdiag] day {simDay}: regime change resolved {b.Status} governmentNow={n.Government} " +
                               $"standing {billsDiagRegimeStandingBefore:0.0}->{n.InternationalStanding:0.0} (expect a big drop, was pluralistic)");
+                }
+            }
+
+            // Fourth phase: nationalize the player's first curated company (index 0) — verifies
+            // BillKind.CompanyOwnership routes through the same vote/decree pipeline and that
+            // the one-time buyout cost actually hits the treasury on enactment.
+            if (billsDiagRegimeResolved && !billsDiagCompanyProposed)
+            {
+                var e = map.Economy.States[me];
+                if (e.Companies.Count == 0)
+                {
+                    billsDiagCompanyProposed = true;
+                    billsDiagCompanyResolved = true;
+                    Debug.Log("[billsdiag] no curated companies for this country — skipping ownership test");
+                }
+                else
+                {
+                    billsDiagCompanyProposed = true;
+                    var company = e.Companies[0];
+                    var profile = CountryProfiles.Get(map.World.Countries[me].IsoA3);
+                    billsDiagTreasuryBefore = e.Treasury;
+                    var target = company.Ownership == Ownership.Public ? Ownership.Private : Ownership.Public;
+                    string headline = map.Legislature.ProposeOwnershipChange(me, map.World.Countries[me].Name,
+                        profile?.Government ?? GovernmentType.Unspecified, profile?.Parties,
+                        0, company.Name, company.Ownership, target, simDay);
+                    var bill = map.Legislature.Bills[map.Legislature.Bills.Count - 1];
+                    billsDiagCompanyBillId = bill.Id;
+                    Debug.Log($"[billsdiag] day {simDay}: proposed {company.Name} {company.Ownership}->{target} " +
+                              $"path={(bill.IsDecree ? "DECREE" : "VOTE")} treasuryBefore={billsDiagTreasuryBefore:0.00} outputBillions={company.OutputBillions:0} — {headline}");
+                }
+            }
+
+            if (billsDiagCompanyProposed && !billsDiagCompanyResolved && billsDiagCompanyBillId >= 0)
+            {
+                foreach (var b in map.Legislature.Bills)
+                {
+                    if (b.Id != billsDiagCompanyBillId || b.Status == BillStatus.Pending) continue;
+                    billsDiagCompanyResolved = true;
+                    var e = map.Economy.States[me];
+                    var company = e.Companies[0];
+                    Debug.Log($"[billsdiag] day {simDay}: ownership bill resolved {b.Status} companyOwnershipNow={company.Ownership} " +
+                              $"treasury {billsDiagTreasuryBefore:0.00}->{e.Treasury:0.00}");
                 }
             }
         }

@@ -9,6 +9,17 @@ three spending levers (education/healthcare/infrastructure) — no industries, n
 per-sector visibility. The ask is to make the economy legible as real industries with real
 manpower and real ownership, not one number that goes up or down.
 
+> **Status (2026-07-17): first slice shipped.** `Sim/Companies.cs` — real named companies
+> (~13 curated countries, `CountryProfiles.Companies`) in real sectors, with player-changeable
+> ownership routed through the [[Legislature and Bills|bill pipeline]] (`BillKind.
+> CompanyOwnership`) exactly like tax/freedom bills — voted on by real party ideology or
+> decreed, same as everything else in [[Government, Legislature and Real Taxes]]. Enactment
+> charges/credits the treasury a one-time buyout-or-sale transaction sized by the company's
+> approximate real scale. Trade tab gained a COMPANIES card. See
+> [[Sectors and Companies]] for the full architecture. **Still open:** sector output doesn't
+> compose GDP yet, no ongoing dividend/tax revenue tied to ownership, and manpower allocation
+> (below) hasn't started.
+
 ## Sectors
 The player named oil, agriculture (with fruit specifically called out as a sub-sector), as
 examples of wanting the economy broken into real industries — the fuller real taxonomy that
@@ -44,13 +55,24 @@ money, not people. Manpower is a separate real resource: how many workers a sect
 which should itself interact with unemployment and sector output.
 
 ## Where this plugs into existing code
-- `Sim/Economy.cs` currently has zero sector breakdown — this is a genuinely new data model,
-  not an extension of an existing one. A `Sector` class (name, output, employment, ownership mix)
-  per country, likely seeded from real approximate sector-share data where available (same
-  research-effort pattern as [[Curated Datasets]]).
-- A `Company` class nested under sectors, with an `Ownership` enum (Public/Private/Mixed).
-- UI: a new sub-view (likely under Trade or a new "Industry" ministry sub-tab) to browse
-  sectors → companies, and to reassign manpower.
-- This is the most build-heavy of the six pillars — no existing system to extend, has to be
-  designed from scratch. Good candidate for its own dedicated session rather than a slice of a
-  bigger one.
+- ✅ `Sim/Companies.cs` — `Sector`/`Ownership` enums, `CompanySeed` (static real roster) and
+  `Company` (mutable per-game copy on `EconomyState.Companies`).
+- ✅ `Sim/CountryProfiles.cs` — real curated companies for ~13 major countries (Saudi Aramco,
+  Apple, Sinopec, Volkswagen, Toyota, BP, TotalEnergies, Gazprom, Reliance Industries,
+  Petrobras — kept genuinely Mixed, a real example — ADNOC, Royal Bank of Canada, Samsung).
+- ✅ `Sim/Legislature.cs` — `BillKind.CompanyOwnership` reuses the existing vote/decree pipeline
+  (encodes the enum as a float scale rather than needing a special-cased path); enactment
+  charges/credits treasury a one-time buyout-or-sale transaction.
+- ✅ `GameUIRoot.DrawCompanies` — Trade tab COMPANIES card, own-country ownership dropdowns,
+  read-only for foreign countries.
+- Verified live as the USA: proposed nationalizing Apple, Democrats (49% seats) backed it,
+  Republicans (51%) opposed — correctly rejected, ownership stayed Private, no treasury
+  transaction fired (confirms `Apply` only runs on `Passed`, not `Rejected`). The passed-
+  transaction arithmetic itself was verified by direct code inspection rather than a live
+  passing vote (would have needed a left-leaning-majority country or another multi-day cycle)
+  — noted here rather than overclaiming a test that wasn't actually run.
+- ⬜ Still fully open: sector output doesn't compose GDP (a genuinely new economic model, kept
+  out of this slice on purpose — see [[Sectors and Companies]]), no ongoing dividend/tax
+  revenue tied to ownership, and manpower allocation is a separate, unstarted axis. This is
+  still the most build-heavy of the six pillars overall — the company/ownership slice is a
+  real start, not the whole pillar.

@@ -4,7 +4,7 @@ tags: [architecture, sim]
 
 # Simulation Overview
 
-`Assets/Scripts/Sim/` — thirteen files, each a mostly-independent system, all ticked together once
+`Assets/Scripts/Sim/` — fourteen files, each a mostly-independent system, all ticked together once
 per simulated day from `MapInteraction.TickEconomy()` (see [[Camera and Input]]). Every state
 class uses **plain public fields**, deliberately — it means [[Save Load]] can serialize the
 entire simulation as a dumb, complete JSON dump and get a bit-identical reload.
@@ -40,7 +40,8 @@ Map coloring also refreshes at the end of this: see [[Map Modes and Coloring]].
 | [[Decision Events]] | Random 2-3-choice player events | [[Economy System]], [[National State]] |
 | [[Player State and Elections]] | Which country the human plays, term/election state | [[National State]] (approval rating) |
 | [[Buildable Infrastructure]] | Player-built road/rail links between own cities | [[Economy System]] (treasury), [[Geo Pipeline\|City]] positions |
-| [[Legislature and Bills]] | Bill pipeline: parties vote or monarchs decree tax law | [[Economy System]] (applies law), CountryProfiles (parties/government) |
+| [[Legislature and Bills]] | Bill pipeline: parties vote or monarchs decree tax/freedom/regime/ownership law | [[Economy System]] (applies law), CountryProfiles (parties/government) |
+| [[Sectors and Companies]] | Real named companies + ownership (data model, no own tick — ownership only changes via Legislature) | [[Economy System]] (`Companies` list) |
 | [[Save Load]] | JSON snapshot of the whole simulation | all of the above |
 | [[History and World Feed]] | Player sparkline history + cross-system headline queue | [[Economy System]], [[National State]] |
 

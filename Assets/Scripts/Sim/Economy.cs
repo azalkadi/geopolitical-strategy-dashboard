@@ -31,6 +31,12 @@ namespace Meridian.Sim
         public bool HasRealBaseline;       // false when GDP/pop were placeholders
         public bool HasRealTaxProfile;     // true when seeded from CountryProfiles' real curated rates
 
+        // First slice of the "Economic Sectors and Companies" vision pillar — real named
+        // companies (see Sim/Companies.cs), mutable per-game so ownership changes (see
+        // LegislatureSystem, BillKind.CompanyOwnership) never touch the shared static
+        // CountryProfiles seed data. Empty for every uncurated country.
+        public List<Company> Companies = new();
+
         // Player-defined taxes beyond the four core levers — freely add/rename/rate/remove
         // (e.g. "Plastic Bag Tax"). Narrower in scope than the core levers, so each one carries
         // a much smaller revenue and growth-drag coefficient (see Tick()).
@@ -129,6 +135,10 @@ namespace Meridian.Sim
                 Population = System.Math.Max(c.PopEst, 10_000L),
                 PopulationGrowth = 1.0f,
             };
+
+            if (profile?.Companies != null)
+                foreach (var seed in profile.Companies)
+                    state.Companies.Add(new Company { Name = seed.Name, Sector = seed.Sector, Ownership = seed.Ownership, OutputBillions = seed.OutputBillions });
 
             float baseOpenness =
                 gdpPerCapita < 5_000.0 ? 0.35f :

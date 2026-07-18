@@ -51,6 +51,7 @@ namespace Meridian.Sim
         public float? TaxVat;
         public float? TaxTariff;
         public List<PartyProfile> Parties;
+        public List<CompanySeed> Companies;
     }
 
     public static class CountryProfiles
@@ -228,6 +229,56 @@ namespace Meridian.Sim
             P("UKR",
                 new PartyProfile("Servant of the People", 0.0f, 0.56f),
                 new PartyProfile("Others", 0f, 0.44f));
+
+            // Real, well-known companies per curated country — revenue figures are approximate/
+            // rounded public-knowledge figures (annual revenue, billions USD) for gameplay
+            // sizing only, not audited financials. Not exhaustive — same honesty pattern as
+            // everything else in this file.
+            void C(string iso, params CompanySeed[] companies) =>
+                ByIsoA3[iso].Companies = new List<CompanySeed>(companies);
+
+            C("SAU",
+                new CompanySeed("Saudi Aramco", Sector.Energy, Ownership.Public, 500),
+                new CompanySeed("SABIC", Sector.Manufacturing, Ownership.Public, 35),
+                new CompanySeed("Al Rajhi Bank", Sector.Finance, Ownership.Private, 8));
+            C("USA",
+                new CompanySeed("Apple", Sector.Technology, Ownership.Private, 400),
+                new CompanySeed("ExxonMobil", Sector.Energy, Ownership.Private, 340),
+                new CompanySeed("JPMorgan Chase", Sector.Finance, Ownership.Private, 160));
+            C("CHN",
+                new CompanySeed("Sinopec", Sector.Energy, Ownership.Public, 400),
+                new CompanySeed("ICBC", Sector.Finance, Ownership.Public, 200),
+                new CompanySeed("Huawei", Sector.Technology, Ownership.Private, 95));
+            C("DEU",
+                new CompanySeed("Volkswagen", Sector.Manufacturing, Ownership.Private, 320),
+                new CompanySeed("Siemens", Sector.Manufacturing, Ownership.Private, 80),
+                new CompanySeed("Deutsche Bank", Sector.Finance, Ownership.Private, 30));
+            C("JPN",
+                new CompanySeed("Toyota", Sector.Manufacturing, Ownership.Private, 280),
+                new CompanySeed("SoftBank", Sector.Technology, Ownership.Private, 55));
+            C("GBR",
+                new CompanySeed("BP", Sector.Energy, Ownership.Private, 210),
+                new CompanySeed("HSBC", Sector.Finance, Ownership.Private, 65));
+            C("FRA",
+                new CompanySeed("TotalEnergies", Sector.Energy, Ownership.Private, 200),
+                new CompanySeed("LVMH", Sector.Services, Ownership.Private, 90));
+            C("RUS",
+                new CompanySeed("Gazprom", Sector.Energy, Ownership.Public, 100),
+                new CompanySeed("Rosneft", Sector.Energy, Ownership.Public, 130));
+            C("IND",
+                new CompanySeed("Reliance Industries", Sector.Energy, Ownership.Private, 100),
+                new CompanySeed("Tata Motors", Sector.Manufacturing, Ownership.Private, 45));
+            C("BRA",
+                // Real, genuinely Mixed ownership: the Brazilian state holds a majority stake
+                // in a publicly-traded company — one of the few real Mixed examples, kept as
+                // such rather than rounded to Public or Private.
+                new CompanySeed("Petrobras", Sector.Energy, Ownership.Mixed, 100));
+            C("ARE",
+                new CompanySeed("ADNOC", Sector.Energy, Ownership.Public, 100));
+            C("CAN",
+                new CompanySeed("Royal Bank of Canada", Sector.Finance, Ownership.Private, 50));
+            C("KOR",
+                new CompanySeed("Samsung Electronics", Sector.Technology, Ownership.Private, 230));
         }
     }
 }

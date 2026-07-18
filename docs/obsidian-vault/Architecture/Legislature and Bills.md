@@ -29,9 +29,12 @@ to fight it") and resolution ("bill passes 61–39") — this is where "parties 
 things" is visible.
 
 ## What's a bill today
-The four core tax levers (income/corporate/VAT/tariff) **and** the three civil-liberty levers
+The four core tax levers (income/corporate/VAT/tariff), the three civil-liberty levers
 (speech/religion/internet — `NationalState.FreedomSpeech/FreedomReligion/FreedomInternet`,
-0-100). The interest rate deliberately stays a direct slider — central banks aren't
+0-100), regime change (below), and company ownership (see
+[[Sectors and Companies]] — `BillKind.CompanyOwnership` reuses this exact numeric vote/decree
+pipeline by encoding `Ownership` as a float scale, party voting mirrors the tax-cut sign
+convention). The interest rate deliberately stays a direct slider — central banks aren't
 legislatures. Foreign countries keep direct sandbox sliders/read-only stats when inspected;
 only the player's own country goes through the political process.
 
@@ -84,22 +87,30 @@ marked open).
   levers, own country only; foreign countries see them as read-only stats.
 - **Politics › PARLIAMENT** (`GameUIRoot.DrawParliament`): real party composition with lean
   labels and seat shares for any curated country, plus the player's bill docket (last 6 bills,
-  live status, For/Against party lists on pending votes — freedom and tax bills interleaved).
+  live status, For/Against party lists on pending votes — every bill kind interleaved).
+- **Trade › COMPANIES** (`GameUIRoot.DrawCompanies`): per-company ownership dropdown for the
+  player's country (proposes a bill on change), read-only roster for foreign countries.
 - A `billsStamp` in `Refresh()` (same pattern as the war stamp) forces a structural panel
-  rebuild on the Economy AND Politics tabs the day a bill resolves.
+  rebuild on the Economy, Politics, AND Trade tabs the day a bill resolves.
 
 ## Persistence & verification
 `LegislatureSystem`/`Bill`/`BillStance` are plain public fields → [[Save Load]] serializes them
 for free; `MapRenderer.ApplySave` falls back to a fresh empty system for older saves.
-`MERIDIAN_DIAG_BILLS=1` runs three phases against `MERIDIAN_AUTOSTART="United States of
+`MERIDIAN_DIAG_BILLS=1` runs four phases against `MERIDIAN_AUTOSTART="United States of
 America"`: a corporate-tax raise at day 20 (logs path, every party's stance, and the
-resolution), a freedom-of-speech tightening bill once that resolves (logs the standing delta),
-then a regime change to one-party state once that resolves (logs the timer and the standing
-delta). All three verified live in one run: the tax bill died 49–51 on party lines; the
-freedom bill passed 51–49 and dropped standing 56.9→53.2; the regime change skipped voting
-entirely, ran the full 45-day timer, correctly set `Government = OneServiceState`, and dropped
-standing further (53.2→36.0). Run with `MERIDIAN_AUTOSTART="Saudi Arabia"` separately to
-confirm the decree path for ordinary bills.
+resolution); a freedom-of-speech tightening bill once that resolves (logs the standing delta);
+a regime change to one-party state once that resolves (logs the timer and the standing delta);
+then a company-ownership change once that resolves (logs the treasury delta). All four
+verified live in one run: the tax bill died 49–51 on party lines; the freedom bill passed
+51–49 and dropped standing 56.9→53.2; the regime change skipped voting entirely, ran the full
+45-day timer, and correctly set `Government = OneServiceState` (standing 53.2→36.0); the
+ownership bill (nationalize Apple) correctly split along party lines (Democrats for,
+Republicans against) and was REJECTED 49–51 — ownership stayed Private and no treasury
+transaction fired, confirming `Apply` only runs on `Passed`. The passed-transaction arithmetic
+itself was checked by code inspection rather than a live passing vote (this run's majority
+opposed it) — noted honestly rather than claiming a test that wasn't actually observed. Run
+with `MERIDIAN_AUTOSTART="Saudi Arabia"` separately to confirm the decree path for ordinary
+bills.
 
 ## Deliberate simplifications (open follow-ups)
 - Only the player proposes bills — [[World AI]] countries don't legislate yet.
@@ -109,7 +120,10 @@ confirm the decree path for ordinary bills.
   axis (curated per party) would be more honest.
 - Freedom baselines are a government-type-bucket heuristic (`NationalState.Seed`), not
   per-country researched data (that's its own Freedom-House-scale project).
-- Bill scope is tax + civil liberties + regime change — spending is the pillar's next step
-  (see [[Government, Legislature and Real Taxes]]).
+- Bill scope is tax + civil liberties + regime change + company ownership — spending bills are
+  the pillar's next step (see [[Government, Legislature and Real Taxes]]).
 - Regime change doesn't shock [[Diplomacy System|bilateral relations]] or trigger [[World AI]]
   yet — only the standing number moves.
+- Company ownership changes don't touch [[Diplomacy System]]/[[World AI]] either, and don't yet
+  add an ongoing dividend/tax stream — only a one-time treasury transaction (see
+  [[Sectors and Companies]]).

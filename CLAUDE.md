@@ -456,3 +456,36 @@ Everything below is built, launched, and verified via Player.log + visual checks
   - Still open in the pillar: spending-bill scope, AI countries legislating/regime-changing,
     elections reshuffling seats, a real social-ideology axis, per-country freedom research,
     regime change reaching Diplomacy/World AI instead of just InternationalStanding.
+- **Sectors & Companies started (same "continue" — next connected node, Bills → Companies →
+  GDP/Treasury):** first slice of the SECOND vision pillar, not just an extension of pillar 1.
+  New `Sim/Companies.cs` — `Sector` (10 real industries), `Ownership` (Public/Private/Mixed),
+  `CompanySeed` (static real roster) and `Company` (mutable per-game copy on new
+  `EconomyState.Companies`, populated at `Seed()` so ownership changes never mutate the shared
+  static seed data). `CountryProfiles.Companies` curates ~13 major countries × 1-3 real,
+  well-known companies each (Saudi Aramco, Apple, Sinopec, Volkswagen, Toyota, BP,
+  TotalEnergies, Gazprom, Reliance Industries, Petrobras — kept genuinely **Mixed** ownership,
+  a real example — ADNOC, Royal Bank of Canada, Samsung), revenue figures approximate/rounded
+  for gameplay sizing only.
+  - New `BillKind.CompanyOwnership` — reuses the EXACT SAME numeric vote/decree pipeline every
+    other bill uses (encodes `Ownership` as a float scale 0/1/2 rather than needing a fourth
+    special-cased path like regime change needed). Party voting mirrors the tax-cut sign
+    convention (right backs privatizing, left backs nationalizing — a real, uncontroversial
+    partisan pattern). Enactment charges/credits the treasury a **one-time buyout-or-sale
+    transaction** sized by `(oldStake-newStake) × OutputBillions × 0.4` — deliberately does NOT
+    yet add an ongoing dividend/tax stream or feed sector output into the GDP formula (kept out
+    of this slice on purpose, not a silent shortcut — see the new vault page for why).
+  - New Trade › COMPANIES card (`GameUIRoot.DrawCompanies`): per-company ownership dropdown for
+    the player's own country, read-only roster for foreign countries. `billsStamp` gate
+    extended to the Trade tab so it rebuilds when an ownership bill resolves.
+  - `MERIDIAN_DIAG_BILLS=1` extended with a fourth phase. **Verified live as USA**: proposed
+    nationalizing Apple, correctly split along real party lines (Democrats FOR, Republicans
+    AGAINST), REJECTED 49–51 — ownership stayed Private, zero treasury transaction fired
+    (confirms `Apply` only runs on `Passed`). The passed-transaction arithmetic itself was
+    checked by code inspection, not a live passing vote (this run's majority opposed it) —
+    documented honestly as such rather than claiming an observation that didn't happen.
+  - New vault page `Architecture/Sectors and Companies.md`; canvas `v_companies`/`v_bills`
+    edge/`v_sectors` updated to reflect exactly what's built vs. still open (sector→GDP
+    composition and ongoing dividends are explicitly marked ⚪ still open, not glossed over).
+  - Still open: sector output composing GDP (a real new economic model, not started), ongoing
+    ownership-based revenue, manpower allocation (a separate axis entirely), only 13 countries
+    curated, AI countries don't propose ownership bills.
