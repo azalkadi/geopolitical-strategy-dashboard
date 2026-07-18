@@ -47,6 +47,33 @@ expanding freedoms, right backs tightening) as a coarse proxy for a social lib-c
 axis that hasn't been curated separately yet — documented as a known simplification in
 `PartySupports`' own comment, not a claim of real second-axis data.
 
+## Regime change — a third bill kind, deliberately special-cased
+`BillKind.RegimeChange` converts the country's own `NationalState.Government`. Unlike tax and
+freedom bills it **always bypasses the party vote** (`ProposeRegimeChange`, not `Propose`) — a
+multi-party legislature doesn't get to vote itself out of existence; this is the player, as
+head of government, driving a constitutional transition unilaterally, so it's always
+decree-style regardless of `CountryProfiles.Parties`. It also runs on its own, much longer
+timer (`RegimeChangeDays` = 45, vs. 5 for an ordinary decree) to reflect the magnitude.
+
+The standing consequence is keyed on a **pluralism axis** (`IsPluralistic`: constitutional
+monarchy, presidential republic, parliamentary republic all count; absolute monarchy and
+one-party state don't), not a judgment about which government type is "better" — losing real
+pluralism costs standing hard (-25), gaining it earns real credit (+12), and even a same-
+category swap carries a small transitional-uncertainty cost (-3). This is the concrete
+implementation of the Vision page's explicit requirement that the sim not assume monarchy=bad,
+democracy=good: the consequence reacts to the *structural fact* of the change, and whether the
+country is actually stable afterward is still driven by the ordinary ApprovalRating/PublicMood/
+economy numbers, exactly like every other country — not a scripted "this regime type fails."
+
+UI: Politics › **CHANGE GOVERNMENT** card (`GameUIRoot.DrawRegimeChange`, own country only) — a
+government-type dropdown plus a "BEGIN TRANSITION" button; while one is pending it shows the
+target and completion date instead.
+
+**Still open**: this only moves `InternationalStanding` — it doesn't yet shock bilateral
+[[Diplomacy System|relations]] or trigger a [[World AI]] reaction the way a real regime change
+would (see the "world reacts realistically" edge on [[Feature Relationships.canvas]], still
+marked open).
+
 ## UI
 - **Economy › tax section** (`GameUIRoot.DrawTaxLever`): for the player's country, each tax
   shows its current rate plus a type-in field — committing a target rate proposes a bill. While
@@ -64,12 +91,15 @@ axis that hasn't been curated separately yet — documented as a known simplific
 ## Persistence & verification
 `LegislatureSystem`/`Bill`/`BillStance` are plain public fields → [[Save Load]] serializes them
 for free; `MapRenderer.ApplySave` falls back to a fresh empty system for older saves.
-`MERIDIAN_DIAG_BILLS=1` runs two phases: a corporate-tax raise at day 20 (logs path, every
-party's stance, and the resolution), then once that resolves, a freedom-of-speech tightening
-bill (logs the path and the international-standing delta on enactment). Run with
-`MERIDIAN_AUTOSTART="United States of America"` for the vote path and `"Saudi Arabia"` for the
-decree path — both verified live: the USA tax bill died 49–51 on party lines; the freedom
-bill's standing consequence and the Saudi decree path were confirmed the same way.
+`MERIDIAN_DIAG_BILLS=1` runs three phases against `MERIDIAN_AUTOSTART="United States of
+America"`: a corporate-tax raise at day 20 (logs path, every party's stance, and the
+resolution), a freedom-of-speech tightening bill once that resolves (logs the standing delta),
+then a regime change to one-party state once that resolves (logs the timer and the standing
+delta). All three verified live in one run: the tax bill died 49–51 on party lines; the
+freedom bill passed 51–49 and dropped standing 56.9→53.2; the regime change skipped voting
+entirely, ran the full 45-day timer, correctly set `Government = OneServiceState`, and dropped
+standing further (53.2→36.0). Run with `MERIDIAN_AUTOSTART="Saudi Arabia"` separately to
+confirm the decree path for ordinary bills.
 
 ## Deliberate simplifications (open follow-ups)
 - Only the player proposes bills — [[World AI]] countries don't legislate yet.
@@ -79,5 +109,7 @@ bill's standing consequence and the Saudi decree path were confirmed the same wa
   axis (curated per party) would be more honest.
 - Freedom baselines are a government-type-bucket heuristic (`NationalState.Seed`), not
   per-country researched data (that's its own Freedom-House-scale project).
-- Bill scope is tax + civil liberties — spending and regime change are the pillar's next steps
+- Bill scope is tax + civil liberties + regime change — spending is the pillar's next step
   (see [[Government, Legislature and Real Taxes]]).
+- Regime change doesn't shock [[Diplomacy System|bilateral relations]] or trigger [[World AI]]
+  yet — only the standing number moves.

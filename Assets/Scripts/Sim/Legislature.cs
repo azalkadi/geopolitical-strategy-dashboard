@@ -18,7 +18,7 @@ namespace Meridian.Sim
     // All public fields / parameterless types so SaveLoad's dumb-complete Newtonsoft dump
     // round-trips the whole system (see Sim/SaveLoad.cs).
 
-    public enum BillKind { IncomeTax, CorporateTax, Vat, Tariff, FreedomSpeech, FreedomReligion, FreedomInternet }
+    public enum BillKind { IncomeTax, CorporateTax, Vat, Tariff, FreedomSpeech, FreedomReligion, FreedomInternet, RegimeChange }
 
     public enum BillStatus { Pending, Passed, Rejected }
 
@@ -45,6 +45,7 @@ namespace Meridian.Sim
         public bool IsDecree;           // no-parties path: auto-enacts, no vote
         public List<BillStance> Stances = new();
         public float YesShare;          // filled at resolution (vote path)
+        public GovernmentType? NewGovernment; // only set for RegimeChange bills
 
         public string KindLabel => Kind switch
         {
@@ -54,11 +55,13 @@ namespace Meridian.Sim
             BillKind.Tariff => "Tariffs",
             BillKind.FreedomSpeech => "Freedom of speech",
             BillKind.FreedomReligion => "Freedom of religion",
-            _ => "Internet freedom",
+            BillKind.FreedomInternet => "Internet freedom",
+            _ => "Regime change",
         };
 
         public bool IsFreedom => Kind == BillKind.FreedomSpeech || Kind == BillKind.FreedomReligion || Kind == BillKind.FreedomInternet;
         public bool IsTightening => IsFreedom && NewValue < OldValue;
+        public bool IsRegimeChange => Kind == BillKind.RegimeChange;
     }
 
     public class LegislatureSystem
@@ -68,6 +71,7 @@ namespace Meridian.Sim
 
         public const long VoteDays = 14;   // a real legislature takes time to fight it out
         public const long DecreeDays = 5;  // decrees are fast, not instant
+        public const long RegimeChangeDays = 45; // a constitutional transition, not a policy tweak
 
         public Bill PendingFor(int countryIndex, BillKind kind)
         {
@@ -135,6 +139,51 @@ namespace Meridian.Sim
             return $"{countryName}'s legislature takes up a bill: {bill.KindLabel} {oldValue:0.0}% → {newValue:0.0}%. {fight}";
         }
 
+        // Regime change: converting a country's own government type — categorically different
+        // from ordinary policy, so it deliberately bypasses the party-vote branch entirely (a
+        // multi-party legislature doesn't get to vote itself out of existence; this is the
+        // player, as head of government, driving a constitutional transition unilaterally) and
+        // takes RegimeChangeDays (45) instead of the ordinary decree/vote timers, reflecting the
+        // magnitude. See docs/obsidian-vault/Vision/Government, Legislature and Real Taxes.md's
+        // "regime change, and the world reacting realistically" requirement — the standing
+        // consequence (applied in Apply) reacts to the STRUCTURAL fact of gaining/losing real
+        // pluralism, not a scripted judgment that any one government type is doomed to succeed
+        // or fail; whether the player's country is actually stable afterward is still driven by
+        // the normal ApprovalRating/PublicMood/economy numbers, exactly like every other country.
+        public string ProposeRegimeChange(int countryIndex, string countryName, GovernmentType oldGov, GovernmentType newGov, long day)
+        {
+            var bill = new Bill
+            {
+                Id = NextId++,
+                CountryIndex = countryIndex,
+                Kind = BillKind.RegimeChange,
+                ProposedDay = day,
+                IsDecree = true,
+                DecisionDay = day + RegimeChangeDays,
+                NewGovernment = newGov,
+            };
+            Bills.Add(bill);
+            return $"{countryName} begins a constitutional transition from {GovLabel(oldGov)} to {GovLabel(newGov)} " +
+                   $"(takes {RegimeChangeDays} days).";
+        }
+
+        public static string GovLabel(GovernmentType g) => g switch
+        {
+            GovernmentType.AbsoluteMonarchy => "absolute monarchy",
+            GovernmentType.ConstitutionalMonarchy => "constitutional monarchy",
+            GovernmentType.PresidentialRepublic => "a presidential republic",
+            GovernmentType.ParliamentaryRepublic => "a parliamentary republic",
+            GovernmentType.OneServiceState => "a one-party state",
+            _ => "an unclassified system",
+        };
+
+        // Pluralism axis for the standing consequence — real multi-party competition and a
+        // real independent legislature, regardless of whether the head of state is elected or
+        // hereditary (a constitutional monarchy counts; an absolute monarchy or one-party state
+        // doesn't).
+        static bool IsPluralistic(GovernmentType g) =>
+            g == GovernmentType.ConstitutionalMonarchy || g == GovernmentType.PresidentialRepublic || g == GovernmentType.ParliamentaryRepublic;
+
         // Ideology model: economic-left parties back tax raises (funding the state), economic-
         // right parties back cuts. Freedom bills reuse the same single EconLean axis as a coarse
         // proxy for a social lib-conservative axis this sim hasn't curated yet (a known
@@ -168,8 +217,12 @@ namespace Meridian.Sim
                 {
                     b.Status = BillStatus.Passed;
                     Apply(b, econ, nat);
-                    (headlines ??= new List<string>()).Add(
-                        $"{names.Name(b.CountryIndex)}: {b.KindLabel} is now {b.NewValue:0.0}{Unit(b)} by decree.");
+                    if (b.IsRegimeChange)
+                        (headlines ??= new List<string>()).Add(
+                            $"{names.Name(b.CountryIndex)} completes its transition to {GovLabel(b.NewGovernment ?? GovernmentType.Unspecified)}.");
+                    else
+                        (headlines ??= new List<string>()).Add(
+                            $"{names.Name(b.CountryIndex)}: {b.KindLabel} is now {b.NewValue:0.0}{Unit(b)} by decree.");
                     continue;
                 }
 
@@ -199,6 +252,24 @@ namespace Meridian.Sim
 
         static void Apply(Bill b, EconomySystem econ, NationalSystem nat)
         {
+            if (b.IsRegimeChange)
+            {
+                if (nat == null || b.CountryIndex < 0 || b.CountryIndex >= nat.States.Count || b.NewGovernment == null) return;
+                var n = nat.States[b.CountryIndex];
+                bool wasPluralistic = IsPluralistic(n.Government);
+                bool nowPluralistic = IsPluralistic(b.NewGovernment.Value);
+                n.Government = b.NewGovernment.Value;
+                // Reacts to the structural fact of the change, not a judgment about which
+                // government type is "better" — losing real pluralism costs standing hard
+                // (real diplomatic backsliding reaction), gaining it earns real credit, and even
+                // a same-category transition carries a small transitional-uncertainty cost.
+                float standingDelta =
+                    wasPluralistic && !nowPluralistic ? -25f :
+                    !wasPluralistic && nowPluralistic ? 12f : -3f;
+                n.InternationalStanding = Clampf(n.InternationalStanding + standingDelta, 0f, 100f);
+                return;
+            }
+
             if (b.IsFreedom)
             {
                 if (nat == null || b.CountryIndex < 0 || b.CountryIndex >= nat.States.Count) return;

@@ -93,20 +93,24 @@ requirement, not a suggestion.
   actual politics number — per-party support is still open.
 - ✅ `Sim/Economy.cs` — `EconomyState.Seed` applies `CountryProfiles` tax rates when present.
 - ✅ `GameUIRoot.AddSlider` — click-and-type numeric entry (`FloatField`), not drag-only.
-- ⬜ `Sim/Diplomacy.cs`/[[World AI]] — regime-change reactions as a relation shock, same channel
-  as denounce/war but internationally broadcast rather than bilateral. Not started.
 - ✅ `Sim/Legislature.cs` — the proposal → vote/decree → enactment pipeline is LIVE for the
-  four core tax levers AND the three freedom levers, with real named parties (~20 curated
-  multi-party countries) voting by ideology and seat share, decree paths for monarchies/
-  one-party states, headlines for the fight and the outcome, parliament + bill-docket + a
-  dedicated FREEDOMS card in the Politics tab, and save/load. Verified all live: a USA
-  corporate-tax raise died 49–51 on party lines (Democrats for, Republicans against); a Saudi
-  royal decree enacted automatically after 5 days; a USA freedom-of-speech tightening bill
-  passed 51–49 (Republicans for, Democrats against — matching the ideology model) and
-  correctly cost international standing on enactment (56.9→53.2). See
-  [[Legislature and Bills]] for the full architecture and its documented simplifications.
+  four core tax levers, the three freedom levers, AND regime change, with real named parties
+  (~20 curated multi-party countries) voting by ideology and seat share, decree paths for
+  monarchies/one-party states, headlines for the fight and the outcome, parliament + bill-
+  docket + FREEDOMS + CHANGE GOVERNMENT cards in the Politics tab, and save/load. Verified all
+  live: a USA corporate-tax raise died 49–51 on party lines (Democrats for, Republicans
+  against); a Saudi royal decree enacted automatically after 5 days; a USA freedom-of-speech
+  tightening bill passed 51–49 (Republicans for, Democrats against) and correctly cost
+  international standing on enactment (56.9→53.2); a USA→one-party-state regime change
+  bypassed the party vote entirely (no stances logged — regime change is always a decree, see
+  [[Legislature and Bills]] for why), ran the full 45-day transition, correctly flipped
+  `NationalState.Government`, and cost standing hard for losing real pluralism (53.2→36.0
+  across the transition window, alongside the normal 45 days of drift already happening in
+  parallel). See [[Legislature and Bills]] for the full architecture.
 - ⬜ Still open within the pillar: AI countries legislating on their own, elections reshuffling
-  seat shares, lobbying/whipping, bill scope beyond tax+freedoms (spending, regime change),
-  a real second (social) party-ideology axis instead of reusing economic lean, per-country
-  researched freedom baselines instead of a government-type-bucket heuristic, and per-party
-  approval replacing the single ApprovalRating number.
+  seat shares, lobbying/whipping, bill scope beyond tax+freedoms+regime (spending), a real
+  second (social) party-ideology axis instead of reusing economic lean, per-country researched
+  freedom baselines instead of a government-type-bucket heuristic, per-party approval
+  replacing the single ApprovalRating number, and [[World AI]] actually reacting to a regime
+  change beyond the standing number (a relation shock, a broadcast headline other countries
+  respond to).

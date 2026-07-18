@@ -283,6 +283,10 @@ namespace Meridian.Map
         bool billsDiagFreedomResolved;
         int billsDiagFreedomBillId = -1;
         float billsDiagStandingBefore;
+        bool billsDiagRegimeProposed;
+        bool billsDiagRegimeResolved;
+        int billsDiagRegimeBillId = -1;
+        float billsDiagRegimeStandingBefore;
         void MaybeRunBillsDiag()
         {
             if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_BILLS") == null) return;
@@ -346,6 +350,34 @@ namespace Meridian.Map
                     var n = map.National.States[me];
                     Debug.Log($"[billsdiag] day {simDay}: freedom bill resolved {b.Status} freedomSpeechNow={n.FreedomSpeech:0} " +
                               $"standing {billsDiagStandingBefore:0.0}->{n.InternationalStanding:0.0} (expect a drop if Passed)");
+                }
+            }
+
+            // Third phase: a regime change to One-Party State — a real backsliding move for any
+            // pluralistic country — verifies ProposeRegimeChange bypasses the party vote (always
+            // a decree), the 45-day timer, and the pluralism-based standing consequence.
+            if (billsDiagFreedomResolved && !billsDiagRegimeProposed)
+            {
+                billsDiagRegimeProposed = true;
+                var n = map.National.States[me];
+                billsDiagRegimeStandingBefore = n.InternationalStanding;
+                var target = GovernmentType.OneServiceState;
+                string headline = map.Legislature.ProposeRegimeChange(me, map.World.Countries[me].Name, n.Government, target, simDay);
+                var bill = map.Legislature.Bills[map.Legislature.Bills.Count - 1];
+                billsDiagRegimeBillId = bill.Id;
+                Debug.Log($"[billsdiag] day {simDay}: proposed regime change {n.Government}->{target} " +
+                          $"decisionDay={bill.DecisionDay} standingBefore={billsDiagRegimeStandingBefore:0.0} — {headline}");
+            }
+
+            if (billsDiagRegimeProposed && !billsDiagRegimeResolved && billsDiagRegimeBillId >= 0)
+            {
+                foreach (var b in map.Legislature.Bills)
+                {
+                    if (b.Id != billsDiagRegimeBillId || b.Status == BillStatus.Pending) continue;
+                    billsDiagRegimeResolved = true;
+                    var n = map.National.States[me];
+                    Debug.Log($"[billsdiag] day {simDay}: regime change resolved {b.Status} governmentNow={n.Government} " +
+                              $"standing {billsDiagRegimeStandingBefore:0.0}->{n.InternationalStanding:0.0} (expect a big drop, was pluralistic)");
                 }
             }
         }

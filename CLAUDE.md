@@ -433,3 +433,26 @@ Everything below is built, launched, and verified via Player.log + visual checks
     the standing-consequence edge annotated with the verified numbers.
   - Still open: spending/regime-change bill scope, AI legislating, elections reshuffling seats,
     a real social-ideology axis, per-country freedom research.
+- **Regime change shipped (same "continue" — next connected node, Bills → Regime Change):**
+  new `BillKind.RegimeChange`. Deliberately special-cased vs. tax/freedom bills — always
+  bypasses the party vote (`LegislatureSystem.ProposeRegimeChange`, not `Propose`; a
+  legislature doesn't get to vote itself out of existence, this is the player unilaterally
+  driving a constitutional transition) and runs its own 45-day timer (`RegimeChangeDays`) vs.
+  the ordinary 5-day decree. Standing consequence keyed on a pluralism axis (`IsPluralistic`:
+  constitutional monarchy + both republic types count, absolute monarchy + one-party don't) —
+  losing real pluralism costs -25, gaining it earns +12, a same-category swap costs -3 — the
+  concrete implementation of "the sim shouldn't assume monarchy=bad, democracy=good": it reacts
+  to the structural fact of the change, not a scripted verdict, and post-transition stability
+  still runs on the ordinary approval/mood/economy numbers like every other country. New
+  Politics › CHANGE GOVERNMENT card (`GameUIRoot.DrawRegimeChange`, own country only):
+  government-type dropdown + BEGIN TRANSITION button, or the pending transition's target/ETA.
+  - `MERIDIAN_DIAG_BILLS=1` extended with a third phase. **Verified live as USA**: proposed
+    USA→OneServiceState, zero party stances logged (confirmed always-decree), ran the full
+    45-day timer (day 48→93), correctly set `Government = OneServiceState`, standing dropped
+    53.2→36.0 across the transition window.
+  - Canvas: `v_regime` flipped to ✅ Built; the `v_regime→w1 (World AI)` edge explicitly kept
+    ⚪ open — regime change only moves the standing number today, it doesn't yet shock
+    [[Diplomacy System|bilateral relations]] or trigger an actual [[World AI]] reaction.
+  - Still open in the pillar: spending-bill scope, AI countries legislating/regime-changing,
+    elections reshuffling seats, a real social-ideology axis, per-country freedom research,
+    regime change reaching Diplomacy/World AI instead of just InternationalStanding.

@@ -890,6 +890,7 @@ namespace Meridian.UI
 
             DrawFreedoms(n);
             DrawParliament();
+            DrawRegimeChange(n);
 
             if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Approval.Count >= 2)
             {
@@ -922,6 +923,49 @@ namespace Meridian.UI
                 Stat("Speech", $"{n.FreedomSpeech:0}");
                 Stat("Religion", $"{n.FreedomReligion:0}");
                 Stat("Internet", $"{n.FreedomInternet:0}");
+            }
+            EndCard();
+        }
+
+        // Converting the player's own country's government type — categorically bigger than a
+        // tax/freedom bill, so it gets its own card and bypasses the party vote entirely (see
+        // LegislatureSystem.ProposeRegimeChange). Own country only.
+        void DrawRegimeChange(NationalState n)
+        {
+            if (interaction.Selected != PlayerState.CountryIndex || map.Legislature == null) return;
+            int me = PlayerState.CountryIndex;
+
+            StartCard();
+            SectionHeader("CHANGE GOVERNMENT");
+            var pending = map.Legislature.PendingFor(me, BillKind.RegimeChange);
+            if (pending != null)
+            {
+                Stat("Transition underway", $"→ {LegislatureSystem.GovLabel(pending.NewGovernment ?? GovernmentType.Unspecified)}");
+                Stat("Completes", DateString(pending.DecisionDay));
+                HelpText("The world is watching — a completed transition moves your international standing based on whether you gained or lost real pluralism.");
+            }
+            else
+            {
+                var options = new List<string>();
+                foreach (GovernmentType g in System.Enum.GetValues(typeof(GovernmentType)))
+                    if (g != GovernmentType.Unspecified && g != n.Government) options.Add(LegislatureSystem.GovLabel(g));
+                var dropdown = new DropdownField("Become", options, 0);
+                StyleDropdown(dropdown);
+                currentContainer.Add(dropdown);
+
+                var btn = MakeButton("BEGIN TRANSITION", 12, GameTheme.BgButton, GameTheme.BgButtonHover, GameTheme.TextPrimary, () =>
+                {
+                    GovernmentType target = GovernmentType.Unspecified;
+                    foreach (GovernmentType g in System.Enum.GetValues(typeof(GovernmentType)))
+                        if (g != GovernmentType.Unspecified && LegislatureSystem.GovLabel(g) == dropdown.value) { target = g; break; }
+                    if (target == GovernmentType.Unspecified) return;
+                    string headline = map.Legislature.ProposeRegimeChange(me, map.World.Countries[me].Name, n.Government, target, interaction.SimDay);
+                    WorldFeed.Push("World", headline);
+                    builtForCategory = (NationCategory)(-1);
+                });
+                btn.style.height = 30; btn.style.marginTop = 6;
+                currentContainer.Add(btn);
+                HelpText("A real constitutional transition — 45 days, one-way until it completes. Losing real pluralism costs standing hard; gaining it earns real credit; the world reacts to the fact of the change, not a scripted verdict on which system is \"better\".");
             }
             EndCard();
         }
