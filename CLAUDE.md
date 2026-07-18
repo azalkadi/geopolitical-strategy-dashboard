@@ -381,3 +381,33 @@ Everything below is built, launched, and verified via Player.log + visual checks
     pipeline and real named political parties are still open (Task #20). Committed docs and
     this slice separately (`39eeb43` docs-only, code commit follows) so the vision capture
     survives even if the code needs iteration.
+- **Legislature & bills shipped (next session block, after a vault audit):** the pillar's core
+  mechanic is now live.
+  - Vault audit first (player asked): fixed 13 dead line-wrapped wikilinks across the vault
+    (Obsidian can't resolve a link containing a newline — they were silently broken in-app),
+    zero broken links/orphans remain; propagated the player's correction that named examples
+    (EU/GCC/UN, F-35s, oil/fruit, the four conflicts) are patterns to generalize, not
+    exhaustive lists — Vision Overview now states this as a reading rule.
+  - New `Sim/Legislature.cs` — bill pipeline: player proposes a tax change (4 core levers; the
+    interest rate deliberately stays a direct lever — central banks aren't legislatures).
+    Countries WITH curated real parties (`CountryProfiles.Parties`, ~20 multi-party countries
+    with real named parties, econ lean, approximate mid-2020s seat shares) → 14-day
+    parliamentary fight: stances taken at proposal from ideology (left backs raises, right
+    backs cuts, deterministic per-bill wrinkle so centrists swing), weighted by seats, >50%
+    passes. Countries WITHOUT parties (monarchies, one-party, uncurated) → decree: auto-enacts
+    after 5 days, flavored by government type. Headlines for proposal/fight/outcome via
+    WorldFeed ("Democrats back it; Republicans vow to fight it").
+  - UI: own-country tax rows are now propose-a-bill fields (pending bills show status + decision
+    date instead of an input; one open bill per lever); Politics tab gained PARLIAMENT (party
+    composition with lean labels + seat shares, any curated country) and BILLS (player's docket,
+    For/Against lists on pending votes) cards; a billsStamp forces the structural rebuild the
+    day a bill resolves. Foreign countries keep the old direct sandbox sliders.
+  - Save/load: `SaveGame.Legislature` + null-fallback for older saves, same pattern as
+    Infrastructure.
+  - **Verified both paths live** via new `MERIDIAN_DIAG_BILLS=1`: USA corporate-tax raise —
+    Democrats (49%) FOR, Republicans (51%) AGAINST, defeated 49–51, rate correctly unchanged;
+    Saudi Arabia — royal decree drafted, enacted automatically on day 5, 20%→24% correctly
+    applied. New vault page `Architecture/Legislature and Bills.md` documents it all.
+  - Still open in the pillar (Task #20): AI countries legislating, elections reshuffling seat
+    shares, lobbying, bill scope beyond tax law (spending/freedoms/regime change), per-party
+    approval.

@@ -95,7 +95,13 @@ requirement, not a suggestion.
 - ✅ `GameUIRoot.AddSlider` — click-and-type numeric entry (`FloatField`), not drag-only.
 - ⬜ `Sim/Diplomacy.cs`/[[World AI]] — regime-change reactions as a relation shock, same channel
   as denounce/war but internationally broadcast rather than bilateral. Not started.
-- ⬜ New: a Legislature/Bills system (`Sim/Legislature.cs`?) — the actual proposal → vote →
-  enactment pipeline, real named parties, plus the UI in the Politics tab to browse/propose/
-  customize bills. This is the big remaining piece — everything shipped so far is the data
-  foundation it needs, not the mechanic itself.
+- ✅ `Sim/Legislature.cs` — the proposal → vote/decree → enactment pipeline is LIVE for the
+  four core tax levers, with real named parties (~20 curated multi-party countries) voting by
+  ideology and seat share, decree paths for monarchies/one-party states, headlines for the
+  fight and the outcome, parliament + bill-docket UI in the Politics tab, and save/load.
+  Verified both paths live: a USA corporate-tax raise died 49–51 on party lines (Democrats
+  for, Republicans against); a Saudi royal decree enacted automatically after 5 days. See
+  [[Legislature and Bills]] for the full architecture.
+- ⬜ Still open within the pillar: AI countries legislating on their own, elections reshuffling
+  seat shares, lobbying/whipping, bill scope beyond tax law (spending, freedoms, regime
+  change), and per-party approval replacing the single ApprovalRating number.

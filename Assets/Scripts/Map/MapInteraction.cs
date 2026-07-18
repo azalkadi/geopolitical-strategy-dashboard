@@ -92,7 +92,7 @@ namespace Meridian.Map
         public bool SaveNow()
         {
             if (map?.Economy == null || map.National == null || map.Diplomacy == null || map.Wars == null) return false;
-            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure);
+            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature);
         }
 
         // Autosave: quitting mid-game shouldn't cost the player their run.
@@ -174,12 +174,17 @@ namespace Meridian.Map
                     }
                 }
 
+                if (map.Legislature != null)
+                    foreach (var headline in map.Legislature.TickAll(simDay, map.Economy, map.CountryNames))
+                        WorldFeed.Push("Parliament", headline);
+
                 CheckElection(simDay);
                 LogEconomyDiagnostic();
                 MaybeRunDiplomacyDiag();
                 MaybeRunWarDiag();
                 MaybeRunSaveDiag();
                 MaybeRunInfraDiag();
+                MaybeRunBillsDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -263,6 +268,51 @@ namespace Meridian.Map
             Debug.Log($"[dipdiag] denounce target={map.World.Countries[frostiest.index].Name}: rel {frostyRelBefore:0.0}->{map.Diplomacy.GetRelation(me, frostiest.index):0.0} approval {approvalBefore:0.0}->{myNat.ApprovalRating:0.0}");
 
             Debug.Log($"[dipdiag] cooldown check: canActAgain={map.Diplomacy.CanAct(me, friendliest.index, simDay)} (expect False right after acting)");
+        }
+
+        // Dev-only: MERIDIAN_DIAG_BILLS=1 proposes a corporate-tax change for the player's
+        // country at day 20, logs which path it takes (parliamentary vote with per-party
+        // stances vs. decree) and then logs the resolution when its day arrives — verifies the
+        // whole propose → fight → vote/decree → enact pipeline from Player.log alone. Run once
+        // with a multi-party AUTOSTART (USA) and once with a monarchy (Saudi Arabia) to cover
+        // both paths.
+        bool billsDiagProposed;
+        bool billsDiagResolved;
+        int billsDiagBillId = -1;
+        void MaybeRunBillsDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_BILLS") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.Legislature == null) return;
+
+            if (!billsDiagProposed && simDay >= 20)
+            {
+                billsDiagProposed = true;
+                var e = map.Economy.States[me];
+                var profile = CountryProfiles.Get(map.World.Countries[me].IsoA3);
+                float target = e.TaxCorporate + 4f;
+                var gov = profile?.Government ?? GovernmentType.Unspecified;
+                string headline = map.Legislature.Propose(me, map.World.Countries[me].Name, gov,
+                    profile?.Parties, BillKind.CorporateTax, e.TaxCorporate, target, simDay);
+                var bill = map.Legislature.Bills[map.Legislature.Bills.Count - 1];
+                billsDiagBillId = bill.Id;
+                Debug.Log($"[billsdiag] day {simDay}: proposed corp tax {e.TaxCorporate:0.0}->{target:0.0} " +
+                          $"path={(bill.IsDecree ? "DECREE" : "VOTE")} decisionDay={bill.DecisionDay} — {headline}");
+                foreach (var s in bill.Stances)
+                    Debug.Log($"[billsdiag]   stance: {s.Party} ({s.SeatShare * 100f:0}% seats) -> {(s.Supports ? "FOR" : "AGAINST")}");
+            }
+
+            if (billsDiagProposed && !billsDiagResolved && billsDiagBillId >= 0)
+            {
+                foreach (var b in map.Legislature.Bills)
+                {
+                    if (b.Id != billsDiagBillId || b.Status == BillStatus.Pending) continue;
+                    billsDiagResolved = true;
+                    var e = map.Economy.States[me];
+                    Debug.Log($"[billsdiag] day {simDay}: bill resolved {b.Status} yesShare={b.YesShare * 100f:0}% " +
+                              $"corpTaxNow={e.TaxCorporate:0.0} (expected {(b.Status == BillStatus.Passed ? b.NewValue : b.OldValue):0.0})");
+                }
+            }
         }
 
         // Dev-only: MERIDIAN_DIAG_INFRA=1 books a road between the player's two biggest own

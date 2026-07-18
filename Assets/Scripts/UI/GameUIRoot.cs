@@ -70,6 +70,7 @@ namespace Meridian.UI
         string builtForTopic = "__unbuilt__";
         bool builtForPanelOpen = false;
         int builtForWarStamp = 0;
+        int builtForBillsStamp = 0;
         readonly List<SliderBinding> activeSliders = new();
 
         // --- event toasts (AI policy changes / threshold-crossing events, surfaced live) ---
@@ -547,14 +548,22 @@ namespace Meridian.UI
 
         void DrawTaxSection(EconomyState e)
         {
+            // Tax LAW goes through the country's real political process for the player's own
+            // nation (see DrawTaxLever/Sim/Legislature.cs) — monarchy decrees, parliament
+            // votes. Interest rate stays a direct lever everywhere: central banks aren't
+            // legislatures. Inspecting a foreign country keeps the old direct sandbox sliders.
+            bool legislated = interaction.Selected == PlayerState.CountryIndex && map.Legislature != null;
+
             StartCard();
             SectionHeader("CORE TAXES & RATES");
             if (e.HasRealTaxProfile)
-                HelpText("Seeded from this country's real headline tax rates — click any value below to type an exact number, or drag to adjust.");
-            AddSlider("Income tax", () => e.TaxIncome, 0f, 60f, v => e.TaxIncome = v);
-            AddSlider("Corporate tax", () => e.TaxCorporate, 0f, 60f, v => e.TaxCorporate = v);
-            AddSlider("VAT", () => e.TaxVat, 0f, 40f, v => e.TaxVat = v);
-            AddSlider("Tariffs", () => e.TaxTariff, 0f, 40f, v => e.TaxTariff = v);
+                HelpText("Seeded from this country's real headline tax rates.");
+            if (legislated)
+                HelpText("Changing tax law is a political act: type a target rate and it becomes a bill — decreed directly in a monarchy, fought over and voted on where there's a parliament.");
+            DrawTaxLever("Income tax", BillKind.IncomeTax, () => e.TaxIncome, 0f, 60f, v => e.TaxIncome = v, legislated);
+            DrawTaxLever("Corporate tax", BillKind.CorporateTax, () => e.TaxCorporate, 0f, 60f, v => e.TaxCorporate = v, legislated);
+            DrawTaxLever("VAT", BillKind.Vat, () => e.TaxVat, 0f, 40f, v => e.TaxVat = v, legislated);
+            DrawTaxLever("Tariffs", BillKind.Tariff, () => e.TaxTariff, 0f, 40f, v => e.TaxTariff = v, legislated);
             AddSlider("Interest rate", () => e.InterestRate, 0f, 20f, v => e.InterestRate = v);
             EndCard();
 
@@ -568,6 +577,60 @@ namespace Meridian.UI
             }
             AddNewTaxRow(e);
             EndCard();
+        }
+
+        // One core tax lever. Foreign countries (and pre-legislature saves) keep the direct
+        // sandbox slider; the player's own country routes changes through Sim/Legislature.cs —
+        // a pending bill shows its status instead of an input, otherwise typing a target rate
+        // proposes one.
+        void DrawTaxLever(string label, BillKind kind, Func<float> get, float lo, float hi, Action<float> set, bool legislated)
+        {
+            if (!legislated)
+            {
+                AddSlider(label, get, lo, hi, set);
+                return;
+            }
+
+            int me = PlayerState.CountryIndex;
+            var pending = map.Legislature.PendingFor(me, kind);
+
+            var row = Row();
+            row.style.marginTop = 4;
+            row.style.alignItems = Align.Center;
+            var lbl = MakeLabel(label, 11, GameTheme.TextDim);
+            lbl.style.width = 100;
+            row.Add(lbl);
+            row.Add(MakeLabel($"{get():0.0}%", 12, GameTheme.TextPrimary, bold: true));
+            var spacer = new VisualElement(); spacer.style.flexGrow = 1; row.Add(spacer);
+
+            if (pending != null)
+            {
+                // The label rebuilds with the panel; the countdown is cheap enough to snapshot
+                // (the bills stamp in Refresh() forces a rebuild the day the bill resolves).
+                string path = pending.IsDecree ? "decree" : "vote";
+                var status = MakeLabel($"→ {pending.NewValue:0.0}% · {path} on {DateString(pending.DecisionDay)}", 11, GameTheme.Accent, bold: true);
+                row.Add(status);
+            }
+            else
+            {
+                var field = new FloatField { value = get(), isDelayed = true };
+                field.style.width = 52;
+                field.style.unityFontStyleAndWeight = FontStyle.Bold;
+                field.style.color = GameTheme.Accent;
+                field.RegisterValueChangedCallback(evt =>
+                {
+                    float target = Mathf.Clamp(evt.newValue, lo, hi);
+                    if (Mathf.Abs(target - get()) < 0.05f) { field.SetValueWithoutNotify(get()); return; }
+                    var profile = CountryProfiles.Get(map.World.Countries[me].IsoA3);
+                    string headline = map.Legislature.Propose(me, map.World.Countries[me].Name,
+                        profile?.Government ?? GovernmentType.Unspecified, profile?.Parties,
+                        kind, get(), target, interaction.SimDay);
+                    WorldFeed.Push("Parliament", headline);
+                    builtForCategory = (NationCategory)(-1); // swap the input for the pending-status row
+                });
+                row.Add(field);
+            }
+            currentContainer.Add(row);
         }
 
         // Small "Economy › Tax Rates" trail with a clickable way back to the category overview
@@ -825,6 +888,8 @@ namespace Meridian.UI
             }
             EndCard();
 
+            DrawParliament();
+
             if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Approval.Count >= 2)
             {
                 StartCard();
@@ -835,6 +900,60 @@ namespace Meridian.UI
                 EndCard();
             }
         }
+
+        // Real party composition (any curated multi-party country) + the player's bill docket.
+        // This is where "parties fighting over things" lives in the UI — stances also surface
+        // as WorldFeed headlines the moment a bill is proposed (see Sim/Legislature.cs).
+        void DrawParliament()
+        {
+            int sel = interaction.Selected;
+            var profile = CountryProfiles.Get(map.World.Countries[sel].IsoA3);
+
+            if (profile?.Parties != null && profile.Parties.Count > 0)
+            {
+                StartCard();
+                SectionHeader("PARLIAMENT");
+                foreach (var p in profile.Parties)
+                    Stat($"{p.Name} · {LeanLabel(p.EconLean)}", $"{p.SeatShare * 100f:0}% seats");
+                HelpText("Approximate seat shares. Ideology decides how each party votes on your bills — left backs raises, right backs cuts, centrists swing on the specifics.");
+                EndCard();
+            }
+
+            if (sel == PlayerState.CountryIndex && map.Legislature != null)
+            {
+                var bills = map.Legislature.BillsOf(sel);
+                if (bills.Count > 0)
+                {
+                    StartCard();
+                    SectionHeader("BILLS");
+                    int from = System.Math.Max(0, bills.Count - 6);
+                    for (int i = bills.Count - 1; i >= from; i--)
+                    {
+                        var b = bills[i];
+                        string status = b.Status switch
+                        {
+                            BillStatus.Pending => b.IsDecree ? $"decree · {DateString(b.DecisionDay)}" : $"in vote · {DateString(b.DecisionDay)}",
+                            BillStatus.Passed => b.IsDecree ? "DECREED" : $"PASSED {b.YesShare * 100f:0}–{(1f - b.YesShare) * 100f:0}",
+                            _ => $"DEFEATED {b.YesShare * 100f:0}–{(1f - b.YesShare) * 100f:0}",
+                        };
+                        Stat($"{b.KindLabel} {b.OldValue:0.0}% → {b.NewValue:0.0}%", status);
+                        if (b.Status == BillStatus.Pending && !b.IsDecree)
+                        {
+                            string fors = "", against = "";
+                            foreach (var s in b.Stances)
+                                if (s.Supports) fors += (fors.Length > 0 ? ", " : "") + s.Party;
+                                else against += (against.Length > 0 ? ", " : "") + s.Party;
+                            HelpText($"For: {(fors.Length > 0 ? fors : "nobody")} · Against: {(against.Length > 0 ? against : "nobody")}");
+                        }
+                    }
+                    EndCard();
+                }
+            }
+        }
+
+        static string LeanLabel(float lean) =>
+            lean <= -0.5f ? "left" : lean < -0.15f ? "center-left" :
+            lean <= 0.15f ? "center" : lean <= 0.5f ? "center-right" : "right";
 
         void DrawMilitary(NationalState n)
         {
@@ -2023,13 +2142,25 @@ namespace Meridian.UI
                 }
             }
 
-            if (sel != builtForSelected || UIState.ActiveCategory != builtForCategory || UIState.ActiveTopic != builtForTopic || UIState.PanelOpen != builtForPanelOpen || warStamp != builtForWarStamp)
+            // A bill resolving (pending → passed/rejected) is a STRUCTURAL panel change on the
+            // Economy tab (a status row must swap back to an input field) and the Politics tab
+            // (the docket's status lines) — same rationale as warStamp above.
+            int billsStamp = 0;
+            if (map.Legislature != null && PlayerState.CountryIndex >= 0 &&
+                (UIState.ActiveCategory == NationCategory.Economy || UIState.ActiveCategory == NationCategory.Politics))
+            {
+                foreach (var b in map.Legislature.BillsOf(PlayerState.CountryIndex))
+                    billsStamp = billsStamp * 31 + b.Id * 3 + (int)b.Status;
+            }
+
+            if (sel != builtForSelected || UIState.ActiveCategory != builtForCategory || UIState.ActiveTopic != builtForTopic || UIState.PanelOpen != builtForPanelOpen || warStamp != builtForWarStamp || billsStamp != builtForBillsStamp)
             {
                 builtForSelected = sel;
                 builtForCategory = UIState.ActiveCategory;
                 builtForTopic = UIState.ActiveTopic;
                 builtForPanelOpen = UIState.PanelOpen;
                 builtForWarStamp = warStamp;
+                builtForBillsStamp = billsStamp;
                 RebuildSidePanel();
             }
             else

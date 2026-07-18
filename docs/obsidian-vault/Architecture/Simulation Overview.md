@@ -4,7 +4,7 @@ tags: [architecture, sim]
 
 # Simulation Overview
 
-`Assets/Scripts/Sim/` — twelve files, each a mostly-independent system, all ticked together once
+`Assets/Scripts/Sim/` — thirteen files, each a mostly-independent system, all ticked together once
 per simulated day from `MapInteraction.TickEconomy()` (see [[Camera and Input]]). Every state
 class uses **plain public fields**, deliberately — it means [[Save Load]] can serialize the
 entire simulation as a dumb, complete JSON dump and get a bit-identical reload.
@@ -23,6 +23,8 @@ entire simulation as a dumb, complete JSON dump and get a bit-identical reload.
    the clock freezes here for the rest of the frame/until decided
 9. [[Buildable Infrastructure]] `InfrastructureSystem.TickAll(day)` — flips any route whose
    construction day has arrived, toasts it, and triggers one map mesh rebuild
+10. [[Legislature and Bills]] `LegislatureSystem.TickAll(day, ...)` — resolves any bill whose
+    vote/decree day has arrived, applies passed tax law, and pushes the outcome headline
 
 Map coloring also refreshes at the end of this: see [[Map Modes and Coloring]].
 
@@ -38,6 +40,7 @@ Map coloring also refreshes at the end of this: see [[Map Modes and Coloring]].
 | [[Decision Events]] | Random 2-3-choice player events | [[Economy System]], [[National State]] |
 | [[Player State and Elections]] | Which country the human plays, term/election state | [[National State]] (approval rating) |
 | [[Buildable Infrastructure]] | Player-built road/rail links between own cities | [[Economy System]] (treasury), [[Geo Pipeline\|City]] positions |
+| [[Legislature and Bills]] | Bill pipeline: parties vote or monarchs decree tax law | [[Economy System]] (applies law), CountryProfiles (parties/government) |
 | [[Save Load]] | JSON snapshot of the whole simulation | all of the above |
 | [[History and World Feed]] | Player sparkline history + cross-system headline queue | [[Economy System]], [[National State]] |
 

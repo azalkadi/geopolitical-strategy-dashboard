@@ -76,6 +76,7 @@ namespace Meridian.Map
         public WorldAI WorldAI { get; private set; }
         public GeoWorldNames CountryNames { get; private set; }
         public InfrastructureSystem Infrastructure { get; private set; }
+        public LegislatureSystem Legislature { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -173,6 +174,9 @@ namespace Meridian.Map
             // (or a save is loaded); see RebuildPlayerInfrastructure.
             Infrastructure = new InfrastructureSystem();
 
+            // The bill pipeline (propose → parliamentary vote or decree → enact).
+            Legislature = new LegislatureSystem();
+
             BuildCountryMeshes();
             BuildCountryBorders();
             BuildProvinceBorders();
@@ -198,8 +202,10 @@ namespace Meridian.Map
             SaveLoad.Apply(save, Economy, National);
             Diplomacy = save.Diplomacy;
             Wars = save.Wars;
-            // Older saves predate player-buildable infrastructure and deserialize this as null.
+            // Older saves predate player-buildable infrastructure / the legislature and
+            // deserialize these as null.
             Infrastructure = save.Infrastructure ?? new InfrastructureSystem();
+            Legislature = save.Legislature ?? new LegislatureSystem();
 
             // Migration: saves written before population dynamics existed deserialize with
             // Population = 0 — reseed those from the geo data instead of simulating a

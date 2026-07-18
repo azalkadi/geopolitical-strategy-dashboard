@@ -26,6 +26,23 @@ namespace Meridian.Sim
         OneServiceState, // single-party / authoritarian one-party state
     }
 
+    // A real political party: economic lean in [-1 left .. +1 right] drives how it votes on
+    // bills (see LegislatureSystem.PartySupports); SeatShare is its approximate share of the
+    // lower house as of the mid-2020s. Seat shares are deliberately approximate — election
+    // results shift and coalitions blur lines; what matters for the mechanic is the honest
+    // relative balance of power, not decimal-exact seat counts. Countries with no Parties list
+    // (monarchies, one-party states, uncurated countries) route bills through the decree path.
+    public class PartyProfile
+    {
+        public string Name = "";
+        public float EconLean;
+        public float SeatShare;
+
+        public PartyProfile() { }
+        public PartyProfile(string name, float econLean, float seatShare)
+        { Name = name; EconLean = econLean; SeatShare = seatShare; }
+    }
+
     public class CountryProfile
     {
         public GovernmentType Government;
@@ -33,6 +50,7 @@ namespace Meridian.Sim
         public float? TaxCorporate;
         public float? TaxVat;
         public float? TaxTariff;
+        public List<PartyProfile> Parties;
     }
 
     public static class CountryProfiles
@@ -95,5 +113,121 @@ namespace Meridian.Sim
 
         public static CountryProfile Get(string isoA3) =>
             !string.IsNullOrEmpty(isoA3) && ByIsoA3.TryGetValue(isoA3, out var p) ? p : null;
+
+        // Real named parties for the curated multi-party countries — approximate lower-house
+        // seat shares as of the mid-2020s (see PartyProfile's precision note). Multi-party
+        // countries NOT yet given a list here (and every uncurated country) fall through to the
+        // decree/executive path in LegislatureSystem — honest about what's been researched, the
+        // same principle as the tax data above. Small parties are folded into an "Others" bloc
+        // (lean ~0) so seat shares still sum to ~1 and votes stay honest.
+        static CountryProfiles()
+        {
+            void P(string iso, params PartyProfile[] parties) =>
+                ByIsoA3[iso].Parties = new List<PartyProfile>(parties);
+
+            P("USA",
+                new PartyProfile("Republicans", 0.7f, 0.51f),
+                new PartyProfile("Democrats", -0.5f, 0.49f));
+            P("GBR",
+                new PartyProfile("Labour", -0.4f, 0.63f),
+                new PartyProfile("Conservatives", 0.6f, 0.19f),
+                new PartyProfile("Liberal Democrats", -0.1f, 0.11f),
+                new PartyProfile("Others", 0f, 0.07f));
+            P("DEU",
+                new PartyProfile("CDU/CSU", 0.5f, 0.33f),
+                new PartyProfile("AfD", 0.8f, 0.24f),
+                new PartyProfile("SPD", -0.4f, 0.19f),
+                new PartyProfile("Greens", -0.5f, 0.14f),
+                new PartyProfile("Die Linke", -0.8f, 0.10f));
+            P("FRA",
+                new PartyProfile("New Popular Front", -0.7f, 0.31f),
+                new PartyProfile("Ensemble", 0.1f, 0.28f),
+                new PartyProfile("National Rally", 0.6f, 0.25f),
+                new PartyProfile("Les Républicains", 0.6f, 0.08f),
+                new PartyProfile("Others", 0f, 0.08f));
+            P("ITA",
+                new PartyProfile("Fratelli d'Italia", 0.7f, 0.30f),
+                new PartyProfile("Partito Democratico", -0.4f, 0.17f),
+                new PartyProfile("Movimento 5 Stelle", -0.3f, 0.13f),
+                new PartyProfile("Forza Italia", 0.5f, 0.11f),
+                new PartyProfile("Lega", 0.7f, 0.10f),
+                new PartyProfile("Others", 0f, 0.19f));
+            P("CAN",
+                new PartyProfile("Liberals", -0.3f, 0.49f),
+                new PartyProfile("Conservatives", 0.6f, 0.42f),
+                new PartyProfile("Bloc Québécois", -0.2f, 0.06f),
+                new PartyProfile("NDP", -0.7f, 0.03f));
+            P("JPN",
+                new PartyProfile("LDP", 0.5f, 0.40f),
+                new PartyProfile("CDP", -0.3f, 0.32f),
+                new PartyProfile("Ishin", 0.4f, 0.08f),
+                new PartyProfile("DPP", 0.0f, 0.06f),
+                new PartyProfile("Komeito", 0.1f, 0.05f),
+                new PartyProfile("Others", 0f, 0.09f));
+            P("IND",
+                new PartyProfile("BJP", 0.4f, 0.44f),
+                new PartyProfile("INC", -0.3f, 0.18f),
+                new PartyProfile("Others", 0f, 0.38f));
+            P("AUS",
+                new PartyProfile("Labor", -0.3f, 0.62f),
+                new PartyProfile("Liberal–National Coalition", 0.6f, 0.29f),
+                new PartyProfile("Others", -0.2f, 0.09f));
+            P("KOR",
+                new PartyProfile("Democratic Party", -0.3f, 0.57f),
+                new PartyProfile("People Power Party", 0.5f, 0.36f),
+                new PartyProfile("Others", 0f, 0.07f));
+            P("BRA",
+                new PartyProfile("PL", 0.7f, 0.19f),
+                new PartyProfile("PT", -0.6f, 0.13f),
+                new PartyProfile("Centrão / Others", 0.1f, 0.68f));
+            P("MEX",
+                new PartyProfile("Morena", -0.6f, 0.55f),
+                new PartyProfile("PAN", 0.5f, 0.14f),
+                new PartyProfile("PRI", 0.2f, 0.07f),
+                new PartyProfile("Others", 0f, 0.24f));
+            P("TUR",
+                new PartyProfile("AKP", 0.4f, 0.45f),
+                new PartyProfile("CHP", -0.3f, 0.28f),
+                new PartyProfile("Others", 0f, 0.27f));
+            P("ISR",
+                new PartyProfile("Likud", 0.5f, 0.27f),
+                new PartyProfile("Religious & right bloc", 0.7f, 0.28f),
+                new PartyProfile("Yesh Atid", -0.1f, 0.20f),
+                new PartyProfile("Center-left & Arab bloc", -0.4f, 0.25f));
+            P("ESP",
+                new PartyProfile("PP", 0.5f, 0.39f),
+                new PartyProfile("PSOE", -0.4f, 0.35f),
+                new PartyProfile("Vox", 0.8f, 0.09f),
+                new PartyProfile("Sumar", -0.7f, 0.09f),
+                new PartyProfile("Others", 0f, 0.08f));
+            P("NLD",
+                new PartyProfile("PVV", 0.6f, 0.25f),
+                new PartyProfile("GroenLinks–PvdA", -0.5f, 0.17f),
+                new PartyProfile("VVD", 0.5f, 0.16f),
+                new PartyProfile("NSC", 0.2f, 0.13f),
+                new PartyProfile("Others", 0f, 0.29f));
+            P("SWE",
+                new PartyProfile("Social Democrats", -0.4f, 0.30f),
+                new PartyProfile("Sweden Democrats", 0.6f, 0.21f),
+                new PartyProfile("Moderates", 0.5f, 0.19f),
+                new PartyProfile("Others", 0f, 0.30f));
+            P("ZAF",
+                new PartyProfile("ANC", -0.4f, 0.40f),
+                new PartyProfile("DA", 0.3f, 0.22f),
+                new PartyProfile("MK", -0.5f, 0.15f),
+                new PartyProfile("EFF", -0.8f, 0.10f),
+                new PartyProfile("Others", 0f, 0.13f));
+            P("ARG",
+                new PartyProfile("LLA & allies", 0.9f, 0.33f),
+                new PartyProfile("Unión por la Patria", -0.5f, 0.40f),
+                new PartyProfile("Others", 0f, 0.27f));
+            P("RUS",
+                new PartyProfile("United Russia", 0.3f, 0.72f),
+                new PartyProfile("CPRF", -0.6f, 0.13f),
+                new PartyProfile("Others", 0f, 0.15f));
+            P("UKR",
+                new PartyProfile("Servant of the People", 0.0f, 0.56f),
+                new PartyProfile("Others", 0f, 0.44f));
+        }
     }
 }

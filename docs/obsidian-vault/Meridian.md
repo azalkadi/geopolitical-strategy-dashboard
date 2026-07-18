@@ -75,6 +75,7 @@ graph TD
     Sim --> Events[Decision Events]
     Sim --> Player[Player State and Elections]
     Sim --> Infra[Buildable Infrastructure]
+    Sim --> Legis[Legislature and Bills]
     Sim --> Save[Save Load]
     Sim --> Hist[History and World Feed]
 
@@ -114,7 +115,8 @@ need:
 - [[Simulation Overview]] — the tree of Sim/ systems and how they tick together
   - [[Economy System]], [[National State]], [[Diplomacy System]], [[War System]],
     [[World AI]], [[Decision Events]], [[Player State and Elections]],
-    [[Buildable Infrastructure]], [[Save Load]], [[History and World Feed]]
+    [[Buildable Infrastructure]], [[Legislature and Bills]], [[Save Load]],
+    [[History and World Feed]]
 
 ## 🎮 [[Gameplay Overview|Game Design]] — how it plays
 - [[Gameplay Overview]] — the core loop
