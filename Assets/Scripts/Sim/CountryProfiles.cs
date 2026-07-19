@@ -279,6 +279,87 @@ namespace Meridian.Sim
                 new CompanySeed("Royal Bank of Canada", Sector.Finance, Ownership.Private, 50));
             C("KOR",
                 new CompanySeed("Samsung Electronics", Sector.Technology, Ownership.Private, 230));
+            // --- Expanded roster: real, well-known companies for the remaining profiled
+            // countries. Same honesty pattern — approximate/rounded revenue for gameplay sizing,
+            // ownership marked Public/Mixed only where the state genuinely holds a controlling or
+            // major stake (Equinor, Eni/Enel, Pemex, Pertamina, PTT, YPF, Turkish Airlines...).
+            // North Korea and Syria are deliberately omitted rather than fabricate companies for
+            // opaque/war economies.
+            C("AUS",
+                new CompanySeed("BHP", Sector.Mining, Ownership.Private, 55),
+                new CompanySeed("Commonwealth Bank", Sector.Finance, Ownership.Private, 25),
+                new CompanySeed("Woolworths Group", Sector.Services, Ownership.Private, 45));
+            C("CHE",
+                new CompanySeed("Nestlé", Sector.Manufacturing, Ownership.Private, 100),
+                new CompanySeed("Novartis", Sector.Healthcare, Ownership.Private, 50),
+                new CompanySeed("UBS", Sector.Finance, Ownership.Private, 40));
+            C("ESP",
+                new CompanySeed("Banco Santander", Sector.Finance, Ownership.Private, 60),
+                new CompanySeed("Iberdrola", Sector.Energy, Ownership.Private, 50),
+                new CompanySeed("Inditex", Sector.Services, Ownership.Private, 35));
+            C("ITA",
+                new CompanySeed("Eni", Sector.Energy, Ownership.Mixed, 100),
+                new CompanySeed("Enel", Sector.Energy, Ownership.Mixed, 90),
+                new CompanySeed("Intesa Sanpaolo", Sector.Finance, Ownership.Private, 25));
+            C("NLD",
+                new CompanySeed("ASML", Sector.Technology, Ownership.Private, 28),
+                new CompanySeed("ING Group", Sector.Finance, Ownership.Private, 30),
+                new CompanySeed("Heineken", Sector.Manufacturing, Ownership.Private, 30));
+            C("SWE",
+                new CompanySeed("Volvo Group", Sector.Manufacturing, Ownership.Private, 45),
+                new CompanySeed("Ericsson", Sector.Technology, Ownership.Private, 25),
+                new CompanySeed("IKEA", Sector.Services, Ownership.Private, 45));
+            C("NOR",
+                new CompanySeed("Equinor", Sector.Energy, Ownership.Mixed, 100),
+                new CompanySeed("DNB Bank", Sector.Finance, Ownership.Mixed, 10));
+            C("TUR",
+                new CompanySeed("Koç Holding", Sector.Manufacturing, Ownership.Private, 50),
+                new CompanySeed("Turkish Airlines", Sector.Services, Ownership.Mixed, 20),
+                new CompanySeed("Türkiye İş Bankası", Sector.Finance, Ownership.Mixed, 10));
+            C("MEX",
+                new CompanySeed("Pemex", Sector.Energy, Ownership.Public, 80),
+                new CompanySeed("América Móvil", Sector.Technology, Ownership.Private, 50),
+                new CompanySeed("Grupo Bimbo", Sector.Manufacturing, Ownership.Private, 20));
+            C("ARG",
+                new CompanySeed("YPF", Sector.Energy, Ownership.Mixed, 20),
+                new CompanySeed("Mercado Libre", Sector.Technology, Ownership.Private, 12));
+            C("ZAF",
+                new CompanySeed("Sasol", Sector.Energy, Ownership.Private, 20),
+                new CompanySeed("Anglo American", Sector.Mining, Ownership.Private, 30),
+                new CompanySeed("Standard Bank", Sector.Finance, Ownership.Private, 12));
+            C("NGA",
+                new CompanySeed("NNPC", Sector.Energy, Ownership.Public, 50),
+                new CompanySeed("Dangote Group", Sector.Manufacturing, Ownership.Private, 10));
+            C("EGY",
+                new CompanySeed("Orascom Construction", Sector.Construction, Ownership.Private, 5),
+                new CompanySeed("Commercial International Bank", Sector.Finance, Ownership.Private, 3));
+            C("IDN",
+                new CompanySeed("Pertamina", Sector.Energy, Ownership.Public, 57),
+                new CompanySeed("Bank Rakyat Indonesia", Sector.Finance, Ownership.Mixed, 15));
+            C("THA",
+                new CompanySeed("PTT", Sector.Energy, Ownership.Mixed, 80),
+                new CompanySeed("Charoen Pokphand", Sector.Agriculture, Ownership.Private, 30));
+            C("SGP",
+                new CompanySeed("Wilmar International", Sector.Agriculture, Ownership.Private, 65),
+                new CompanySeed("DBS Bank", Sector.Finance, Ownership.Private, 15),
+                new CompanySeed("Singapore Airlines", Sector.Services, Ownership.Mixed, 13));
+            C("VNM",
+                new CompanySeed("PetroVietnam", Sector.Energy, Ownership.Public, 25),
+                new CompanySeed("Vingroup", Sector.Construction, Ownership.Private, 7));
+            C("PAK",
+                new CompanySeed("Oil & Gas Development Co.", Sector.Energy, Ownership.Public, 3),
+                new CompanySeed("Habib Bank", Sector.Finance, Ownership.Private, 3));
+            C("IRN",
+                new CompanySeed("National Iranian Oil Co.", Sector.Energy, Ownership.Public, 110));
+            C("ISR",
+                new CompanySeed("Teva Pharmaceutical", Sector.Healthcare, Ownership.Private, 15),
+                new CompanySeed("Bank Hapoalim", Sector.Finance, Ownership.Private, 6));
+            C("UKR",
+                new CompanySeed("Naftogaz", Sector.Energy, Ownership.Public, 10),
+                new CompanySeed("Metinvest", Sector.Mining, Ownership.Private, 10));
+            C("JOR",
+                new CompanySeed("Arab Bank", Sector.Finance, Ownership.Private, 4),
+                new CompanySeed("Hikma Pharmaceuticals", Sector.Healthcare, Ownership.Private, 3));
         }
     }
 }

@@ -663,4 +663,20 @@ Everything below is built, launched, and verified via Player.log + visual checks
   `MERIDIAN_DIAG_AILEGIS=1` verified live (autopilot ~350 days, 17 proposals): Switzerland/Kuwait
   raised taxes on deficits by decree; Israel/Netherlands/India/Italy cut taxes via real party
   votes (all surplus + right-leaning) — ideology-correct both paths, zero exceptions.
-  - Economic features remaining (4-5/5): more curated companies, plus any polish.
+- **"Complete all the economic features" — item 4/5: expanded company roster.**
+  `CountryProfiles` curated companies grew from 13 to **35 countries** — added real well-known
+  firms for Australia (BHP/CommBank/Woolworths), Switzerland (Nestlé/Novartis/UBS), Spain, Italy
+  (Eni/Enel mixed), Netherlands (ASML/ING/Heineken), Sweden, Norway (Equinor mixed), Turkey,
+  Mexico (Pemex), Argentina (YPF), South Africa, Nigeria (NNPC), Egypt, Indonesia (Pertamina),
+  Thailand (PTT), Singapore, Vietnam (PetroVietnam), Pakistan, Iran (NIOC), Israel, Ukraine
+  (Naftogaz), Jordan. State/mixed ownership marked only where the state genuinely holds a
+  controlling/major stake. North Korea and Syria deliberately omitted (opaque/war economies —
+  won't fabricate). Verified live as Norway: 2 companies, `soeDividends=$8.4B` (Equinor
+  100×.15×.5 + DNB 10×.18×.5, exact), Energy bumped Services share to a realistic 50%, no
+  static-init crash, zero exceptions.
+- **All 5 economic features from "complete all the economic features" are now DONE**: (1) sectors
+  compose GDP + per-sector margins, (2) manpower/labour allocation, (3) AI countries legislate,
+  (4) 35-country company roster, plus SOE dividends/efficiency-drag and the France/Norway ISO
+  fix from the prior push. Economic pillar (2) core loop is complete; remaining economic depth
+  (per-sector manpower, per-sector margins beyond one number, sector-level trade flows) is
+  future polish, not a gap in the requested scope.
