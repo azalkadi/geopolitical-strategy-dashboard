@@ -846,22 +846,19 @@ namespace Meridian.UI
                 return (f, t);
             }
 
-            double DistanceOf(int fromCity, int toCity)
-            {
-                var a = GeoMath.MercatorToLonLat(map.World.Cities[fromCity].Pos.x, map.World.Cities[fromCity].Pos.y);
-                var b = GeoMath.MercatorToLonLat(map.World.Cities[toCity].Pos.x, map.World.Cities[toCity].Pos.y);
-                return InfrastructureSystem.DistanceKm(a, b);
-            }
-
             void UpdateEstimate()
             {
                 var (from, to) = ResolveSelection();
                 if (from == to) { estimateLabel.text = "Pick two different cities."; return; }
-                double dist = DistanceOf(from, to);
-                double roadCost = InfrastructureSystem.EstimateCost(dist, false);
-                double railCost = InfrastructureSystem.EstimateCost(dist, true);
-                long days = InfrastructureSystem.EstimateDays(dist);
-                estimateLabel.text = $"{dist:0} km · Road ${roadCost:0.0}B · Rail ${railCost:0.0}B · {days} days to build";
+                // Road and rail take different terrain-following paths (rail avoids mountains/
+                // water harder), so price each on its own route.
+                var road = map.RouteBetween(from, to, false);
+                var rail = map.RouteBetween(from, to, true);
+                double roadCost = InfrastructureSystem.EstimateCost(road.WeightedKm, false);
+                double railCost = InfrastructureSystem.EstimateCost(rail.WeightedKm, true);
+                long roadDays = InfrastructureSystem.EstimateDays(road.WeightedKm);
+                string terrain = road.WeightedKm > road.GeometricKm * 1.25 ? " · routes around rough terrain" : "";
+                estimateLabel.text = $"{road.GeometricKm:0} km · Road ${roadCost:0.0}B ({roadDays}d) · Rail ${railCost:0.0}B{terrain}";
             }
             UpdateEstimate();
             fromDropdown.RegisterValueChangedCallback(_ => UpdateEstimate());
@@ -871,9 +868,9 @@ namespace Meridian.UI
             {
                 var (from, to) = ResolveSelection();
                 if (from == to) { ShowToast("System", "Pick two different cities."); return; }
-                double dist = DistanceOf(from, to);
+                var route = map.RouteBetween(from, to, rail);
                 string msg = map.Infrastructure.Begin(from, to, map.World.Cities[from].Name, map.World.Cities[to].Name,
-                    rail, countryIdx, e, interaction.SimDay, dist);
+                    rail, countryIdx, e, interaction.SimDay, route.PathMercator, route.GeometricKm, route.WeightedKm);
                 ShowToast(countryName, msg);
             }
 

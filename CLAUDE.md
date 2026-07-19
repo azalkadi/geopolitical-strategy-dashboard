@@ -680,3 +680,21 @@ Everything below is built, launched, and verified via Player.log + visual checks
   fix from the prior push. Economic pillar (2) core loop is complete; remaining economic depth
   (per-sector manpower, per-sector margins beyond one number, sector-level trade flows) is
   future polish, not a gap in the requested scope.
+- **Terrain-following roads & railways (player build mechanism):** built routes are no longer
+  straight lines — `Map/TerrainRouter` runs A* over a cost field sampled from the satellite
+  basemap (water dark-blue = expensive bridges, bright snow/rock/desert = expensive grades,
+  normal land cheap), so a road/rail bends around gulfs and mountain blocks the way real ones do.
+  `MapRenderer.RouteBetween(from, to, rail)` returns `{PathMercator, GeometricKm, WeightedKm}`;
+  `WeightedKm` (terrain-weighted) drives cost/build-time, `GeometricKm` is the shown length.
+  **Railways penalised harder than roads** on water and gradient → different, usually longer
+  path. `BuiltRoute.PathMercator` is `[JsonIgnore]` (Unity Vector2 breaks Newtonsoft via its
+  recursive `normalized`/`magnitude`) — A* is deterministic so `MapRenderer.ApplySave` re-plans
+  every route's path from its city endpoints on load. `RebuildPlayerInfrastructure` draws the
+  polyline (renderer already supported multi-point `LineFeature`s). `GameUIRoot` builder + the
+  `MERIDIAN_DIAG_INFRA` diag both route through `RouteBetween` (Begin signature changed:
+  distanceKm → pathMercator + geometricKm + weightedKm). Verified live: Istanbul→Ankara road
+  bends +37km (350→387) around the Gulf of Izmit — a realistic ~10% detour — renders, completes,
+  save-reload re-plans, zero exceptions; basemap texture confirmed GPU-readable in the build.
+  Honest limitation: no elevation dataset, so brightness is the mountain proxy — strong for
+  snow/desert ranges, weak for green low mountains. Future upgrade path: snap to the real
+  `ne_10m_roads_extended` network (already loaded) via graph pathfinding.

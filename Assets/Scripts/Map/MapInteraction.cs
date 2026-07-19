@@ -607,9 +607,14 @@ namespace Meridian.Map
                 var myEcon = map.Economy.States[me];
                 double treasuryBefore = myEcon.Treasury;
                 infraDiagRouteIndex = map.Infrastructure.Routes.Count;
+                // Terrain-following route (Map/TerrainRouter) instead of a straight line — log
+                // how much the path bends and how much heavier the terrain-weighted length is
+                // than both the straight-line and the geometric path length.
+                var route = map.RouteBetween(from, to, false);
                 string msg = map.Infrastructure.Begin(from, to, map.World.Cities[from].Name, map.World.Cities[to].Name,
-                    false, me, myEcon, simDay, dist);
+                    false, me, myEcon, simDay, route.PathMercator, route.GeometricKm, route.WeightedKm);
                 Debug.Log($"[infradiag] {msg} treasury {treasuryBefore:0.00}->{myEcon.Treasury:0.00} (expect a drop)");
+                Debug.Log($"[infradiag] terrain route: straightLine={dist:0}km pathGeometric={route.GeometricKm:0}km terrainWeighted={route.WeightedKm:0}km waypoints={route.PathMercator.Count} (weighted>geometric => crosses rough ground)");
             }
 
             if (infraDiagStarted && !infraDiagCompleteLogged && infraDiagRouteIndex >= 0 && infraDiagRouteIndex < map.Infrastructure.Routes.Count)

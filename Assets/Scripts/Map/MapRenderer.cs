@@ -245,6 +245,14 @@ namespace Meridian.Map
                 if (e.Sectors == null || e.Sectors.Count == 0)
                     e.Sectors = SectorInfo.Seed(e.Gdp, e.GdpPerCapita, e.Companies);
             }
+            // Route paths aren't serialized (see BuiltRoute.PathMercator) — re-plan each one
+            // deterministically from its city endpoints so loaded roads/rail still follow the
+            // terrain instead of snapping back to straight lines.
+            if (Infrastructure != null)
+                foreach (var r in Infrastructure.Routes)
+                    if (r.FromCity >= 0 && r.FromCity < World.Cities.Count && r.ToCity >= 0 && r.ToCity < World.Cities.Count)
+                        r.PathMercator = RouteBetween(r.FromCity, r.ToCity, r.IsRailway).PathMercator;
+
             RefreshCountryColors();
             RebuildPlayerInfrastructure();
         }
@@ -557,6 +565,16 @@ namespace Meridian.Map
         // incremental append) and once after a save loads. Slightly bolder width and drawn a
         // hair closer to the camera than natural roads/rail so a player's own construction
         // visibly reads as "yours" even where it runs alongside/over existing infrastructure.
+        // Terrain-following route planner (Map/TerrainRouter), built lazily off the satellite
+        // basemap the first time the player previews or commits a build. Null-safe: if the
+        // basemap never loaded, the router itself falls back to straight lines.
+        TerrainRouter terrainRouter;
+        public TerrainRouter.Route RouteBetween(int fromCity, int toCity, bool rail)
+        {
+            terrainRouter ??= new TerrainRouter(SatelliteTexture);
+            return terrainRouter.Plan(World.Cities[fromCity].Pos, World.Cities[toCity].Pos, rail);
+        }
+
         public void RebuildPlayerInfrastructure()
         {
             bool wasActive = PlayerInfrastructureRoot != null && PlayerInfrastructureRoot.activeSelf;
@@ -572,7 +590,11 @@ namespace Meridian.Map
                 {
                     if (!r.Completed) continue;
                     if (r.FromCity < 0 || r.FromCity >= World.Cities.Count || r.ToCity < 0 || r.ToCity >= World.Cities.Count) continue;
-                    var line = new List<Vector2> { World.Cities[r.FromCity].Pos, World.Cities[r.ToCity].Pos };
+                    // Draw the terrain-following path if it has one (new routes); fall back to a
+                    // straight city-to-city line for routes from pre-terrain-routing saves.
+                    var line = r.PathMercator != null && r.PathMercator.Count >= 2
+                        ? new List<Vector2>(r.PathMercator)
+                        : new List<Vector2> { World.Cities[r.FromCity].Pos, World.Cities[r.ToCity].Pos };
                     var feat = new LineFeature { Name = $"{r.FromName}-{r.ToName}", Lines = new List<List<Vector2>> { line } };
                     (r.IsRailway ? railFeatures : roadFeatures).Add(feat);
                 }

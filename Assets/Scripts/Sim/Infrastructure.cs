@@ -20,6 +20,14 @@ namespace Meridian.Sim
         public long CompletionDay;
         public bool Completed;
         public double Cost;
+
+        // The actual terrain-following route geometry in world (Mercator) space, including both
+        // city endpoints (see Map/TerrainRouter). NOT serialized — Unity's Vector2 has recursive
+        // computed properties (normalized/magnitude) that break Newtonsoft, and the A* path is
+        // deterministic anyway, so MapRenderer.ApplySave re-plans it from the city endpoints on
+        // load. Empty until then; the renderer falls back to a straight line if it's ever empty.
+        [Newtonsoft.Json.JsonIgnore]
+        public List<Vector2> PathMercator = new();
     }
 
     public class InfrastructureSystem
@@ -55,10 +63,14 @@ namespace Meridian.Sim
         // exact cost/duration — this just books it and charges the treasury immediately
         // (same unconditional-spend pattern as DiplomacySystem.SendAid; going into debt over
         // it is the player's call, same as every other spending lever).
-        public string Begin(int fromCity, int toCity, string fromName, string toName, bool rail, int ownerIdx, EconomyState payer, long day, double distanceKm)
+        // geometricKm is the real length shown to the player; weightedKm is the terrain-weighted
+        // length (longer/costlier through mountains and water) that drives cost and build time —
+        // both come from Map/TerrainRouter. pathMercator is the route geometry to render.
+        public string Begin(int fromCity, int toCity, string fromName, string toName, bool rail, int ownerIdx, EconomyState payer, long day,
+                            List<Vector2> pathMercator, double geometricKm, double weightedKm)
         {
-            double cost = EstimateCost(distanceKm, rail);
-            long buildDays = EstimateDays(distanceKm);
+            double cost = EstimateCost(weightedKm, rail);
+            long buildDays = EstimateDays(weightedKm);
             payer.Treasury -= cost;
             Routes.Add(new BuiltRoute
             {
@@ -71,9 +83,13 @@ namespace Meridian.Sim
                 StartDay = day,
                 CompletionDay = day + buildDays,
                 Cost = cost,
+                PathMercator = pathMercator ?? new List<Vector2>(),
             });
+            // Note the terrain premium in the message when the route is meaningfully harder than
+            // a straight line (mountains/water bent the path or forced bridges).
+            string terrain = weightedKm > geometricKm * 1.25 ? " — rough terrain" : "";
             return $"{(rail ? "Railway" : "Road")} construction begun: {fromName} — {toName} " +
-                   $"({distanceKm:0}km, ${cost:0.0}B, ready in {buildDays} days).";
+                   $"({geometricKm:0}km{terrain}, ${cost:0.0}B, ready in {buildDays} days).";
         }
 
         // Flips Completed on any route whose day has arrived; returns only the ones that JUST
