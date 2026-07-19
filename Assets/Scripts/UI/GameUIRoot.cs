@@ -555,6 +555,8 @@ namespace Meridian.UI
             Why(e.LastWhy);
             EndCard();
 
+            DrawSectors(e);
+
             // History charts exist only for the nation the player actually governs — the sim
             // doesn't record daily series for all 258 countries.
             if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Gdp.Count >= 2)
@@ -568,6 +570,50 @@ namespace Meridian.UI
             }
 
             DrawTaxSection(e);
+        }
+
+        // GDP composition by sector — the ten shares (summing to 100%) that make the economy
+        // legible as real industries rather than one aggregate number. Sorted biggest-first;
+        // each row is a labelled share bar with the sector's $ output. Static per rebuild (shares
+        // drift only slowly), so no live binding needed.
+        void DrawSectors(EconomyState e)
+        {
+            if (e.Sectors == null || e.Sectors.Count == 0) return;
+
+            StartCard();
+            SectionHeader("GDP BY SECTOR");
+
+            var sorted = new List<SectorState>(e.Sectors);
+            sorted.Sort((a, b) => b.Share.CompareTo(a.Share));
+            var accent = UIState.ActiveCategory.Accent();
+
+            foreach (var s in sorted)
+            {
+                var head = Row();
+                head.style.marginBottom = 1;
+                head.Add(MakeLabel(s.Label, 10, GameTheme.TextDim));
+                var spacer = new VisualElement(); spacer.style.flexGrow = 1; head.Add(spacer);
+                head.Add(MakeLabel($"{s.Share:0.0}%  ·  ${s.Output:n0}B", 10, GameTheme.TextPrimary, bold: true));
+                currentContainer.Add(head);
+
+                var track = new VisualElement();
+                track.style.height = 6;
+                track.style.backgroundColor = new StyleColor(GameTheme.BgSliderTrack);
+                track.style.borderTopLeftRadius = 2; track.style.borderTopRightRadius = 2;
+                track.style.borderBottomLeftRadius = 2; track.style.borderBottomRightRadius = 2;
+                track.style.marginBottom = 5;
+                track.style.overflow = Overflow.Hidden;
+                var fill = new VisualElement();
+                fill.style.position = Position.Absolute;
+                fill.style.left = 0; fill.style.top = 0; fill.style.bottom = 0;
+                fill.style.width = new Length(Mathf.Clamp(s.Share, 0f, 100f), LengthUnit.Percent);
+                fill.style.backgroundColor = new StyleColor(GameTheme.Muted(accent, 0.2f));
+                track.Add(fill);
+                currentContainer.Add(track);
+            }
+
+            HelpText("Shares drift over time toward faster-growing sectors (services, tech, finance) as an economy develops.");
+            EndCard();
         }
 
         void DrawTaxSection(EconomyState e)

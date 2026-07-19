@@ -37,9 +37,14 @@ namespace Meridian.Sim
         // CountryProfiles seed data. Empty for every uncurated country.
         public List<Company> Companies = new();
 
-        // Distributable profit as a share of a company's OutputBillions (revenue). One shared
-        // number rather than per-sector detail — anchored so a fully state-owned Aramco yields
-        // dividends the same order of magnitude as its real state payouts (see Tick).
+        // Sector composition of GDP — ten shares summing to 100%, drifting over time toward the
+        // faster-growing sectors (see Sim/SectorModel.cs). GDP still grows via the macro model
+        // below; this decomposes it and feeds a small productivity nudge back into growth.
+        public List<SectorState> Sectors = new();
+
+        // Kept only for old-save migration (see SaveLoad): games saved before the per-sector
+        // margin table existed used this single flat margin. Live dividends now use
+        // SectorInfo.ProfitMargin(company.Sector). Not referenced by Tick anymore.
         public const double CompanyProfitMargin = 0.10;
 
         // Player-defined taxes beyond the four core levers — freely add/rename/rate/remove
@@ -145,6 +150,9 @@ namespace Meridian.Sim
                 foreach (var seed in profile.Companies)
                     state.Companies.Add(new Company { Name = seed.Name, Sector = seed.Sector, Ownership = seed.Ownership, OutputBillions = seed.OutputBillions });
 
+            // Sector breakdown: tier template, bumped where the country has big real companies.
+            state.Sectors = SectorInfo.Seed(state.Gdp, gdpPerCapita, state.Companies);
+
             float baseOpenness =
                 gdpPerCapita < 5_000.0 ? 0.35f :
                 gdpPerCapita < 15_000.0 ? 0.28f :
@@ -182,7 +190,12 @@ namespace Meridian.Sim
             float spendBoost = (SpendInfrastructure - 3.0f) * 0.10f
                              + (SpendEducation - 4.5f) * 0.05f
                              + TradeAgreementExportBonus * 4.0f;
-            float target = BaseGrowthTarget - taxDrag - rateDrag + spendBoost + Noise() * 0.15f;
+            // Sector composition drifts and feeds a small bounded productivity nudge into trend
+            // growth — a tech/finance/services-weighted economy grows a hair faster than an
+            // agriculture/mining-weighted one of the same size. Also refreshes each sector's
+            // Output against current GDP for display and dividends.
+            float sectorNudge = SectorInfo.TickAll(Sectors, Gdp);
+            float target = BaseGrowthTarget - taxDrag - rateDrag + spendBoost + sectorNudge + Noise() * 0.15f;
             GrowthRate = Clampf(GrowthRate * 0.98f + target * 0.02f, -15.0f, 15.0f);
 
             Gdp *= 1.0 + GrowthRate / 100.0 / 365.0;
@@ -238,7 +251,7 @@ namespace Meridian.Sim
             {
                 double stake = co.Ownership == Ownership.Public ? 1.0 : co.Ownership == Ownership.Mixed ? 0.5 : 0.0;
                 if (stake > 0.0)
-                    Treasury += co.OutputBillions * CompanyProfitMargin * stake / 365.0;
+                    Treasury += co.OutputBillions * SectorInfo.ProfitMargin(co.Sector) * stake / 365.0;
                 double drift = GrowthRate / 100.0 - stake * 0.015;
                 co.OutputBillions = System.Math.Max(0.1, co.OutputBillions * (1.0 + drift / 365.0));
             }

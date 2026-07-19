@@ -626,3 +626,20 @@ Everything below is built, launched, and verified via Player.log + visual checks
   - Still open: AI countries legislating + elections reshuffling seats (pillar 1), sector
     output composing GDP + manpower (pillar 2), terrorism/military depth (pillar 3 continues),
     escalation from seeded tension into AI-declared wars.
+- **"Complete all the economic features" — item 1/5: sectors compose GDP + per-sector margins.**
+  New `Sim/SectorModel.cs`: every country's GDP is decomposed into the 10 sectors as shares
+  summing to 100%, seeded by development tier (`Low`/`LowMid`/`UpMid`/`High` templates keyed off
+  GDP-per-capita) then raised wherever the country's real curated companies out-produce the
+  template — Saudi Arabia reads Energy 39% from Aramco/SABIC, not the 2% tier baseline. Shares
+  drift daily toward higher-`ShareDrift` sectors (tech/services/finance gain, agriculture/mining
+  shrink — real structural transformation), renormalize to 100, and feed a bounded ±0.1%/yr
+  productivity nudge into `Economy.Tick`'s growth target (composition matters without
+  overriding the tuned macro model, which still owns aggregate growth). `SectorInfo.ProfitMargin`
+  gives each sector a real margin (finance .18, energy .15 … agriculture .04); SOE dividends now
+  use the company's sector margin instead of the old flat 10%. `EconomyState.Sectors` serializes
+  free; `MapRenderer.ApplySave` reseeds it for pre-sector saves. New Economy-tab GDP-BY-SECTOR
+  card (`DrawSectors`), ranked share bars + $ output. Verified live as Saudi Arabia: `[econdiag]`
+  shows `topSector=Energy 39.1%` drifting to 39.0% by day 91, `soeDividends=$77.8B/yr` (Aramco
+  500×.15 + SABIC 35×.08, up from $53.5B under the flat margin), zero exceptions.
+  - Economic features remaining (2-5/5): manpower/labour allocation, AI countries legislating,
+    more curated companies.

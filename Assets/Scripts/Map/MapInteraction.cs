@@ -595,9 +595,17 @@ namespace Meridian.Map
             foreach (var co in e.Companies)
             {
                 double stake = co.Ownership == Ownership.Public ? 1.0 : co.Ownership == Ownership.Mixed ? 0.5 : 0.0;
-                soeAnnual += co.OutputBillions * EconomyState.CompanyProfitMargin * stake;
+                soeAnnual += co.OutputBillions * SectorInfo.ProfitMargin(co.Sector) * stake;
             }
-            Debug.Log($"[econdiag] day {simDay}: GDP=${e.Gdp:n1}B growth={e.GrowthRate:0.00}% unemp={e.Unemployment:0.00}% inflation={e.Inflation:0.00}% treasury=${e.Treasury:n1}B taxes=[income={e.TaxIncome:0.0} corp={e.TaxCorporate:0.0} vat={e.TaxVat:0.0} tariff={e.TaxTariff:0.0} custom={e.CustomTaxes.Count}] effTax={e.EffectiveTaxRate():0.0}% soeDividends=${soeAnnual:n1}B/yr companies={e.Companies.Count}");
+            // Top sector by share, to show the composition model is live and drifting.
+            string topSector = "none";
+            if (e.Sectors != null && e.Sectors.Count > 0)
+            {
+                var top = e.Sectors[0];
+                foreach (var s in e.Sectors) if (s.Share > top.Share) top = s;
+                topSector = $"{top.Label} {top.Share:0.0}%";
+            }
+            Debug.Log($"[econdiag] day {simDay}: GDP=${e.Gdp:n1}B growth={e.GrowthRate:0.00}% unemp={e.Unemployment:0.00}% inflation={e.Inflation:0.00}% treasury=${e.Treasury:n1}B taxes=[income={e.TaxIncome:0.0} corp={e.TaxCorporate:0.0} vat={e.TaxVat:0.0} tariff={e.TaxTariff:0.0} custom={e.CustomTaxes.Count}] effTax={e.EffectiveTaxRate():0.0}% soeDividends=${soeAnnual:n1}B/yr companies={e.Companies.Count} topSector={topSector}");
         }
 
         // Approval-rating-based term/election mechanic — the same ApprovalRating already shown

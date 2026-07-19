@@ -42,6 +42,19 @@ points at:
 Each sector should be inspectable on its own: the player should be able to see every company
 operating in a given sector (e.g. "show me every company in the oil sector").
 
+> [!success] Status: ✅ Sectors compose GDP (`Sim/SectorModel.cs`). Every country's GDP is
+> decomposed into the 10 sectors as shares summing to 100%, seeded by development tier (poor =
+> agriculture/mining-heavy, rich = services/finance/tech-heavy) and then bumped wherever the
+> country has big real curated companies — so Saudi Arabia reads **Energy 39%** from Aramco's
+> real output, not the flat 2% tier baseline (verified live). Shares **drift over time** toward
+> the faster-growing sectors (real structural transformation), and the composition feeds a
+> small bounded nudge back into aggregate growth (tech/finance-weighted economies grow a hair
+> faster). GDP still *grows* via the tuned macro model — sectors decompose it rather than
+> replacing it, a deliberate choice to avoid destabilizing the balanced core. Per-sector profit
+> margins (energy/finance fat, agriculture thin) now drive SOE dividends too, replacing the old
+> flat 10%. Shown on the Economy tab as a GDP-BY-SECTOR card. **Still open:** manpower
+> allocation (below) and per-sector detail beyond one margin number each.
+
 ## Companies, and public/private/mixed ownership
 Individual companies exist within a sector, and the player can set each one's ownership model —
 fully public (state-owned), fully private, or mixed. This is a real, consequential lever (state

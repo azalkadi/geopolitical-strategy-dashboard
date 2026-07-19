@@ -239,6 +239,11 @@ namespace Meridian.Map
                     if (e.PopulationGrowth == 0f) e.PopulationGrowth = 1.0f;
                     e.LastCreditRating = e.CreditRatingLabel;
                 }
+                // Migration: saves written before sector composition existed deserialize with an
+                // empty Sectors list — reseed from the country's current GDP/companies so the
+                // Economy panel and the growth nudge have real data instead of nothing.
+                if (e.Sectors == null || e.Sectors.Count == 0)
+                    e.Sectors = SectorInfo.Seed(e.Gdp, e.GdpPerCapita, e.Companies);
             }
             RefreshCountryColors();
             RebuildPlayerInfrastructure();
