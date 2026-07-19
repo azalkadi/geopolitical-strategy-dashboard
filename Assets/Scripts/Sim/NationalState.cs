@@ -74,7 +74,12 @@ namespace Meridian.Sim
 
             // Education spending compounds with direct research spending — a strong school
             // system raises the ceiling on what research money can produce.
-            float innovationTarget = Clampf((float)(gdpRankPercentile * 60.0) + ResearchSpending * 15f + (e.SpendEducation - 4.5f) * 3f, 0f, 100f);
+            // Money (ResearchSpending, SpendEducation) AND people (research/education manpower)
+            // both drive innovation — funding a lab with no staff, or staff with no funding,
+            // each underperforms. Manpower terms are zero at their defaults (3% research, 7%
+            // education) so this is unchanged until the player reallocates.
+            float innovationTarget = Clampf((float)(gdpRankPercentile * 60.0) + ResearchSpending * 15f + (e.SpendEducation - 4.5f) * 3f
+                + (e.ManpowerResearch - 3f) * 2.5f + (e.ManpowerEducation - 7f) * 1.5f, 0f, 100f);
             InnovationIndex = Clampf(InnovationIndex + (innovationTarget - InnovationIndex) * 0.01f, 0f, 100f);
 
             double openness = e.Gdp > 0.01 ? e.Exports / e.Gdp : 0.0;
@@ -83,14 +88,17 @@ namespace Meridian.Sim
 
             // Healthcare spending is the daily-life lever: people feel underfunded hospitals
             // long before they feel a GDP decimal point.
-            float moodTarget = Clampf(70f - (e.Unemployment - 7f) * 2.5f - System.Math.Max(0f, e.Inflation - 4f) * 2f + (e.SpendHealthcare - 6.0f) * 2.5f, 0f, 100f);
+            // Healthcare mood depends on funding (SpendHealthcare) and staffing (ManpowerHealthcare)
+            // together — a well-funded but understaffed system still leaves people waiting.
+            float moodTarget = Clampf(70f - (e.Unemployment - 7f) * 2.5f - System.Math.Max(0f, e.Inflation - 4f) * 2f
+                + (e.SpendHealthcare - 6.0f) * 2.5f + (e.ManpowerHealthcare - 10f) * 1.2f, 0f, 100f);
             PublicMood = Clampf(PublicMood + (moodTarget - PublicMood) * 0.015f, 0f, 100f);
 
             // Population dynamics live here (not in EconomyState.Tick) because the drivers —
             // mood and healthcare — are this class's numbers. Good living conditions pull
             // growth toward ~2%/yr, misery toward decline; GDP per capita then moves with the
             // ratio of the two growth curves.
-            float popTarget = Clampf(0.8f + (PublicMood - 50f) * 0.02f + (e.SpendHealthcare - 6.0f) * 0.06f, -0.8f, 2.5f);
+            float popTarget = Clampf(0.8f + (PublicMood - 50f) * 0.02f + (e.SpendHealthcare - 6.0f) * 0.06f + (e.ManpowerHealthcare - 10f) * 0.02f, -0.8f, 2.5f);
             e.PopulationGrowth = Clampf(e.PopulationGrowth + (popTarget - e.PopulationGrowth) * 0.005f, -0.8f, 2.5f);
             e.Population *= 1.0 + e.PopulationGrowth / 100.0 / 365.0;
         }

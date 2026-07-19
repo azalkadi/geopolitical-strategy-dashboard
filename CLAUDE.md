@@ -641,5 +641,16 @@ Everything below is built, launched, and verified via Player.log + visual checks
   card (`DrawSectors`), ranked share bars + $ output. Verified live as Saudi Arabia: `[econdiag]`
   shows `topSector=Energy 39.1%` drifting to 39.0% by day 91, `soeDividends=$77.8B/yr` (Aramco
   500×.15 + SABIC 35×.08, up from $53.5B under the flat margin), zero exceptions.
-  - Economic features remaining (2-5/5): manpower/labour allocation, AI countries legislating,
-    more curated companies.
+- **"Complete all the economic features" — item 2/5: manpower / labour allocation.**
+  `EconomyState.ManpowerHealthcare/Education/Research` (% of the labour force = `Population×0.5`),
+  edited on a Budget-tab MANPOWER card as sliders separate from the money spending levers.
+  Two-sided trade-off, exactly zero at the 10/7/3 defaults: above baseline pulls unemployment
+  down (`manpowerEmploy` term), lifts `moodTarget` (healthcare staff) and `innovationTarget`
+  (education/research staff) in `NationalState.Tick` alongside the money levers, and lifts
+  population growth — but pulls workers from the private economy so `manpowerDrag` shaves the
+  growth target. Fields are public → serialize free; old saves fall back to the C# defaults, no
+  migration. `MERIDIAN_DIAG_MANPOWER=1` verified live (USA, 20%→55% staffing): innovation
+  47→71, mood 55→76, unemployment 6.99→5.76, growth 4.59→4.36, ~75M public workers — all four
+  directions correct, zero exceptions.
+  - Economic features remaining (3-5/5): AI countries legislating, more curated companies,
+    plus any polish.

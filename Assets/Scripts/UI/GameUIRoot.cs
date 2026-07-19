@@ -784,6 +784,16 @@ namespace Meridian.UI
             HelpText("Infrastructure and education feed growth, education also drives innovation, healthcare lifts public mood — all of it costs treasury every day. 'Other' (administration, pensions, debt service) is fixed.");
             EndCard();
 
+            StartCard();
+            SectionHeader("MANPOWER (% OF LABOUR FORCE)");
+            Stat("Labour force", $"{e.LabourForce:n0}");
+            AddSlider("Healthcare staff", () => e.ManpowerHealthcare, 0f, 30f, v => e.ManpowerHealthcare = v);
+            AddSlider("Education staff", () => e.ManpowerEducation, 0f, 25f, v => e.ManpowerEducation = v);
+            AddSlider("Research staff", () => e.ManpowerResearch, 0f, 20f, v => e.ManpowerResearch = v);
+            Stat("Public workers", $"{e.PublicWorkers:n0}  ({e.PublicManpower:0.0}%)");
+            HelpText("People, not money — separate from spending above. More staff cuts unemployment and lifts mood/innovation, but pulls workers from the private economy, so overshooting drags growth. Both funding and staffing matter.");
+            EndCard();
+
             if (interaction.Selected == PlayerState.CountryIndex && PlayerHistory.Treasury.Count >= 2)
             {
                 StartCard();

@@ -62,6 +62,24 @@ namespace Meridian.Sim
         public const float SpendBase = 6.5f;
         public float TotalSpendingRate => SpendBase + SpendEducation + SpendHealthcare + SpendInfrastructure;
 
+        // Manpower allocation — a PEOPLE resource, distinct from the money spending levers above.
+        // Percentages of the labour force directed into public healthcare/education/research
+        // staffing. Defaults sum to ManpowerBaseline (the neutral point where manpower neither
+        // helps nor drags). Raising them employs people (unemployment falls) and lifts the
+        // matching outcome — healthcare→public mood & population, education/research→innovation —
+        // but pulls workers out of the productive private economy, so overshooting drags growth.
+        // A real trade-off, not a free lever. Money (SpendHealthcare etc.) and people (these)
+        // both matter and stack.
+        public float ManpowerHealthcare = 10f;
+        public float ManpowerEducation = 7f;
+        public float ManpowerResearch = 3f;
+        public const float ManpowerBaseline = 20f; // 10 + 7 + 3
+        public float PublicManpower => ManpowerHealthcare + ManpowerEducation + ManpowerResearch;
+        // Roughly half a population is working-age and participating in the labour force — a
+        // deliberately simple coefficient, enough to express manpower as real headcounts in the UI.
+        public double LabourForce => Population * 0.5;
+        public double PublicWorkers => LabourForce * PublicManpower / 100.0;
+
         // Sum of active trade-agreement export bonuses (set by DiplomacySystem; each agreement
         // adds a small slice of extra export propensity for BOTH signatories).
         public float TradeAgreementExportBonus;
@@ -195,7 +213,11 @@ namespace Meridian.Sim
             // agriculture/mining-weighted one of the same size. Also refreshes each sector's
             // Output against current GDP for display and dividends.
             float sectorNudge = SectorInfo.TickAll(Sectors, Gdp);
-            float target = BaseGrowthTarget - taxDrag - rateDrag + spendBoost + sectorNudge + Noise() * 0.15f;
+            // Public manpower above baseline is pulled out of the productive private economy —
+            // a real growth cost that balances its unemployment/services benefits below. At the
+            // default baseline this is exactly zero.
+            float manpowerDrag = (PublicManpower - ManpowerBaseline) * 0.015f;
+            float target = BaseGrowthTarget - taxDrag - rateDrag + spendBoost + sectorNudge - manpowerDrag + Noise() * 0.15f;
             GrowthRate = Clampf(GrowthRate * 0.98f + target * 0.02f, -15.0f, 15.0f);
 
             Gdp *= 1.0 + GrowthRate / 100.0 / 365.0;
@@ -209,7 +231,11 @@ namespace Meridian.Sim
             // to pick) had unemployment rise every single day with no equilibrium, forever,
             // regardless of tax policy — confirmed by 660 days of observed play where a rich
             // nation's unemployment climbed 7.0% to 11.1% with no sign of leveling off.
-            Unemployment = Clampf(Unemployment + (BaseGrowthTarget - GrowthRate) * 0.01f, 2.0f, 35.0f);
+            // Public-sector hiring absorbs labour: manpower above baseline pulls unemployment
+            // down (people employed in healthcare/education/research), below baseline pushes it
+            // up. Small daily nudge on top of the growth-driven drift; zero at the default.
+            float manpowerEmploy = (PublicManpower - ManpowerBaseline) * 0.0006f;
+            Unemployment = Clampf(Unemployment + (BaseGrowthTarget - GrowthRate) * 0.01f - manpowerEmploy, 2.0f, 35.0f);
             Inflation = Clampf(
                 Inflation + (GrowthRate - BaseGrowthTarget) * 0.005f - (InterestRate - 4.0f) * 0.03f + Noise() * 0.02f,
                 -3.0f, 40.0f);

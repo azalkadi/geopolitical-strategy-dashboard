@@ -187,6 +187,7 @@ namespace Meridian.Map
                 MaybeRunInfraDiag();
                 MaybeRunBillsDiag();
                 MaybeRunContextMenuDiag();
+                MaybeRunManpowerDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -459,6 +460,35 @@ namespace Meridian.Map
                 contextMenuDiagClosed = true;
                 CloseContextMenu();
                 Debug.Log($"[ctxmenudiag] closed context menu, ContextMenuCountry={ContextMenuCountry} (expect -1)");
+            }
+        }
+
+        // Dev-only: MERIDIAN_DIAG_MANPOWER=1 cranks public-sector staffing at day 20 and logs
+        // innovation/mood/unemployment/growth over the following year — verifies the manpower
+        // levers move the right numbers (up for services/innovation, unemployment down, a small
+        // growth drag) from Player.log alone.
+        bool manpowerDiagSet;
+        long manpowerDiagNextLog;
+        void MaybeRunManpowerDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_MANPOWER") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.National == null) return;
+            var e = map.Economy.States[me];
+            var n = map.National.States[me];
+
+            if (!manpowerDiagSet && simDay >= 20)
+            {
+                manpowerDiagSet = true;
+                Debug.Log($"[manpowerdiag] day {simDay} BEFORE: manpower={e.PublicManpower:0.0}% innovation={n.InnovationIndex:0.0} mood={n.PublicMood:0.0} unemp={e.Unemployment:0.00} growth={e.GrowthRate:0.00}");
+                e.ManpowerHealthcare = 25f; e.ManpowerEducation = 15f; e.ManpowerResearch = 15f; // 55%, +35 over baseline
+                Debug.Log($"[manpowerdiag] set manpower to {e.PublicManpower:0.0}% (healthcare 25 / education 15 / research 15)");
+                manpowerDiagNextLog = simDay + 60;
+            }
+            if (manpowerDiagSet && simDay >= manpowerDiagNextLog)
+            {
+                manpowerDiagNextLog = simDay + 60;
+                Debug.Log($"[manpowerdiag] day {simDay}: innovation={n.InnovationIndex:0.0} mood={n.PublicMood:0.0} unemp={e.Unemployment:0.00} growth={e.GrowthRate:0.00} publicWorkers={e.PublicWorkers:n0}");
             }
         }
 

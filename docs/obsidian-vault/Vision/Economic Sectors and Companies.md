@@ -67,6 +67,18 @@ education, research, and (implicitly) other sectors — this is distinct from th
 money, not people. Manpower is a separate real resource: how many workers a sector actually has,
 which should itself interact with unemployment and sector output.
 
+> [!success] Status: ✅ Built. `EconomyState.ManpowerHealthcare/Education/Research` — % of the
+> labour force (`Population × 0.5`) staffing each public sector, edited on the Budget tab's
+> MANPOWER card as sliders *separate from* the money spending levers. Real two-sided trade-off,
+> zero at the 10/7/3 defaults: raising staffing **cuts unemployment** (public hiring absorbs
+> labour), **lifts mood** (healthcare staff, alongside `SpendHealthcare`) and **innovation**
+> (education/research staff, alongside `ResearchSpending`/`SpendEducation`) — but pulls workers
+> from the productive private economy, so overshooting **drags growth**. Money and people both
+> matter and stack. Verified live (USA, staffing 20%→55%): innovation 47→71, mood 55→76,
+> unemployment 6.99→5.76, growth 4.59→4.36 — every number moved the right way. **Still open:**
+> per-sector manpower beyond the three public services (general private-economy headcount is
+> implicit, not individually allocatable).
+
 ## Where this plugs into existing code
 - ✅ `Sim/Companies.cs` — `Sector`/`Ownership` enums, `CompanySeed` (static real roster) and
   `Company` (mutable per-game copy on `EconomyState.Companies`).
