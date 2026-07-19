@@ -652,5 +652,15 @@ Everything below is built, launched, and verified via Player.log + visual checks
   migration. `MERIDIAN_DIAG_MANPOWER=1` verified live (USA, 20%→55% staffing): innovation
   47→71, mood 55→76, unemployment 6.99→5.76, growth 4.59→4.36, ~75M public workers — all four
   directions correct, zero exceptions.
-  - Economic features remaining (3-5/5): AI countries legislating, more curated companies,
-    plus any polish.
+- **"Complete all the economic features" — item 3/5: AI countries legislate.**
+  `MapInteraction.MaybeAILegislate` — each day a small deterministic sample (hash of country+day,
+  ~1 proposal/4-5 days globally) of foreign countries considers a tax bill from its fiscal
+  situation + ruling ideology: deficit>3% of GDP → raise income/VAT; surplus + right-leaning
+  legislature (seat-weighted `EconLean`>0.05) → cut income/corporate. Runs through the exact same
+  `LegislatureSystem.Propose` the player uses — curated-party countries vote, uncurated decree.
+  Headlines only for economies >$400B GDP (no spam). `LegislatureSystem.TickAll` now prunes
+  resolved bills >60 days old so the list stays bounded with 258 countries legislating.
+  `MERIDIAN_DIAG_AILEGIS=1` verified live (autopilot ~350 days, 17 proposals): Switzerland/Kuwait
+  raised taxes on deficits by decree; Israel/Netherlands/India/Italy cut taxes via real party
+  votes (all surplus + right-leaning) — ideology-correct both paths, zero exceptions.
+  - Economic features remaining (4-5/5): more curated companies, plus any polish.

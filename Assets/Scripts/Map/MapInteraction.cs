@@ -176,8 +176,11 @@ namespace Meridian.Map
                 }
 
                 if (map.Legislature != null)
+                {
+                    MaybeAILegislate(simDay);
                     foreach (var headline in map.Legislature.TickAll(simDay, map.Economy, map.National, map.CountryNames))
                         WorldFeed.Push("Parliament", headline);
+                }
 
                 CheckElection(simDay);
                 LogEconomyDiagnostic();
@@ -460,6 +463,81 @@ namespace Meridian.Map
                 contextMenuDiagClosed = true;
                 CloseContextMenu();
                 Debug.Log($"[ctxmenudiag] closed context menu, ContextMenuCountry={ContextMenuCountry} (expect -1)");
+            }
+        }
+
+        // AI countries legislate too — not just the player. Each day a small deterministic
+        // sample of foreign countries considers a tax bill fitting its fiscal situation and
+        // ruling ideology: a country running a real deficit moves to RAISE a tax; a country with
+        // healthy books and a right-leaning legislature moves to CUT one. The bill runs through
+        // the exact same LegislatureSystem.Propose pipeline the player uses — countries with real
+        // curated parties fight a weighted floor vote, the rest (uncurated) decree — so foreign
+        // tax policy genuinely drifts with each country's own economy and politics instead of
+        // sitting frozen at its seed value forever. Only major economies surface a headline
+        // (avoids spam from 258 countries); the rest change quietly. Deterministic (hash of
+        // country+day), so a save/reload reproduces the same world.
+        int aiLegisCount;
+        void MaybeAILegislate(long day)
+        {
+            if (map.World == null || map.Economy == null || map.National == null) return;
+            int n = map.World.Countries.Count;
+            int player = PlayerState.CountryIndex;
+            for (int i = 0; i < n; i++)
+            {
+                if (i == player) continue;
+                // ~1 proposal every 4-5 days globally across 258 countries.
+                if (AiLegisHash((uint)i, (uint)day) % 1100u != 0u) continue;
+                if (i >= map.Economy.States.Count || i >= map.National.States.Count) continue;
+
+                var c = map.World.Countries[i];
+                var e = map.Economy.States[i];
+                var nat = map.National.States[i];
+                var profile = CountryProfiles.Get(c.IsoA3);
+                var parties = profile?.Parties;
+
+                float lean = 0f;
+                if (parties != null) foreach (var p in parties) lean += p.EconLean * p.SeatShare;
+
+                double deficitRatio = e.Gdp > 1.0 ? e.AnnualDeficit / e.Gdp : 0.0;
+                BillKind kind; float oldV, newV;
+                if (deficitRatio > 0.03) // real deficit -> raise a tax to close it
+                {
+                    bool vat = AiLegisHash((uint)i, (uint)day + 7u) % 2u == 0u;
+                    kind = vat ? BillKind.Vat : BillKind.IncomeTax;
+                    oldV = vat ? e.TaxVat : e.TaxIncome;
+                    float cap = vat ? 30f : 60f;
+                    newV = System.Math.Min(cap, oldV + 2f + AiLegisHash((uint)i, (uint)day + 3u) % 3u);
+                }
+                else if (deficitRatio < 0.0 && lean > 0.05f) // surplus + right-leaning -> cut a tax
+                {
+                    bool corp = AiLegisHash((uint)i, (uint)day + 11u) % 2u == 0u;
+                    kind = corp ? BillKind.CorporateTax : BillKind.IncomeTax;
+                    oldV = corp ? e.TaxCorporate : e.TaxIncome;
+                    newV = System.Math.Max(5f, oldV - (2f + AiLegisHash((uint)i, (uint)day + 5u) % 2u));
+                }
+                else continue; // no fiscal case to act on today
+
+                if (System.Math.Abs(newV - oldV) < 0.5f) continue;
+                if (map.Legislature.PendingFor(i, kind) != null) continue;
+
+                string headline = map.Legislature.Propose(i, c.Name, nat.Government, parties, kind, oldV, newV, day);
+                aiLegisCount++;
+                // Only the big economies are newsworthy; the rest legislate quietly.
+                if (e.Gdp > 400.0) WorldFeed.Push("World", headline);
+                if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_AILEGIS") != null)
+                    Debug.Log($"[ailegis] day {day}: #{aiLegisCount} {c.Name} ({(parties != null ? "vote" : "decree")}) {kind} {oldV:0.0}->{newV:0.0} deficitRatio={deficitRatio:0.000} lean={lean:0.00}");
+            }
+        }
+
+        static uint AiLegisHash(uint a, uint b)
+        {
+            unchecked
+            {
+                uint h = 0x811c9dc5u;
+                h = (h ^ a) * 0x01000193u;
+                h = (h ^ b) * 0x01000193u;
+                h ^= h >> 15;
+                return h;
             }
         }
 

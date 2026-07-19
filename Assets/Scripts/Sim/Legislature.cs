@@ -284,6 +284,14 @@ namespace Meridian.Sim
                         $"{names.Name(b.CountryIndex)}: bill defeated {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} stays {Fmt(b, b.OldValue)}.");
                 }
             }
+
+            // Prune old resolved bills so the list stays bounded once AI countries are also
+            // legislating (258 countries proposing over game-years would otherwise grow it
+            // without limit). Pending bills are always kept; resolved ones survive 60 days so the
+            // player's own recent outcomes still show in the ministry panels' bill history.
+            if (Bills.Count > 64)
+                Bills.RemoveAll(b => b.Status != BillStatus.Pending && day - b.DecisionDay > 60);
+
             return headlines ?? Empty;
         }
         static readonly List<string> Empty = new();

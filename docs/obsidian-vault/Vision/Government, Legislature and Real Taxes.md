@@ -107,7 +107,17 @@ requirement, not a suggestion.
   `NationalState.Government`, and cost standing hard for losing real pluralism (53.2→36.0
   across the transition window, alongside the normal 45 days of drift already happening in
   parallel). See [[Legislature and Bills]] for the full architecture.
-- ⬜ Still open within the pillar: AI countries legislating on their own, elections reshuffling
+- ✅ **AI countries legislate on their own** (`MapInteraction.MaybeAILegislate`): each day a
+  small deterministic sample of foreign countries considers a tax bill fitting its own fiscal
+  situation and ruling ideology — a country running a real deficit moves to raise a tax, one
+  with healthy books and a right-leaning legislature moves to cut. It runs through the exact
+  same `LegislatureSystem.Propose` pipeline the player uses: curated-party countries fight a
+  weighted floor vote, uncurated ones decree. Only major economies surface a headline (no spam
+  from 258 countries); `TickAll` now prunes resolved bills older than 60 days so the list stays
+  bounded. Verified live (autopilot, ~350 days): Switzerland & Kuwait raised taxes on deficits
+  by decree, Israel/Netherlands/India/Italy cut taxes via real party votes with surplus +
+  right-leaning legislatures — ideology-correct, zero exceptions.
+- ⬜ Still open within the pillar: elections reshuffling
   seat shares, lobbying/whipping, bill scope beyond tax+freedoms+regime (spending), a real
   second (social) party-ideology axis instead of reusing economic lean, per-country researched
   freedom baselines instead of a government-type-bucket heuristic, per-party approval
