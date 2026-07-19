@@ -36,17 +36,26 @@ Party voting reuses the tax-cut sign convention: economic-right parties back pri
 real, uncontroversial partisan pattern as tax cuts, since privatization is a shrink-the-state
 move in the same sense.
 
-## The real effect — a one-time transaction, not yet ongoing
+## The real effect — a buyout transaction AND an ongoing dividend stream
 On enactment, `Legislature.Apply` charges/credits the treasury a **one-time buyout-or-sale
-transaction**, sized by `(oldStake - newStake) × company.OutputBillions × 0.4` where stake is
+transaction**, sized by `(oldStake - newStake) × company.OutputBillions × 1.5` where stake is
 1.0 for Public, 0.5 for Mixed, 0 for Private — nationalizing costs a real buyout, privatizing
-raises a real one-time windfall. `Company.Ownership` flips to the new value.
+raises a real one-time windfall. `Company.Ownership` flips to the new value. The 1.5× revenue
+multiple is a fair-value earnings multiple (15× the 10% profit margin below); the original
+0.4× placeholder predates dividends and would have paid for itself in 4 years — a money pump.
 
-**Deliberately does not yet**: add an ongoing dividend/tax stream tied to the new ownership, or
-feed sector output into the GDP growth formula at all — `EconomyState.Tick()`'s core macro
-model is untouched by this slice. Modeling sectors as truly composing GDP is real future work
-kept out of this slice specifically to avoid touching the GDP formula until that's properly
-designed, not a silently-faked shortcut.
+**Ongoing effects** (`EconomyState.Tick()`): every state-held company pays
+`OutputBillions × CompanyProfitMargin (10%) × stake / 365` into the treasury daily — the real
+anchor: fully-public Saudi Aramco at ~$500B output yields ~$50B/yr, the same order as its real
+state payouts. The flip side of nationalizing: state-run firms carry an efficiency drag
+(-1.5%/yr at full state ownership) on output growth, so a nationalized company's output — and
+with it future dividends AND its eventual re-privatization price — compounds slower than the
+economy around it. That's the genuine SOE tradeoff: immediate revenue vs. long-run growth.
+Verified live as Saudi Arabia: `[econdiag]` logs `soeDividends=$53.5B/yr companies=3`
+(Aramco 500 + SABIC 35, both Public, × 10% — exact match), drifting to 53.6 as output grows.
+
+**Still deliberately not done**: sector output composing GDP — `Sector` still only labels
+companies; the macro growth model doesn't aggregate them.
 
 ## UI
 **Trade tab › COMPANIES card** (`GameUIRoot.DrawCompanies`) — lists the selected country's
@@ -64,9 +73,9 @@ through a real party vote, treasury paid the buyout cost on enactment, `Ownershi
 
 ## Deliberate simplifications (open follow-ups)
 - Only 13 countries have curated companies — most countries show no COMPANIES card at all.
-- No ongoing dividend/tax revenue tied to ownership — only the one-time transaction.
 - Sector output doesn't compose GDP yet — `Sector` currently only labels a company, it isn't
   aggregated into anything.
+- The profit margin is one shared 10% across all sectors — no per-sector margin realism.
 - [[Economic Sectors and Companies|Manpower allocation]] (a people, not money, resource axis)
   is a separate, unstarted piece of this pillar.
 - AI countries don't propose ownership bills.

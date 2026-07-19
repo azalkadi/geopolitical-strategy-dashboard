@@ -338,14 +338,15 @@ namespace Meridian.Sim
                 var company = e.Companies[b.CompanyIndex];
                 // A real, one-time buyout-or-sale cash flow, sized by the company's approximate
                 // real output (see Sim/Companies.cs) — nationalizing costs the state a buyout,
-                // privatizing raises a real one-time windfall. Doesn't yet add an ongoing
-                // dividend/tax stream tied to the new ownership (that's real future work, see
-                // docs/obsidian-vault/Architecture/Legislature and Bills.md's open items) — kept
-                // out of this slice specifically to avoid touching EconomyState.Tick's core GDP
-                // formula until sector output composing GDP is properly designed.
+                // privatizing raises a real one-time windfall. Ownership now also drives an
+                // ongoing dividend stream (EconomyState.Tick pays state-stake × 10% margin
+                // annually), so the price is a fair-value earnings multiple: 1.5× revenue =
+                // 15× the 10% profit margin, a normal takeover valuation. (The original 0.4×
+                // placeholder predates dividends; with an income stream attached it would have
+                // paid for itself in 4 years — an obvious money pump.)
                 float oldStake = StateStake(b.OldOwnership);
                 float newStake = StateStake(b.NewOwnership);
-                e.Treasury += (oldStake - newStake) * company.OutputBillions * 0.4;
+                e.Treasury += (oldStake - newStake) * company.OutputBillions * 1.5;
                 company.Ownership = b.NewOwnership;
                 return;
             }

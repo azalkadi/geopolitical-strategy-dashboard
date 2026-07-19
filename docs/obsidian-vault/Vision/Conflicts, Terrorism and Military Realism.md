@@ -32,6 +32,36 @@ real current conflict, not one flat list:
 Seeding this breadth — not just four countries — is what makes the world feel like *this* world
 rather than a generic one with a few hot spots painted on.
 
+> [!success] Status: ✅ First slice built — the real early-2026 world map now seeds at game start
+> (`Sim/WorldAlignments.cs`, applied in `MapRenderer` right after `DiplomacySystem.Seed`):
+> - **14 real blocs** as relation floors with correct Jan-2026 membership: NATO's 32 (Finland
+>   2023, Sweden 2024), EU 27, GCC, CSTO *minus Armenia* (participation frozen 2024), ASEAN
+>   *including Timor-Leste* (admitted Oct 2025), Five Eyes, Nordic, Baltic, Benelux, Visegrad
+>   (floor lowered — cohesion eroded over Ukraine), Mercosur *with Bolivia* (full member 2024),
+>   Turkic States, Alliance of Sahel States, CARICOM.
+> - **~120 curated bilateral pairs**: severe hostilities (Iran–Israel post-June-2025 war,
+>   US–Iran, both Koreas, China–Taiwan, India–Pakistan post-Sindoor, Armenia–Azerbaijan
+>   post-Karabakh, Serbia–Kosovo, Morocco–Algeria, Ethiopia–Eritrea, DRC–Rwanda,
+>   Venezuela–Guyana...), tense-but-functional pairs (US–China, Greece–Turkey overriding their
+>   shared NATO floor, GERD, US–Canada/Denmark 2025 ruptures...), special allies beyond any bloc
+>   (US–Israel/Japan/Korea, China–Pakistan, Russia–Belarus/North-Korea, Turkey–Azerbaijan...),
+>   and friendships (Abraham-Accords pairs, Iran–Russia, Taiwan's seven remaining formal
+>   diplomatic partners...). Post-Assad Syria is modeled correctly: Iran–Syria hostile,
+>   Turkey–Syria friendly.
+> - **Russia–Ukraine seeds as an actual active war** at day 0 — started 1,407 days before the
+>   Jan 1 2026 epoch, modest attacker score, both sides worn to near-stalemate exhaustion.
+> - Gaza is seeded as severe hostility rather than an active interstate war, reflecting the
+>   Oct 2025 ceasefire holding at the Jan 2026 snapshot.
+> - Curated via a multi-agent research workflow with an adversarial verification pass per
+>   domain; the verifiers' corrections (TLS in ASEAN, BOL in Mercosur, US–Taiwan as strategic
+>   ambiguity not treaty ally, ISR-PSE war→severe, Houthi stand-down, post-Assad flips) are all
+>   applied in the committed data. Verified live: boot log confirms 942 pair applications, the
+>   seeded war, France's EU floor (which also proves the Natural Earth `ISO_A3="-99"` fallback
+>   fix), and Greece–Turkey's curated 30 overriding NATO's 70.
+> - Still open in this section: civil wars/internal fragmentation as a mechanic (Sudan, Myanmar
+>   are relation-seeded but their internal wars aren't modeled), and tension escalating into
+>   AI-declared wars from these seeds.
+
 ## Terrorism as an internal mechanic
 Distinct from interstate [[War System|war]]: a terrorist/insurgent organization can exist and
 grow *inside* a country (the example given: an org growing inside Saudi Arabia). The player

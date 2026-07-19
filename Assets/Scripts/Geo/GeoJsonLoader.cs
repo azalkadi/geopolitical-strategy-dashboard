@@ -321,7 +321,11 @@ namespace Meridian.Geo
                     Name = PropStr(props, "NAME"),
                     NameLong = PropStr(props, "NAME_LONG"),
                     IsoA2 = PropStr(props, "ISO_A2"),
-                    IsoA3 = PropStr(props, "ISO_A3"),
+                    // Natural Earth quirk: a few countries carry ISO_A3="-99" (notably FRANCE and
+                    // NORWAY, because their sovereignty covers overseas collectivities NE splits
+                    // out). ADM0_A3 always has the real code — without this fallback every
+                    // CountryProfiles/curated-data lookup silently failed for those countries.
+                    IsoA3 = NormalizeIso(PropStr(props, "ISO_A3"), PropStr(props, "ADM0_A3")),
                     Continent = PropStr(props, "CONTINENT"),
                     Subregion = PropStr(props, "SUBREGION"),
                     PopEst = PropLong(props, "POP_EST"),
@@ -565,6 +569,9 @@ namespace Meridian.Geo
         // --- Property helpers (port of mesh.rs prop_* / point_coords) -------------------
 
         static string PropStr(JToken props, string key) => props?[key]?.Type == JTokenType.String ? props[key].ToString() : (props?[key]?.ToString() ?? "");
+
+        static string NormalizeIso(string isoA3, string adm0A3) =>
+            string.IsNullOrEmpty(isoA3) || isoA3 == "-99" ? adm0A3 : isoA3;
 
         static long PropLong(JToken props, string key)
         {

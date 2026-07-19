@@ -588,7 +588,16 @@ namespace Meridian.Map
             if (simDay < nextDiagDay) return;
             nextDiagDay = simDay + 30;
             var e = map.Economy.States[PlayerState.CountryIndex];
-            Debug.Log($"[econdiag] day {simDay}: GDP=${e.Gdp:n1}B growth={e.GrowthRate:0.00}% unemp={e.Unemployment:0.00}% inflation={e.Inflation:0.00}% treasury=${e.Treasury:n1}B taxes=[income={e.TaxIncome:0.0} corp={e.TaxCorporate:0.0} vat={e.TaxVat:0.0} tariff={e.TaxTariff:0.0} custom={e.CustomTaxes.Count}] effTax={e.EffectiveTaxRate():0.0}%");
+            // SOE dividend readout: state-stake-weighted annual dividend flow across the
+            // country's curated companies (0 for fully-private rosters and uncurated countries)
+            // — makes the ownership-drives-revenue loop verifiable straight from this log line.
+            double soeAnnual = 0;
+            foreach (var co in e.Companies)
+            {
+                double stake = co.Ownership == Ownership.Public ? 1.0 : co.Ownership == Ownership.Mixed ? 0.5 : 0.0;
+                soeAnnual += co.OutputBillions * EconomyState.CompanyProfitMargin * stake;
+            }
+            Debug.Log($"[econdiag] day {simDay}: GDP=${e.Gdp:n1}B growth={e.GrowthRate:0.00}% unemp={e.Unemployment:0.00}% inflation={e.Inflation:0.00}% treasury=${e.Treasury:n1}B taxes=[income={e.TaxIncome:0.0} corp={e.TaxCorporate:0.0} vat={e.TaxVat:0.0} tariff={e.TaxTariff:0.0} custom={e.CustomTaxes.Count}] effTax={e.EffectiveTaxRate():0.0}% soeDividends=${soeAnnual:n1}B/yr companies={e.Companies.Count}");
         }
 
         // Approval-rating-based term/election mechanic — the same ApprovalRating already shown

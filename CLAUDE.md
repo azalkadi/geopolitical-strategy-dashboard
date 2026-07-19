@@ -582,3 +582,47 @@ Everything below is built, launched, and verified via Player.log + visual checks
     not new iconography or layout restructuring — tiered map icons, train movement, and deeper
     city/province interaction (still open in this pillar, see above) are a separate, larger body
     of work.
+- **Real 2026 world seeding (Pillar 3 first slice) + SOE dividends (Pillar 2 core completion) +
+  France/Norway ISO bug fix ("dev most important things"):** three highest-impact realism gaps
+  closed in one push.
+  - **Pre-existing bug found and fixed**: Natural Earth carries `ISO_A3="-99"` for France and
+    Norway (their sovereignty spans overseas collectivities NE splits out), so every
+    `CountryProfiles` lookup — taxes, parties, government type — had silently failed for both
+    countries since the profiles system shipped. `GeoJsonLoader.NormalizeIso` now falls back to
+    `ADM0_A3` (always correct). Verified live: France now gets its EU relation floor.
+  - **`Sim/WorldAlignments.cs` (new)**: the real early-2026 geopolitical map seeds at game
+    start, overlaid on the geography-hash baseline right after `DiplomacySystem.Seed` in
+    `MapRenderer`. 14 real blocs as relation floors with correct Jan-2026 membership (NATO 32
+    incl. Finland/Sweden, EU 27, GCC, CSTO minus frozen-out Armenia, ASEAN incl. Timor-Leste
+    admitted Oct 2025, Five Eyes, Nordic, Baltic, Benelux, eroded Visegrad at 58, Mercosur with
+    Bolivia, Turkic States, Alliance of Sahel States, CARICOM) + ~120 curated bilateral pairs
+    (severe hostilities, tense pairs, special allies, friendships — incl. post-Assad Syria
+    flips: IRN-SYR hostile, TUR-SYR friendly; Gaza as severe-not-war per the Oct 2025
+    ceasefire; Taiwan's 7 remaining formal diplomatic partners). **Russia-Ukraine seeds as an
+    actual active war at day 0** (StartDay -1407 = Feb 24 2022, score +12, exhaustion 58/64 —
+    below the >70 mutual-exhaustion auto-peace threshold so it runs but can plausibly end
+    within the first game year). `Apply()` runs blocs-then-pairs so a curated pair overrides
+    bloc floors (GRC-TUR at 30 despite shared NATO); baselines are set too, not just live
+    values, so `TickAll`'s drift doesn't decay the curated world back to the hash. `SeedWars()`
+    bypasses `Declare()`'s gates deliberately (recorded history, not a new declaration — no
+    fresh approval bumps).
+  - **Data curated via a multi-agent Workflow** (3 domain curators + 3 adversarial verifiers,
+    all corrections applied): the verify pass caught real errors — Timor-Leste's Oct 2025 ASEAN
+    admission, Bolivia's 2024 Mercosur membership, USA-TWN as strategic ambiguity (friendly 78)
+    not treaty ally, ISR-PSE war→severe, Houthi stand-down post-ceasefire, stale CYP-CYN
+    rationale — before anything was committed.
+  - **SOE dividends (`EconomyState.Tick`)**: state-held companies now pay
+    `OutputBillions × 10% margin × stake / 365` into the treasury daily, and carry a -1.5%/yr
+    (at full stake) efficiency drag on output growth — the real SOE tradeoff: revenue now vs.
+    compounding slower than the economy. Buyout multiple rebalanced 0.4×→1.5× revenue (15×
+    earnings, fair value) since with an income stream attached the old placeholder paid for
+    itself in 4 years. `[econdiag]` now logs `soeDividends=$X.XB/yr companies=N`.
+  - **Verified live** (full build errors=0, launched as Saudi Arabia, zero exceptions): boot
+    log shows `applied 942 curated relation pairs, seeded 1 active conflicts` + spot-check line
+    `RUS-UKR=0 atWar=True, FRA-DEU=77 (>=72 EU floor, proves ISO fix), GRC-TUR=30 (pair
+    overrides NATO floor)`; econdiag shows `soeDividends=$53.5B/yr` — exact match for
+    (Aramco 500 + SABIC 35) × 10%, drifting to 53.6 as output compounds; Saudi deficit is
+    ~$2.4B/month WITH the dividend vs ~$6.9B/month without it.
+  - Still open: AI countries legislating + elections reshuffling seats (pillar 1), sector
+    output composing GDP + manpower (pillar 2), terrorism/military depth (pillar 3 continues),
+    escalation from seeded tension into AI-declared wars.

@@ -37,6 +37,11 @@ namespace Meridian.Sim
         // CountryProfiles seed data. Empty for every uncurated country.
         public List<Company> Companies = new();
 
+        // Distributable profit as a share of a company's OutputBillions (revenue). One shared
+        // number rather than per-sector detail — anchored so a fully state-owned Aramco yields
+        // dividends the same order of magnitude as its real state payouts (see Tick).
+        public const double CompanyProfitMargin = 0.10;
+
         // Player-defined taxes beyond the four core levers — freely add/rename/rate/remove
         // (e.g. "Plastic Bag Tax"). Narrower in scope than the core levers, so each one carries
         // a much smaller revenue and growth-drag coefficient (see Tick()).
@@ -219,6 +224,24 @@ namespace Meridian.Sim
             // yields ~0.1% of GDP annually, versus the core levers' ~20-25% combined.
             foreach (var t in CustomTaxes)
                 Treasury += Gdp * (t.Rate / 100.0) * 0.01 / 365.0;
+
+            // State-owned enterprise dividends: a nationalized company pays its profits into
+            // the treasury daily, stake-weighted for Mixed ownership. Margin sanity check
+            // against the real anchor: Saudi Aramco at ~$480B output × 10% ≈ $48B/yr to the
+            // state — same order as (conservative vs.) Aramco's real dividend+royalty flows.
+            // The flip side of the deal: state-run firms carry an efficiency drag (~1.5%/yr at
+            // full state ownership), so a nationalized company's output — and with it future
+            // dividends AND its eventual re-privatization sale price — compounds slower than
+            // the economy around it. Private companies pay nothing directly here; their
+            // contribution is already inside the macro tax base above.
+            foreach (var co in Companies)
+            {
+                double stake = co.Ownership == Ownership.Public ? 1.0 : co.Ownership == Ownership.Mixed ? 0.5 : 0.0;
+                if (stake > 0.0)
+                    Treasury += co.OutputBillions * CompanyProfitMargin * stake / 365.0;
+                double drift = GrowthRate / 100.0 - stake * 0.015;
+                co.OutputBillions = System.Math.Max(0.1, co.OutputBillions * (1.0 + drift / 365.0));
+            }
 
             // Same "crossed a threshold this tick" event logic as the Rust (reconstructs the
             // pre-update value by subtracting the delta). Faithful to the original, including

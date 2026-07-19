@@ -170,6 +170,20 @@ namespace Meridian.Map
 
             // Wars + autonomous world activity (AI wars/agreements, surfaced via WorldFeed toasts).
             Wars = new WarSystem();
+
+            // Real early-2026 geopolitics overlaid on the geography baseline: alliance blocs,
+            // curated hostilities/friendships, and the interstate wars actually in progress
+            // when the game clock starts (see Sim/WorldAlignments.cs).
+            int alignedPairs = WorldAlignments.Apply(World.Countries, Diplomacy);
+            int seededWars = WorldAlignments.SeedWars(World.Countries, Wars);
+            Debug.Log($"[map] applied {alignedPairs} curated relation pairs, seeded {seededWars} active conflicts");
+            // Spot checks in the boot log: a war pair, a bloc-floor pair (France also proves
+            // the ISO_A3="-99" fallback works — without it FRA resolves to nothing and gets no
+            // EU floor), and a curated-pair-overrides-bloc case (GRC-TUR are both NATO).
+            int FindIso(string iso) => World.Countries.FindIndex(c => c.IsoA3 == iso);
+            int iRus = FindIso("RUS"), iUkr = FindIso("UKR"), iFra = FindIso("FRA"), iDeu = FindIso("DEU"), iGrc = FindIso("GRC"), iTur = FindIso("TUR");
+            if (iRus >= 0 && iUkr >= 0 && iFra >= 0 && iDeu >= 0 && iGrc >= 0 && iTur >= 0)
+                Debug.Log($"[map] alignment spot-check: RUS-UKR={Diplomacy.GetRelation(iRus, iUkr):0} (expect 0, atWar={Wars.WarBetween(iRus, iUkr) != null}) FRA-DEU={Diplomacy.GetRelation(iFra, iDeu):0} (expect >=72) GRC-TUR={Diplomacy.GetRelation(iGrc, iTur):0} (expect 30)");
             CountryNames = new GeoWorldNames(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Name : "?");
             WorldAI = new WorldAI(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Continent : "");
 
