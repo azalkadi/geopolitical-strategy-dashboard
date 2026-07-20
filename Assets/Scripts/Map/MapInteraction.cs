@@ -208,7 +208,7 @@ namespace Meridian.Map
                 if (map.Legislature != null)
                 {
                     MaybeAILegislate(simDay);
-                    foreach (var headline in map.Legislature.TickAll(simDay, map.Economy, map.National, map.CountryNames))
+                    foreach (var headline in map.Legislature.TickAll(simDay, map.Economy, map.National, map.CountryNames, map.Diplomacy))
                         WorldFeed.Push("Parliament", headline);
                 }
 
@@ -330,6 +330,8 @@ namespace Meridian.Map
         bool billsDiagRegimeResolved;
         int billsDiagRegimeBillId = -1;
         float billsDiagRegimeStandingBefore;
+        int billsDiagRegimeDeuIdx = -1;
+        float billsDiagRegimeRelDeuBefore;
         bool billsDiagCompanyProposed;
         bool billsDiagCompanyResolved;
         int billsDiagCompanyBillId = -1;
@@ -408,6 +410,8 @@ namespace Meridian.Map
                 billsDiagRegimeProposed = true;
                 var n = map.National.States[me];
                 billsDiagRegimeStandingBefore = n.InternationalStanding;
+                billsDiagRegimeDeuIdx = map.World.Countries.FindIndex(c => c.IsoA3 == "DEU");
+                billsDiagRegimeRelDeuBefore = billsDiagRegimeDeuIdx >= 0 ? map.Diplomacy.GetRelation(me, billsDiagRegimeDeuIdx) : -1f;
                 var target = GovernmentType.OneServiceState;
                 string headline = map.Legislature.ProposeRegimeChange(me, map.World.Countries[me].Name, n.Government, target, simDay);
                 var bill = map.Legislature.Bills[map.Legislature.Bills.Count - 1];
@@ -423,8 +427,10 @@ namespace Meridian.Map
                     if (b.Id != billsDiagRegimeBillId || b.Status == BillStatus.Pending) continue;
                     billsDiagRegimeResolved = true;
                     var n = map.National.States[me];
+                    float relDeuAfter = billsDiagRegimeDeuIdx >= 0 ? map.Diplomacy.GetRelation(me, billsDiagRegimeDeuIdx) : -1f;
                     Debug.Log($"[billsdiag] day {simDay}: regime change resolved {b.Status} governmentNow={n.Government} " +
-                              $"standing {billsDiagRegimeStandingBefore:0.0}->{n.InternationalStanding:0.0} (expect a big drop, was pluralistic)");
+                              $"standing {billsDiagRegimeStandingBefore:0.0}->{n.InternationalStanding:0.0} (expect a big drop, was pluralistic); " +
+                              $"relations with Germany {billsDiagRegimeRelDeuBefore:0.0}->{relDeuAfter:0.0} (expect a drop — a democracy recoiling from the new autocracy)");
                 }
             }
 

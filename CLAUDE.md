@@ -759,6 +759,15 @@ terrorism, (5) tiered city icons, then further down the vision list.
   unreliable (window focus/position), same honest caveat as the minimap/right-click menu. Still
   open in this pillar: representational airport/rail/road icons, train movement, per-tier city
   shapes.
-- **Overnight session status: 5/5 queued features shipped + verified** (infra dividend, elections,
-  unions, terrorism, capital markers), each its own pushed commit. Continuing down the vision list
-  if the loop runs on.
+- **[6/queue] Regime change now shocks bilateral relations (closes a documented gap).** Previously
+  a regime change only moved the global `InternationalStanding` number. `LegislatureSystem.Apply`
+  now takes the `DiplomacySystem` (threaded through `TickAll`); when a regime change crosses the
+  pluralism line, it shocks bilateral relations: a country going authoritarian has democracies
+  (pluralistic governments) recoil (−8) while fellow autocracies warm slightly (+3); a country
+  democratising warms democracies (+6) and cools autocracies (−3). A same-category reshuffle
+  doesn't move relations. `MERIDIAN_DIAG_BILLS` regime phase verified live: USA→OneServiceState
+  dropped standing 51.3→36.7 AND relations with Germany 38.2→30.2 (a democracy recoiling), zero
+  exceptions.
+- **Overnight session status: 6 features shipped + verified** (infra dividend, elections, unions,
+  terrorism, capital markers, regime-change diplomacy shock), each its own pushed commit.
+  Continuing down the vision list if the loop runs on.

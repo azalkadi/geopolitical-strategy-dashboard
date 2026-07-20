@@ -245,7 +245,7 @@ namespace Meridian.Sim
         // Resolves any bill whose day has come. Returns headlines (empty list most days).
         // `nat` is optional (callers that only ever propose tax bills can pass null); freedom
         // bills are a no-op without it.
-        public List<string> TickAll(long day, EconomySystem econ, NationalSystem nat, GeoWorldNames names)
+        public List<string> TickAll(long day, EconomySystem econ, NationalSystem nat, GeoWorldNames names, DiplomacySystem dip = null)
         {
             List<string> headlines = null;
             foreach (var b in Bills)
@@ -255,7 +255,7 @@ namespace Meridian.Sim
                 if (b.IsDecree)
                 {
                     b.Status = BillStatus.Passed;
-                    Apply(b, econ, nat);
+                    Apply(b, econ, nat, dip);
                     if (b.IsRegimeChange)
                         (headlines ??= new List<string>()).Add(
                             $"{names.Name(b.CountryIndex)} completes its transition to {GovLabel(b.NewGovernment ?? GovernmentType.Unspecified)}.");
@@ -273,7 +273,7 @@ namespace Meridian.Sim
                 if (yes > 0.5f)
                 {
                     b.Status = BillStatus.Passed;
-                    Apply(b, econ, nat);
+                    Apply(b, econ, nat, dip);
                     (headlines ??= new List<string>()).Add(
                         $"{names.Name(b.CountryIndex)}: bill passes {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} is now {Fmt(b, b.NewValue)}.");
                 }
@@ -297,7 +297,7 @@ namespace Meridian.Sim
         static readonly List<string> Empty = new();
         static string Unit(Bill b) => b.IsFreedom ? "" : "%";
 
-        static void Apply(Bill b, EconomySystem econ, NationalSystem nat)
+        static void Apply(Bill b, EconomySystem econ, NationalSystem nat, DiplomacySystem dip)
         {
             if (b.IsRegimeChange)
             {
@@ -314,6 +314,24 @@ namespace Meridian.Sim
                     wasPluralistic && !nowPluralistic ? -25f :
                     !wasPluralistic && nowPluralistic ? 12f : -3f;
                 n.InternationalStanding = Clampf(n.InternationalStanding + standingDelta, 0f, 100f);
+
+                // The world reacts bilaterally, not just to a global standing number: democracies
+                // (pluralistic governments) recoil from a country that abandons pluralism and
+                // warm to one that adopts it, while fellow autocracies shrug or quietly approve.
+                // A crossing of the pluralism line is what moves relations — a same-category
+                // reshuffle doesn't.
+                if (dip != null && wasPluralistic != nowPluralistic)
+                {
+                    for (int i = 0; i < nat.States.Count && i < dip.Count; i++)
+                    {
+                        if (i == b.CountryIndex) continue;
+                        bool otherPluralistic = IsPluralistic(nat.States[i].Government);
+                        if (!nowPluralistic) // this country just went authoritarian
+                            dip.ChangeRelation(b.CountryIndex, i, otherPluralistic ? -8f : +3f);
+                        else                 // this country just democratised
+                            dip.ChangeRelation(b.CountryIndex, i, otherPluralistic ? +6f : -3f);
+                    }
+                }
                 return;
             }
 
