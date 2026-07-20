@@ -749,3 +749,16 @@ terrorism, (5) tiered city icons, then further down the vision list.
   denting growth/mood, counter-op cut 59→50 with the heavy-handed flag; zero exceptions. NOTE:
   attacks surface as WorldFeed **toasts, not Debug.Log** — verify via `TerrorismSystem.TotalAttacks`,
   not by grepping Player.log for the headline text. Still open: a named org with a map location.
+- **[5/queue] Distinct capital markers (Pillar 5).** `MapRenderer.BuildCapitalMarkers` renders
+  every national capital (`City.IsCapital`, from Natural Earth `ADM0CAP`) as a gold halo ring +
+  bright core (two stacked ScreenDot passes, always-visible `CapitalsRoot`) — a categorically
+  different marker from the pop-tiered city dots, not just a bigger/gold dot. Capitals still keep
+  their tier dot for click-picking; the halo is the visual layer on top. Builds + launches with
+  zero exceptions, `built city markers` logs clean (no shader warning). VISUAL confirmation of the
+  on-screen halo is pending a manual look — the screenshot automation on this machine is
+  unreliable (window focus/position), same honest caveat as the minimap/right-click menu. Still
+  open in this pillar: representational airport/rail/road icons, train movement, per-tier city
+  shapes.
+- **Overnight session status: 5/5 queued features shipped + verified** (infra dividend, elections,
+  unions, terrorism, capital markers), each its own pushed commit. Continuing down the vision list
+  if the loop runs on.

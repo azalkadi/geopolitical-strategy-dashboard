@@ -86,6 +86,7 @@ namespace Meridian.Map
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
         public GameObject[] CityTierRoots { get; private set; } // indexed by (int)CityTier
+        public GameObject CapitalsRoot { get; private set; }    // national capitals, distinct marker, always shown
         public GameObject AirportsRoot { get; private set; }
         public GameObject PortsRoot { get; private set; }
         public GameObject RoadsRoot { get; private set; }
@@ -499,7 +500,62 @@ namespace Meridian.Map
                 // MapLayers turns finer tiers on by zoom; start all off except megacities.
                 root.SetActive((CityTier)t == CityTier.Megacity);
             }
+            BuildCapitalMarkers(dotShader);
             Debug.Log("[map] built city markers");
+        }
+
+        // National capitals get a categorically DIFFERENT marker from ordinary cities — a gold
+        // ring/halo around a bright core, the classic "★ capital" cartography symbol — instead of
+        // just a bigger or gold-tinted dot. Built as two constant-screen-size dot passes (a large
+        // semi-transparent gold halo behind, a small bright core in front) so a capital reads as a
+        // haloed star at any zoom. Always visible (capitals matter even at world view), unlike the
+        // zoom-gated ordinary-city tiers. Capitals still also carry their normal tier dot for
+        // click-picking; this layer is the visual distinction on top.
+        void BuildCapitalMarkers(Shader dotShader)
+        {
+            var caps = new List<City>();
+            foreach (var city in World.Cities) if (city.IsCapital) caps.Add(city);
+            CapitalsRoot = new GameObject("Capitals");
+            CapitalsRoot.transform.SetParent(transform, false);
+            if (caps.Count == 0 || dotShader == null) return;
+
+            // (pixelRadius, color) for the two stacked passes: gold halo, then bright core.
+            var passes = new (float r, Color c, string name)[]
+            {
+                (10f, new Color(1f, 0.82f, 0.28f, 0.55f), "CapitalHalo"),
+                (3.5f, new Color(1f, 0.97f, 0.85f, 1f), "CapitalCore"),
+            };
+            foreach (var pass in passes)
+            {
+                var verts = new List<Vector3>(caps.Count * 4);
+                var cols = new List<Color>(caps.Count * 4);
+                var uvs = new List<Vector2>(caps.Count * 4);
+                var tris = new List<int>(caps.Count * 6);
+                foreach (var city in caps)
+                {
+                    int b = verts.Count;
+                    var center = new Vector3(city.Pos.x, city.Pos.y, CityZ - 0.0003f); // just above tier dots
+                    verts.Add(center); verts.Add(center); verts.Add(center); verts.Add(center);
+                    uvs.Add(new Vector2(0, 0)); uvs.Add(new Vector2(1, 0)); uvs.Add(new Vector2(1, 1)); uvs.Add(new Vector2(0, 1));
+                    cols.Add(pass.c); cols.Add(pass.c); cols.Add(pass.c); cols.Add(pass.c);
+                    tris.Add(b); tris.Add(b + 2); tris.Add(b + 1);
+                    tris.Add(b); tris.Add(b + 3); tris.Add(b + 2);
+                }
+                var mesh = new Mesh { name = pass.name };
+                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                mesh.SetVertices(verts); mesh.SetColors(cols); mesh.SetUVs(0, uvs); mesh.SetTriangles(tris, 0);
+                var mb = mesh.bounds; mb.Expand(5f); mesh.bounds = mb;
+
+                var go = new GameObject(pass.name);
+                go.transform.SetParent(CapitalsRoot.transform, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var mr = go.AddComponent<MeshRenderer>();
+                var mat = new Material(dotShader) { name = pass.name };
+                mat.SetFloat("_PixelRadius", pass.r);
+                mr.sharedMaterial = mat;
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                mr.receiveShadows = false;
+            }
         }
 
         // Airports and seaports — the ne_10m_airports / ne_10m_ports Natural Earth datasets were

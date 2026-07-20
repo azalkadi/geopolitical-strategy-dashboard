@@ -57,6 +57,15 @@ specific complaint should already be resolved; flag it if it recurs.
   should look like airports, roads like roads, rail like rail (not a generic colored line) —
   this is the same spirit as the casing-style rendering already shipped this session, taken
   further into genuinely representational iconography.
+  > [!success] Status: 🟡 Capitals now distinct. `MapRenderer.BuildCapitalMarkers` gives every
+  > national capital (`City.IsCapital`, from Natural Earth's `ADM0CAP`) a categorically different
+  > marker — a gold halo ring around a bright core (the "★ capital" symbol), always visible at
+  > any zoom — instead of the same dot in a bigger size. Ordinary cities keep their pop-tiered
+  > dots (Town/City/MajorCity/Megacity by size). Built on the same proven ScreenDot shader as the
+  > city dots; builds and launches with zero exceptions (a clean on-screen visual confirmation is
+  > still pending a manual look — the screenshot automation on this dev machine is unreliable).
+  > ⚪ Still open: representational airport/rail/road icons (vs. dots/lines), and per-tier shape
+  > differentiation for non-capital cities.
 
 ## Movement and flow visuals
 - Trains should visibly move along the rail lines they're on, not just exist as a static line.
