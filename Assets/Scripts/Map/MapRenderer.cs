@@ -77,6 +77,9 @@ namespace Meridian.Map
         public GeoWorldNames CountryNames { get; private set; }
         public InfrastructureSystem Infrastructure { get; private set; }
         public LegislatureSystem Legislature { get; private set; }
+        // Supranational-union membership registry (derived from WorldAlignments, not serialized —
+        // rebuilt on load). Passive effects are baked into economy/national state at seed.
+        public UnionSystem Unions { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -177,6 +180,13 @@ namespace Meridian.Map
             int alignedPairs = WorldAlignments.Apply(World.Countries, Diplomacy);
             int seededWars = WorldAlignments.SeedWars(World.Countries, Wars);
             Debug.Log($"[map] applied {alignedPairs} curated relation pairs, seeded {seededWars} active conflicts");
+
+            // Supranational unions: build the membership registry and bake in each member's
+            // passive per-function effect (economic trade lift / military standing + readiness /
+            // intelligence standing). Seed-time only — the effects live in serialized fields.
+            Unions = UnionSystem.Build(World.Countries);
+            Unions.ApplyPassiveEffects(Economy, National);
+            Wars.Unions = Unions; // mutual-defence on war declaration
             // Spot checks in the boot log: a war pair, a bloc-floor pair (France also proves
             // the ISO_A3="-99" fallback works — without it FRA resolves to nothing and gets no
             // EU floor), and a curated-pair-overrides-bloc case (GRC-TUR are both NATO).
@@ -184,6 +194,10 @@ namespace Meridian.Map
             int iRus = FindIso("RUS"), iUkr = FindIso("UKR"), iFra = FindIso("FRA"), iDeu = FindIso("DEU"), iGrc = FindIso("GRC"), iTur = FindIso("TUR");
             if (iRus >= 0 && iUkr >= 0 && iFra >= 0 && iDeu >= 0 && iGrc >= 0 && iTur >= 0)
                 Debug.Log($"[map] alignment spot-check: RUS-UKR={Diplomacy.GetRelation(iRus, iUkr):0} (expect 0, atWar={Wars.WarBetween(iRus, iUkr) != null}) FRA-DEU={Diplomacy.GetRelation(iFra, iDeu):0} (expect >=72) GRC-TUR={Diplomacy.GetRelation(iGrc, iTur):0} (expect 30)");
+            // Union spot-check: Germany is in the EU (economic → export bonus) and NATO (military
+            // → standing + readiness bonus), so both effects should be non-zero.
+            if (iDeu >= 0)
+                Debug.Log($"[map] union effects DEU: memberships={Unions.MembershipsOf(iDeu).Count} exportBonus={Economy.States[iDeu].TradeAgreementExportBonus:0.000} (expect >0 from EU) allianceStanding={National.States[iDeu].AllianceStandingBonus:0.0} allianceReadiness={National.States[iDeu].AllianceReadinessBonus:0.0} (expect >0 from NATO)");
             CountryNames = new GeoWorldNames(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Name : "?");
             WorldAI = new WorldAI(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Continent : "");
 
@@ -259,6 +273,11 @@ namespace Meridian.Map
                     }
                 }
             }
+            // Rebuild the union membership registry (derived, not serialized). Do NOT re-apply
+            // passive effects — they're already baked into the loaded economy/national fields.
+            Unions = UnionSystem.Build(World.Countries);
+            if (Wars != null) Wars.Unions = Unions;
+
             // Route paths aren't serialized (see BuiltRoute.PathMercator) — re-plan each one
             // deterministically from its city endpoints so loaded roads/rail still follow the
             // terrain instead of snapping back to straight lines.

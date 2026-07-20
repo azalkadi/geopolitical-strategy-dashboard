@@ -721,3 +721,17 @@ terrorism, (5) tiered city icons, then further down the vision list.
   `ApplySave` reseeds `Parties` for pre-election saves. `MERIDIAN_DIAG_ELECTION=1` verified live:
   USA flipped Republicans→Democrats (50.2%) as conditions swung left; 10 elections over ~700 days
   (Italy/South Africa/Mexico/Ukraine/Korea/Japan/Netherlands), real parties, zero exceptions.
+- **[3/queue] Supranational unions (Pillar 4 — was zero code).** `WorldAlignments.Bloc` gained a
+  `UnionType` (Economic/Military/Intelligence/Political); the 14 curated blocs are now typed by
+  real function. New `Sim/UnionSystem` builds a membership registry from the blocs + country ISO
+  list and bakes per-function passive effects at seed: Economic → export/growth dividend scaled
+  by bloc size (into `TradeAgreementExportBonus`); Military → `NationalState.AllianceStandingBonus`
+  + `AllianceReadinessBonus` (folded into the standing/readiness drift targets in `Tick` so they
+  persist); Intelligence → standing; Political → alignment only. **Mutual defence**: `WarSystem`
+  gained a `Unions` ref (`[JsonIgnore]`, reset on load) — `Declare` now drops every military
+  ally's relations with an aggressor who attacks a bloc member, plus an extra standing hit.
+  Registry is derived (rebuilt on load, `[JsonIgnore]`-style — NOT re-applied so baked effects
+  don't double); `MapRenderer` builds+applies at seed, rebuilds registry only on `ApplySave`. New
+  Diplomacy-tab UNIONS & BLOCS card (`DrawUnions`). Verified live (Germany): 2 memberships
+  (EU+NATO), exportBonus 0.060 (EU, size-scaled), allianceStanding 4.0 / readiness 5.0 (NATO),
+  zero exceptions. Still open: union-level legislation, join/leave, OPEC-style cartels.

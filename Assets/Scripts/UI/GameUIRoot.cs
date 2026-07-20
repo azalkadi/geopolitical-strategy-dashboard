@@ -1311,11 +1311,37 @@ namespace Meridian.UI
             if (dip == null || me < 0) { HelpText("Standing is a composite of economic size, trade openness, and approval."); EndCard(); return; }
             EndCard();
 
+            DrawUnions(interaction.Selected);
+
             if (sel >= 0 && sel != me && sel < dip.Count)
                 DrawBilateralDiplomacy(dip, me, sel);
             else
                 DrawDiplomacyOverview(dip, me);
         }
+
+        // Supranational-union memberships of the selected country, each labelled by its real
+        // function and the effect it confers (see Sim/UnionSystem).
+        void DrawUnions(int idx)
+        {
+            if (map.Unions == null) return;
+            var memberships = map.Unions.MembershipsOf(idx);
+            if (memberships == null || memberships.Count == 0) return;
+
+            StartCard();
+            SectionHeader("UNIONS & BLOCS");
+            foreach (var b in memberships)
+                Stat(b.Name, UnionFunctionLabel(b.Type));
+            HelpText("Economic unions lift member trade & growth; military alliances give collective-security standing and readiness, and turn the whole bloc against anyone who attacks a member.");
+            EndCard();
+        }
+
+        static string UnionFunctionLabel(WorldAlignments.UnionType t) => t switch
+        {
+            WorldAlignments.UnionType.Economic => "Economic · trade & growth",
+            WorldAlignments.UnionType.Military => "Military · collective defense",
+            WorldAlignments.UnionType.Intelligence => "Intelligence · shared intel",
+            _ => "Political · alignment",
+        };
 
         // Viewing a FOREIGN country's Diplomacy tab = your bilateral relationship with it,
         // and the levers you can pull. This is where diplomacy is actually played.

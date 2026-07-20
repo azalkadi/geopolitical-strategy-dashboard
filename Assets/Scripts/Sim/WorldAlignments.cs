@@ -14,13 +14,20 @@ namespace Meridian.Sim
     // pass) before being committed — see docs/obsidian-vault/Data Sources.
     public static class WorldAlignments
     {
+        // What a bloc actually DOES — its real function, which drives its in-game effect
+        // (see Sim/UnionSystem). Economic unions boost members' trade/growth; military alliances
+        // give collective-security standing/readiness and mutual-defence anger; intelligence
+        // pacts give standing; political forums are alignment only (relation floor, no bonus).
+        public enum UnionType { Economic, Military, Intelligence, Political }
+
         public class Bloc
         {
             public string Name;
+            public UnionType Type;
             public float Floor;      // minimum bilateral relation between any two members
             public string[] Members; // ISO A3
-            public Bloc(string name, float floor, params string[] members)
-            { Name = name; Floor = floor; Members = members; }
+            public Bloc(string name, UnionType type, float floor, params string[] members)
+            { Name = name; Type = type; Floor = floor; Members = members; }
         }
 
         public class PairSeed
@@ -42,29 +49,32 @@ namespace Meridian.Sim
 
         static WorldAlignments()
         {
-            void B(string name, float floor, params string[] members) => Blocs.Add(new Bloc(name, floor, members));
+            void B(string name, UnionType type, float floor, params string[] members) => Blocs.Add(new Bloc(name, type, floor, members));
             void P(string a, string b, float rel, string why) => Pairs.Add(new PairSeed(a, b, rel, why));
             void W(string a, string b, float rel, long daysAgo, float score, float exhA, float exhB, string why) =>
                 Pairs.Add(new PairSeed(a, b, rel, why) { AtWar = true, WarStartDaysAgo = daysAgo, WarScore = score, WarExhaustionA = exhA, WarExhaustionB = exhB });
 
             // ---- Alliance / integration blocs (floors; most-specific pair overrides below) ----
-            B("NATO", 70, "USA", "CAN", "GBR", "FRA", "DEU", "ITA", "ESP", "PRT", "NLD", "BEL", "LUX", "DNK", "NOR", "ISL",
+            // Second arg = real function (UnionType), which decides the in-game effect a member
+            // gets: Economic → trade/growth, Military → collective-security standing + readiness +
+            // mutual-defence anger, Intelligence → standing, Political → alignment only.
+            B("NATO", UnionType.Military, 70, "USA", "CAN", "GBR", "FRA", "DEU", "ITA", "ESP", "PRT", "NLD", "BEL", "LUX", "DNK", "NOR", "ISL",
                 "POL", "CZE", "SVK", "HUN", "ROU", "BGR", "GRC", "TUR", "ALB", "HRV", "SVN", "MNE", "MKD",
                 "EST", "LVA", "LTU", "FIN", "SWE"); // 32 members: Finland 2023, Sweden 2024
-            B("European Union", 72, "AUT", "BEL", "BGR", "HRV", "CYP", "CZE", "DNK", "EST", "FIN", "FRA", "DEU", "GRC",
+            B("European Union", UnionType.Economic, 72, "AUT", "BEL", "BGR", "HRV", "CYP", "CZE", "DNK", "EST", "FIN", "FRA", "DEU", "GRC",
                 "HUN", "IRL", "ITA", "LVA", "LTU", "LUX", "MLT", "NLD", "POL", "PRT", "ROU", "SVK", "SVN", "ESP", "SWE");
-            B("Gulf Cooperation Council", 70, "SAU", "ARE", "KWT", "QAT", "BHR", "OMN"); // post-AlUla reconciliation
-            B("CSTO", 65, "RUS", "BLR", "KAZ", "KGZ", "TJK"); // Armenia excluded: participation frozen since 2024
-            B("ASEAN", 55, "BRN", "KHM", "IDN", "LAO", "MYS", "MMR", "PHL", "SGP", "THA", "VNM", "TLS"); // TLS admitted Oct 2025
-            B("Five Eyes", 85, "USA", "GBR", "CAN", "AUS", "NZL");
-            B("Nordic Council", 85, "DNK", "FIN", "ISL", "NOR", "SWE");
-            B("Baltic Assembly", 85, "EST", "LVA", "LTU");
-            B("Benelux", 85, "BEL", "NLD", "LUX");
-            B("Visegrad Group", 58, "POL", "CZE", "SVK", "HUN"); // cohesion eroded over Ukraine
-            B("Mercosur", 62, "ARG", "BRA", "PRY", "URY", "BOL"); // Bolivia full member since July 2024
-            B("Organization of Turkic States", 60, "TUR", "AZE", "KAZ", "KGZ", "UZB");
-            B("Alliance of Sahel States", 75, "MLI", "BFA", "NER"); // post-coup confederation, left ECOWAS Jan 2025
-            B("CARICOM", 65, "ATG", "BHS", "BRB", "BLZ", "DMA", "GRD", "GUY", "HTI", "JAM", "KNA", "LCA", "VCT", "SUR", "TTO");
+            B("Gulf Cooperation Council", UnionType.Economic, 70, "SAU", "ARE", "KWT", "QAT", "BHR", "OMN"); // post-AlUla reconciliation
+            B("CSTO", UnionType.Military, 65, "RUS", "BLR", "KAZ", "KGZ", "TJK"); // Armenia excluded: participation frozen since 2024
+            B("ASEAN", UnionType.Economic, 55, "BRN", "KHM", "IDN", "LAO", "MYS", "MMR", "PHL", "SGP", "THA", "VNM", "TLS"); // TLS admitted Oct 2025
+            B("Five Eyes", UnionType.Intelligence, 85, "USA", "GBR", "CAN", "AUS", "NZL");
+            B("Nordic Council", UnionType.Economic, 85, "DNK", "FIN", "ISL", "NOR", "SWE");
+            B("Baltic Assembly", UnionType.Political, 85, "EST", "LVA", "LTU");
+            B("Benelux", UnionType.Economic, 85, "BEL", "NLD", "LUX");
+            B("Visegrad Group", UnionType.Political, 58, "POL", "CZE", "SVK", "HUN"); // cohesion eroded over Ukraine
+            B("Mercosur", UnionType.Economic, 62, "ARG", "BRA", "PRY", "URY", "BOL"); // Bolivia full member since July 2024
+            B("Organization of Turkic States", UnionType.Political, 60, "TUR", "AZE", "KAZ", "KGZ", "UZB");
+            B("Alliance of Sahel States", UnionType.Military, 75, "MLI", "BFA", "NER"); // post-coup confederation, left ECOWAS Jan 2025
+            B("CARICOM", UnionType.Economic, 65, "ATG", "BHS", "BRB", "BLZ", "DMA", "GRD", "GUY", "HTI", "JAM", "KNA", "LCA", "VCT", "SUR", "TTO");
 
             // ---- Active interstate wars at game start (Jan 1 2026) ----
             // Russia-Ukraine: full-scale invasion since Feb 24 2022 = 1,407 days before the game

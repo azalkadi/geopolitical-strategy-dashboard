@@ -6,7 +6,30 @@ tags: [vision, game-design, politics]
 
 Part of [[Vision Overview|the vision]]. Real geopolitics happens at more than one level —
 countries belong to blocs that have their own governance layered above individual national
-politics. Meridian currently has no concept of this at all; every country is fully independent.
+politics.
+
+> [!success] Status: 🟡 First slice built (`Sim/UnionSystem`). The 14 curated blocs in
+> `WorldAlignments` are now **typed by their real function** and confer real per-function passive
+> effects on members, baked in at world seed:
+> - **Economic** (EU, GCC, ASEAN, Mercosur, Nordic, Benelux, CARICOM) → a single-market export &
+>   growth dividend scaled by how big the bloc is in-game (a member of the 27-strong EU gains far
+>   more than one of a 3-member bloc). Folds into `EconomyState.TradeAgreementExportBonus`.
+> - **Military** (NATO, CSTO, AES) → a collective-security standing + readiness bonus
+>   (`NationalState.AllianceStandingBonus`/`AllianceReadinessBonus`), **plus mutual defence**:
+>   declaring war on a member turns that member's *whole* alliance against the aggressor
+>   (`WarSystem.Declare` drops every ally's relations with the aggressor and adds an extra global
+>   standing hit) — so invading a NATO/CSTO member is a categorically different proposition than
+>   invading a non-aligned country.
+> - **Intelligence** (Five Eyes) → a shared-intel standing bonus.
+> - **Political** (Visegrad, Turkic States, Baltic Assembly) → alignment only (the relation
+>   floor), no economic/military bonus.
+>
+> A UNIONS & BLOCS card on the Diplomacy tab lists any country's memberships and each one's
+> function. Verified live: Germany reads 2 memberships (EU + NATO), export bonus 0.060 from the
+> EU, standing +4 / readiness +5 from NATO. **Still open:** union-level legislation (a bloc
+> passing law binding on members), evolving membership (join/leave), and commodity cartels (OPEC
+> production quotas) as their own distinct type. This is the *effects* slice; the *governance*
+> layer below is the larger remaining piece.
 
 > **Naming note:** the player named EU/GCC/UN as examples while describing this, not the
 > complete list — they explicitly asked for the fuller real category and its real distinct

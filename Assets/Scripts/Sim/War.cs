@@ -27,6 +27,11 @@ namespace Meridian.Sim
         public List<War> Active = new();
         uint rng = 0x77aa11bb;
 
+        // Set once by MapRenderer after the union registry is built. When present, declaring war
+        // on a military-alliance member turns that member's whole bloc against the aggressor
+        // (mutual defence) — see Declare. Not serialized; rebuilt with the registry on load.
+        [Newtonsoft.Json.JsonIgnore] public UnionSystem Unions;
+
         public const float DeclareRelationCeiling = 35f; // can only declare on countries you're cold with
         public const float ConcessionScoreThreshold = 40f;
         public const double ReparationsGdpFraction = 0.02;
@@ -73,6 +78,20 @@ namespace Meridian.Sim
             dip.ChangeRelation(attacker, defender, -100f);
             var aggressorNat = nat.States[attacker];
             aggressorNat.InternationalStanding = Clampf(aggressorNat.InternationalStanding - 6f, 0f, 100f);
+
+            // Mutual defence: attacking a military-alliance member turns that member's whole bloc
+            // against the aggressor — every ally's relations with the aggressor drop hard, and the
+            // aggressor takes an extra worldwide standing hit for striking an allied nation. This
+            // is why invading a NATO/CSTO member is a very different proposition than invading a
+            // non-aligned one.
+            if (Unions != null)
+            {
+                var allies = Unions.MilitaryAlliesOf(defender);
+                foreach (int ally in allies)
+                    if (ally != attacker) dip.ChangeRelation(attacker, ally, -25f);
+                if (allies.Count > 0)
+                    aggressorNat.InternationalStanding = Clampf(aggressorNat.InternationalStanding - 4f, 0f, 100f);
+            }
 
             // Rally-round-the-flag: both governments get a short-term approval bump; the
             // exhaustion mechanics take it all back (and more) if the war drags on.

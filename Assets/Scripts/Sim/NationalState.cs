@@ -35,6 +35,13 @@ namespace Meridian.Sim
         public float FreedomReligion;
         public float FreedomInternet;
 
+        // Passive bonuses from supranational-union membership (see Sim/UnionSystem), baked in at
+        // world seed. Military/intelligence blocs add standing (collective clout); military blocs
+        // also add readiness. Folded into the drift targets in Tick so they persist rather than
+        // decaying away. 0 for non-aligned countries.
+        public float AllianceStandingBonus;
+        public float AllianceReadinessBonus;
+
         // Live, per-game parliament — a mutable COPY of CountryProfiles.Parties made at seed, so
         // elections reshuffle THIS game's seat shares without corrupting the shared static data
         // (same copy-on-seed rule as EconomyState.Companies). Null/empty for countries without
@@ -109,7 +116,7 @@ namespace Meridian.Sim
             float approvalTarget = Clampf(50f + e.GrowthRate * 4f - (e.Unemployment - 7f) * 2f - System.Math.Max(0f, e.Inflation - 4f) * 3f, 0f, 100f);
             ApprovalRating = Clampf(ApprovalRating + (approvalTarget - ApprovalRating) * 0.01f, 0f, 100f);
 
-            float readinessTarget = Clampf(DefenseSpending * 20f, 0f, 100f);
+            float readinessTarget = Clampf(DefenseSpending * 20f + AllianceReadinessBonus, 0f, 100f);
             ReadinessIndex = Clampf(ReadinessIndex + (readinessTarget - ReadinessIndex) * 0.02f, 0f, 100f);
 
             // Education spending compounds with direct research spending — a strong school
@@ -123,7 +130,7 @@ namespace Meridian.Sim
             InnovationIndex = Clampf(InnovationIndex + (innovationTarget - InnovationIndex) * 0.01f, 0f, 100f);
 
             double openness = e.Gdp > 0.01 ? e.Exports / e.Gdp : 0.0;
-            float standingTarget = Clampf((float)(gdpRankPercentile * 50.0) + (float)System.Math.Min(20.0, openness * 40.0) + ApprovalRating * 0.3f, 0f, 100f);
+            float standingTarget = Clampf((float)(gdpRankPercentile * 50.0) + (float)System.Math.Min(20.0, openness * 40.0) + ApprovalRating * 0.3f + AllianceStandingBonus, 0f, 100f);
             InternationalStanding = Clampf(InternationalStanding + (standingTarget - InternationalStanding) * 0.01f, 0f, 100f);
 
             // Healthcare spending is the daily-life lever: people feel underfunded hospitals
