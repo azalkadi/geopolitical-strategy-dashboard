@@ -143,6 +143,31 @@ namespace Meridian.Map
             return focused is TextField;
         }
 
+        // A completed domestic road/rail link is a real productivity dividend, not just a line
+        // on the map: better internal logistics raises growth (EconomyState.LogisticsBonus, read
+        // by Economy.Tick). Recomputed from scratch each time a link completes or a save loads —
+        // cheap, since one game produces at most dozens of routes. Railways count for more than
+        // roads (higher capacity), and connecting two BIG cities matters more than two towns.
+        bool logisticsNeedsRecompute = true;
+        void RecomputeLogistics()
+        {
+            if (map.Infrastructure == null || map.Economy == null || map.World == null) return;
+            foreach (var e in map.Economy.States) e.LogisticsBonus = 0f;
+            foreach (var r in map.Infrastructure.Routes)
+            {
+                if (!r.Completed) continue;
+                int owner = r.OwnerCountryIndex;
+                if (owner < 0 || owner >= map.Economy.States.Count) continue;
+                if (r.FromCity < 0 || r.FromCity >= map.World.Cities.Count || r.ToCity < 0 || r.ToCity >= map.World.Cities.Count) continue;
+                long popMin = System.Math.Min(map.World.Cities[r.FromCity].PopMax, map.World.Cities[r.ToCity].PopMax);
+                float size = Mathf.Clamp01(Mathf.Log10(Mathf.Max(1f, popMin)) / 7f); // ~1.0 at 10M people
+                float contrib = (r.IsRailway ? 0.35f : 0.22f) * (0.4f + size);
+                map.Economy.States[owner].LogisticsBonus += contrib;
+            }
+            foreach (var e in map.Economy.States)
+                if (e.LogisticsBonus > EconomyState.MaxLogisticsBonus) e.LogisticsBonus = EconomyState.MaxLogisticsBonus;
+        }
+
         void TickEconomy()
         {
             dayAccum += daysPerSecond * Time.deltaTime;
@@ -172,7 +197,12 @@ namespace Meridian.Map
                         foreach (var r in justCompleted)
                             WorldFeed.Push("Infrastructure", $"{(r.IsRailway ? "Railway" : "Road")} completed: {r.FromName} — {r.ToName}.");
                         map.RebuildPlayerInfrastructure();
+                        logisticsNeedsRecompute = true; // a new link changes the connectivity dividend
                     }
+                    // Recompute lazily: covers both a just-completed link and the first tick
+                    // after a save is loaded (loaded routes are already Completed, so no
+                    // completion event fires for them).
+                    if (logisticsNeedsRecompute) { RecomputeLogistics(); logisticsNeedsRecompute = false; }
                 }
 
                 if (map.Legislature != null)
@@ -624,7 +654,8 @@ namespace Meridian.Map
                 {
                     infraDiagCompleteLogged = true;
                     int meshChildren = map.PlayerInfrastructureRoot != null ? map.PlayerInfrastructureRoot.transform.childCount : 0;
-                    Debug.Log($"[infradiag] route completed day {simDay} (scheduled {route.CompletionDay}) playerInfraMeshChildren={meshChildren} (expect >0)");
+                    float bonus = map.Economy.States[me].LogisticsBonus;
+                    Debug.Log($"[infradiag] route completed day {simDay} (scheduled {route.CompletionDay}) playerInfraMeshChildren={meshChildren} (expect >0) logisticsBonus={bonus:0.000}%/yr (expect >0)");
                 }
             }
         }

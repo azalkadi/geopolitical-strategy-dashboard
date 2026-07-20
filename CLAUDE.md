@@ -698,3 +698,15 @@ Everything below is built, launched, and verified via Player.log + visual checks
   Honest limitation: no elevation dataset, so brightness is the mountain proxy — strong for
   snow/desert ranges, weak for green low mountains. Future upgrade path: snap to the real
   `ne_10m_roads_extended` network (already loaded) via graph pathfinding.
+
+## Overnight autonomous session (2026-07-20 → 07-21, "develop while I sleep")
+Working a queue of features, each build-verified + committed + pushed. Order: (1) infrastructure
+connectivity dividend, (2) elections reshuffle parliaments, (3) supranational unions, (4)
+terrorism, (5) tiered city icons, then further down the vision list.
+- **[1/queue] Infrastructure connectivity dividend.** A completed domestic road/rail link now
+  raises the owner's growth (`EconomyState.LogisticsBonus`, capped 1.2%/yr, fed into
+  `Economy.Tick`'s `spendBoost`). `MapInteraction.RecomputeLogistics` rebuilds it on completion
+  or save-load: `(rail .35 / road .22) × (0.4 + citySizeFactor)` per route, size scaling with the
+  smaller connected city's population. Shown on the builder card; `MERIDIAN_DIAG_INFRA` logs it.
+  Verified live (Turkey): Istanbul–Ankara road → `logisticsBonus=0.294%/yr`, zero exceptions.
+  This gives the terrain-routing/infrastructure real gameplay teeth (was cosmetic before).

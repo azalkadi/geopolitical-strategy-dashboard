@@ -891,6 +891,9 @@ namespace Meridian.UI
                     string status = r.Completed ? "COMPLETE" : $"ready day {r.CompletionDay}";
                     Stat($"{(r.IsRailway ? "Rail" : "Road")}: {r.FromName} → {r.ToName}", status);
                 }
+                if (e.LogisticsBonus > 0f)
+                    StatColored("Connectivity growth bonus", $"+{e.LogisticsBonus:0.00}%/yr", true);
+                HelpText("Completed links raise growth through better internal logistics — railways and links between big cities count for more.");
             }
 
             EndCard();

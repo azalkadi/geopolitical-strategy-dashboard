@@ -72,7 +72,15 @@ in-progress (not-yet-completed) route survives a save/load roundtrip.
   most authentic "follow terrain" would route a new highway along the actual road corridors that
   real engineers surveyed. That's a graph-pathfinding project of its own; the basemap-cost A*
   here is a self-contained first version that already bends around water and bright terrain.
-- No ongoing gameplay bonus — a completed route is currently a purely visual/flavor achievement
-  (see [[Development Roadmap.canvas]] stage 5 for the "finishing pass" this could feed into,
-  e.g. a small trade/growth bonus for connected city pairs).
 - Own-country only — no cross-border construction.
+
+## Gameplay payoff — the connectivity dividend
+A completed link is no longer just a line on the map: it raises the owner's growth via
+`EconomyState.LogisticsBonus` (read by `Economy.Tick`'s `spendBoost`). `MapInteraction.
+RecomputeLogistics` rebuilds it from scratch whenever a link completes or a save loads — each
+completed route contributes `(rail 0.35 / road 0.22) × (0.4 + citySizeFactor)` %/yr, where the
+size factor scales with the smaller of the two connected cities' populations (log scale, ~1.0 at
+10M), so a railway between two megacities is worth far more than a road between two towns. Capped
+at `MaxLogisticsBonus` (1.2%/yr) so it's a meaningful edge, not a runaway. Shown on the builder
+card as "Connectivity growth bonus +X%/yr"; `MERIDIAN_DIAG_INFRA` logs it on completion (verified:
+Istanbul–Ankara road → +0.294%/yr).

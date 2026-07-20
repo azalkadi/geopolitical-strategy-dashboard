@@ -84,6 +84,14 @@ namespace Meridian.Sim
         // adds a small slice of extra export propensity for BOTH signatories).
         public float TradeAgreementExportBonus;
 
+        // Growth dividend (%/yr) from the player's completed domestic road/rail links — better
+        // internal logistics is a real productivity boost. Recomputed from the country's
+        // completed BuiltRoutes whenever one finishes (see MapInteraction.RecomputeLogistics);
+        // 0 for every country that hasn't connected any cities. Capped so it's a meaningful but
+        // not game-breaking edge.
+        public float LogisticsBonus;
+        public const float MaxLogisticsBonus = 1.2f;
+
         // Trade openness (exports/imports as a fraction of GDP), set once at seed from the
         // same GDP-per-capita tiering as growth — smaller/less-diversified economies tend to
         // run more trade relative to GDP. Deliberately simplified (real bilateral trade flows
@@ -207,7 +215,8 @@ namespace Meridian.Sim
             // agreements add a small openness dividend on top.
             float spendBoost = (SpendInfrastructure - 3.0f) * 0.10f
                              + (SpendEducation - 4.5f) * 0.05f
-                             + TradeAgreementExportBonus * 4.0f;
+                             + TradeAgreementExportBonus * 4.0f
+                             + LogisticsBonus; // player-built road/rail connectivity dividend
             // Sector composition drifts and feeds a small bounded productivity nudge into trend
             // growth — a tech/finance/services-weighted economy grows a hair faster than an
             // agriculture/mining-weighted one of the same size. Also refreshes each sector's
