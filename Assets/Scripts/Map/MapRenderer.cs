@@ -244,6 +244,20 @@ namespace Meridian.Map
                 // Economy panel and the growth nudge have real data instead of nothing.
                 if (e.Sectors == null || e.Sectors.Count == 0)
                     e.Sectors = SectorInfo.Seed(e.Gdp, e.GdpPerCapita, e.Companies);
+
+                // Migration: saves written before live parliaments existed have National.Parties
+                // == null — reseed the per-game party list from the curated static data so
+                // elections and vote math work on a loaded game too.
+                if (National != null && i < National.States.Count && National.States[i].Parties == null)
+                {
+                    var prof = CountryProfiles.Get(World.Countries[i].IsoA3);
+                    if (prof?.Parties != null)
+                    {
+                        var copy = new List<PartyProfile>(prof.Parties.Count);
+                        foreach (var p in prof.Parties) copy.Add(new PartyProfile(p.Name, p.EconLean, p.SeatShare));
+                        National.States[i].Parties = copy;
+                    }
+                }
             }
             // Route paths aren't serialized (see BuiltRoute.PathMercator) — re-plan each one
             // deterministically from its city endpoints so loaded roads/rail still follow the

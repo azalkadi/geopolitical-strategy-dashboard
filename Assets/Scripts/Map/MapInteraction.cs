@@ -212,6 +212,8 @@ namespace Meridian.Map
                         WorldFeed.Push("Parliament", headline);
                 }
 
+                MaybeRunElections(simDay);
+
                 CheckElection(simDay);
                 LogEconomyDiagnostic();
                 MaybeRunDiplomacyDiag();
@@ -341,7 +343,7 @@ namespace Meridian.Map
                 float target = e.TaxCorporate + 4f;
                 var gov = profile?.Government ?? GovernmentType.Unspecified;
                 string headline = map.Legislature.Propose(me, map.World.Countries[me].Name, gov,
-                    profile?.Parties, BillKind.CorporateTax, e.TaxCorporate, target, simDay);
+                    map.National.States[me].Parties, BillKind.CorporateTax, e.TaxCorporate, target, simDay);
                 var bill = map.Legislature.Bills[map.Legislature.Bills.Count - 1];
                 billsDiagBillId = bill.Id;
                 Debug.Log($"[billsdiag] day {simDay}: proposed corp tax {e.TaxCorporate:0.0}->{target:0.0} " +
@@ -373,7 +375,7 @@ namespace Meridian.Map
                 float target = System.Math.Max(0f, n.FreedomSpeech - 20f);
                 billsDiagStandingBefore = n.InternationalStanding;
                 string headline = map.Legislature.Propose(me, map.World.Countries[me].Name,
-                    profile?.Government ?? GovernmentType.Unspecified, profile?.Parties,
+                    profile?.Government ?? GovernmentType.Unspecified, map.National.States[me].Parties,
                     BillKind.FreedomSpeech, n.FreedomSpeech, target, simDay);
                 var bill = map.Legislature.Bills[map.Legislature.Bills.Count - 1];
                 billsDiagFreedomBillId = bill.Id;
@@ -441,7 +443,7 @@ namespace Meridian.Map
                     billsDiagTreasuryBefore = e.Treasury;
                     var target = company.Ownership == Ownership.Public ? Ownership.Private : Ownership.Public;
                     string headline = map.Legislature.ProposeOwnershipChange(me, map.World.Countries[me].Name,
-                        profile?.Government ?? GovernmentType.Unspecified, profile?.Parties,
+                        profile?.Government ?? GovernmentType.Unspecified, map.National.States[me].Parties,
                         0, company.Name, company.Ownership, target, simDay);
                     var bill = map.Legislature.Bills[map.Legislature.Bills.Count - 1];
                     billsDiagCompanyBillId = bill.Id;
@@ -522,8 +524,7 @@ namespace Meridian.Map
                 var c = map.World.Countries[i];
                 var e = map.Economy.States[i];
                 var nat = map.National.States[i];
-                var profile = CountryProfiles.Get(c.IsoA3);
-                var parties = profile?.Parties;
+                var parties = nat.Parties; // live, election-reshuffled seats — not the static seed
 
                 float lean = 0f;
                 if (parties != null) foreach (var p in parties) lean += p.EconLean * p.SeatShare;
@@ -556,6 +557,36 @@ namespace Meridian.Map
                 if (e.Gdp > 400.0) WorldFeed.Push("World", headline);
                 if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_AILEGIS") != null)
                     Debug.Log($"[ailegis] day {day}: #{aiLegisCount} {c.Name} ({(parties != null ? "vote" : "decree")}) {kind} {oldV:0.0}->{newV:0.0} deficitRatio={deficitRatio:0.000} lean={lean:0.00}");
+            }
+        }
+
+        // Every country with a real parliament holds a general election on a rolling ~4-year
+        // cycle, staggered per country (hash offset) so they don't all vote on the same day.
+        // NationalState.RunElection swings seat shares by the country's economic conditions, so
+        // the balance of power — and therefore how AI (and the player's) bills get voted — drifts
+        // across a game instead of sitting frozen at the seeded parliament. Major economies (and
+        // always the player) get a WorldFeed headline.
+        const long ElectionPeriodDays = 1460; // ~4 years
+        void MaybeRunElections(long day)
+        {
+            if (map.National == null || map.Economy == null || map.World == null) return;
+            for (int i = 0; i < map.National.States.Count && i < map.World.Countries.Count; i++)
+            {
+                var nat = map.National.States[i];
+                if (nat.Parties == null || nat.Parties.Count == 0) continue;
+                long offset = AiLegisHash((uint)i, 0xE1EC7u) % (uint)ElectionPeriodDays;
+                if ((day + offset) % ElectionPeriodDays != 0) continue;
+
+                string winner = nat.RunElection(map.Economy.States[i], (uint)(day ^ (i * 2654435761u)));
+                if (winner == null) continue;
+                if (map.Economy.States[i].Gdp > 400.0 || i == PlayerState.CountryIndex)
+                    WorldFeed.Push("Election", $"{map.World.Countries[i].Name}: general election — {winner} gains ground.");
+                if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_ELECTION") != null)
+                {
+                    var top = nat.Parties[0];
+                    foreach (var p in nat.Parties) if (p.SeatShare > top.SeatShare) top = p;
+                    Debug.Log($"[electiondiag] day {day}: {map.World.Countries[i].Name} election — winner={winner}, largest now {top.Name} {top.SeatShare * 100f:0.0}%");
+                }
             }
         }
 

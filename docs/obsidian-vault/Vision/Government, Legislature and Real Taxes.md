@@ -117,8 +117,18 @@ requirement, not a suggestion.
   bounded. Verified live (autopilot, ~350 days): Switzerland & Kuwait raised taxes on deficits
   by decree, Israel/Netherlands/India/Italy cut taxes via real party votes with surplus +
   right-leaning legislatures — ideology-correct, zero exceptions.
-- ⬜ Still open within the pillar: elections reshuffling
-  seat shares, lobbying/whipping, bill scope beyond tax+freedoms+regime (spending), a real
+- ✅ **Elections reshuffle parliaments** (`NationalState.RunElection`, `MapInteraction.
+  MaybeRunElections`): every country with a real parliament holds a general election on a rolling
+  ~4-year cycle (staggered per country), and seat shares swing by economic conditions — the right
+  gains on strong growth / low inflation, the left on high unemployment, plus deterministic noise
+  — then renormalise. Party seats are now **live per-game state** (`NationalState.Parties`, a
+  copy-on-seed of the curated `CountryProfiles.Parties`, same rule as `EconomyState.Companies`),
+  so a game's balance of power drifts instead of sitting frozen: every Propose call site and the
+  Parliament panel read the live seats, so [[World AI|AI legislation]] and the player's own vote
+  math evolve as parties rise and fall. Verified live: USA flipped Republicans→Democrats (50.2%)
+  as conditions swung left; 10 elections across ~700 days (Italy, South Africa, Mexico, Ukraine,
+  Korea, Japan, Netherlands) with real parties, zero exceptions.
+- ⬜ Still open within the pillar: lobbying/whipping, bill scope beyond tax+freedoms+regime (spending), a real
   second (social) party-ideology axis instead of reusing economic lean, per-country researched
   freedom baselines instead of a government-type-bucket heuristic, per-party approval
   replacing the single ApprovalRating number, and [[World AI]] actually reacting to a regime

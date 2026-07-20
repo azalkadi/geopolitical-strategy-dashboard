@@ -710,3 +710,14 @@ terrorism, (5) tiered city icons, then further down the vision list.
   smaller connected city's population. Shown on the builder card; `MERIDIAN_DIAG_INFRA` logs it.
   Verified live (Turkey): Istanbul–Ankara road → `logisticsBonus=0.294%/yr`, zero exceptions.
   This gives the terrain-routing/infrastructure real gameplay teeth (was cosmetic before).
+- **[2/queue] Elections reshuffle parliaments.** Party seat shares are now live per-game state:
+  `NationalState.Parties` is a copy-on-seed of `CountryProfiles.Parties` (same rule as
+  `EconomyState.Companies` — elections must not corrupt the shared static data). `RunElection`
+  swings seats by economic conditions (right gains on growth/low-inflation, left on unemployment,
+  + deterministic noise, renormalised); `MapInteraction.MaybeRunElections` runs one per country
+  on a staggered ~4-year (1460-day) cycle. **Every Propose call site + the Parliament panel now
+  read the live seats** (`GameUIRoot.LivePartiesOf`, `MaybeAILegislate`, bills diag), so AI
+  legislation and the player's vote math evolve as the balance of power shifts. Save migration in
+  `ApplySave` reseeds `Parties` for pre-election saves. `MERIDIAN_DIAG_ELECTION=1` verified live:
+  USA flipped Republicans→Democrats (50.2%) as conditions swung left; 10 elections over ~700 days
+  (Italy/South Africa/Mexico/Ukraine/Korea/Japan/Netherlands), real parties, zero exceptions.

@@ -693,7 +693,7 @@ namespace Meridian.UI
                     if (Mathf.Abs(target - get()) < 0.05f) { field.SetValueWithoutNotify(get()); return; }
                     var profile = CountryProfiles.Get(map.World.Countries[me].IsoA3);
                     string headline = map.Legislature.Propose(me, map.World.Countries[me].Name,
-                        profile?.Government ?? GovernmentType.Unspecified, profile?.Parties,
+                        profile?.Government ?? GovernmentType.Unspecified, LivePartiesOf(me),
                         kind, get(), target, interaction.SimDay);
                     WorldFeed.Push("Parliament", headline);
                     builtForCategory = (NationCategory)(-1); // swap the input for the pending-status row
@@ -998,7 +998,7 @@ namespace Meridian.UI
                         if (target == c.Ownership) return;
                         var profile = CountryProfiles.Get(map.World.Countries[sel].IsoA3);
                         string headline = map.Legislature.ProposeOwnershipChange(sel, map.World.Countries[sel].Name,
-                            profile?.Government ?? GovernmentType.Unspecified, profile?.Parties,
+                            profile?.Government ?? GovernmentType.Unspecified, LivePartiesOf(sel),
                             ci, c.Name, c.Ownership, target, interaction.SimDay);
                         WorldFeed.Push("Parliament", headline);
                         builtForCategory = (NationCategory)(-1);
@@ -1119,21 +1119,28 @@ namespace Meridian.UI
             EndCard();
         }
 
+        // The country's LIVE per-game parliament (NationalState.Parties) — reshuffled by
+        // elections — not the static CountryProfiles seed. Null for countries without curated
+        // parties (they decree). All Propose call sites and the Parliament panel read this so
+        // the player's vote math and the displayed seats always reflect the current balance.
+        List<PartyProfile> LivePartiesOf(int idx) =>
+            map.National != null && idx >= 0 && idx < map.National.States.Count ? map.National.States[idx].Parties : null;
+
         // Real party composition (any curated multi-party country) + the player's bill docket.
         // This is where "parties fighting over things" lives in the UI — stances also surface
         // as WorldFeed headlines the moment a bill is proposed (see Sim/Legislature.cs).
         void DrawParliament()
         {
             int sel = interaction.Selected;
-            var profile = CountryProfiles.Get(map.World.Countries[sel].IsoA3);
+            var liveParties = LivePartiesOf(sel);
 
-            if (profile?.Parties != null && profile.Parties.Count > 0)
+            if (liveParties != null && liveParties.Count > 0)
             {
                 StartCard();
                 SectionHeader("PARLIAMENT");
-                foreach (var p in profile.Parties)
+                foreach (var p in liveParties)
                     Stat($"{p.Name} · {LeanLabel(p.EconLean)}", $"{p.SeatShare * 100f:0}% seats");
-                HelpText("Approximate seat shares. Ideology decides how each party votes on your bills — left backs raises, right backs cuts, centrists swing on the specifics.");
+                HelpText("Live seat shares — they shift at each election as the economy swings voters left or right. Ideology decides how each party votes on your bills.");
                 EndCard();
             }
 

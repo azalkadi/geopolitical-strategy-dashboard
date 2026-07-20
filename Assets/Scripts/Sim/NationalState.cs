@@ -35,6 +35,46 @@ namespace Meridian.Sim
         public float FreedomReligion;
         public float FreedomInternet;
 
+        // Live, per-game parliament — a mutable COPY of CountryProfiles.Parties made at seed, so
+        // elections reshuffle THIS game's seat shares without corrupting the shared static data
+        // (same copy-on-seed rule as EconomyState.Companies). Null/empty for countries without
+        // curated parties (they route bills through the decree path). SeatShare is a fraction
+        // summing to ~1.0; a bill passes at >0.5. See RunElection.
+        public List<PartyProfile> Parties;
+
+        // A general election reshuffles seat shares by economic conditions + noise: parties whose
+        // economic ideology matches the moment gain (the right gains on strong growth / low
+        // inflation, the left on high unemployment), then everything renormalises to sum ~1.0.
+        // Deterministic per (seed) so a save/reload reproduces the same result. Returns the
+        // biggest gainer's name for a headline, or null if this country has no parties. Making
+        // seat shares move is what lets AI legislation (and the player's vote math) evolve across
+        // a game instead of sitting frozen at the seeded balance forever.
+        public string RunElection(EconomyState e, uint seed)
+        {
+            if (Parties == null || Parties.Count == 0) return null;
+            float rightSwing = (e.GrowthRate - 2f) * 0.010f
+                             - (e.Unemployment - 7f) * 0.008f
+                             - System.Math.Max(0f, e.Inflation - 4f) * 0.006f;
+            float total = 0f, bestGain = -999f; string winner = null;
+            foreach (var p in Parties)
+            {
+                uint h = Hash(seed, (uint)(p.Name.Length * 131 + (int)(p.EconLean * 100f)));
+                float noise = (h % 1000u) / 1000f * 0.06f - 0.03f; // ±0.03 seat fraction
+                float delta = p.EconLean * rightSwing + noise;
+                float ns = System.Math.Max(0.01f, p.SeatShare + delta);
+                if (ns - p.SeatShare > bestGain) { bestGain = ns - p.SeatShare; winner = p.Name; }
+                p.SeatShare = ns;
+                total += ns;
+            }
+            if (total > 0f) foreach (var p in Parties) p.SeatShare /= total;
+            return winner;
+        }
+
+        static uint Hash(uint a, uint b)
+        {
+            unchecked { uint h = 0x811c9dc5u; h = (h ^ a) * 0x01000193u; h = (h ^ b) * 0x01000193u; h ^= h >> 15; return h; }
+        }
+
         public static NationalState Seed(GovernmentType government = GovernmentType.Unspecified)
         {
             float baseFreedom = government switch
@@ -116,7 +156,16 @@ namespace Meridian.Sim
             foreach (var c in countries)
             {
                 var profile = CountryProfiles.Get(c.IsoA3);
-                sys.States.Add(NationalState.Seed(profile?.Government ?? GovernmentType.Unspecified));
+                var ns = NationalState.Seed(profile?.Government ?? GovernmentType.Unspecified);
+                // Deep-copy the curated parties into per-game state so elections mutate this
+                // game's parliament, never the shared static CountryProfiles data.
+                if (profile?.Parties != null)
+                {
+                    ns.Parties = new List<PartyProfile>(profile.Parties.Count);
+                    foreach (var p in profile.Parties)
+                        ns.Parties.Add(new PartyProfile(p.Name, p.EconLean, p.SeatShare));
+                }
+                sys.States.Add(ns);
             }
             return sys;
         }
