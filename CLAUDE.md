@@ -735,3 +735,17 @@ terrorism, (5) tiered city icons, then further down the vision list.
   Diplomacy-tab UNIONS & BLOCS card (`DrawUnions`). Verified live (Germany): 2 memberships
   (EU+NATO), exportBonus 0.060 (EU, size-scaled), allianceStanding 4.0 / readiness 5.0 (NATO),
   zero exceptions. Still open: union-level legislation, join/leave, OPEC-style cartels.
+- **[4/queue] Terrorism as an internal mechanic (Pillar 3).** New `Sim/TerrorismSystem` +
+  `NationalState.TerrorThreat` (0-100, serializes free). Threat grows from grievance
+  (`(60-FreedomSpeech)*0.5 + (55-PublicMood)*0.35 + max(0,unemp-8)*1.5`), suppressed by security
+  (defence spending + readiness); above the 35 attack threshold it fires probabilistic attacks
+  (`~(threat-35)*4/1000` per day) that dent growth, drain treasury, hit mood/approval, and push a
+  Security toast. Countered by `LaunchOperation` (Military-tab INTERNAL SECURITY card) — spends
+  treasury to cut threat, but a heavy hand in a low-freedom state (`FreedomSpeech<24`) cuts less
+  and stings mood (real counterinsurgency nuance; durable fix is freedoms/jobs/mood). Seeded from
+  grievance at world start (near-zero at seed since mood/unemployment are uniform then — it builds
+  as conditions diverge). `MERIDIAN_DIAG_TERROR=1` verified live (forced FS=8/unemp=20/mood=25 →
+  grievance 54): threat sustained 45-59, `TotalAttacks` climbed 3→6→10 over ~130 days visibly
+  denting growth/mood, counter-op cut 59→50 with the heavy-handed flag; zero exceptions. NOTE:
+  attacks surface as WorldFeed **toasts, not Debug.Log** — verify via `TerrorismSystem.TotalAttacks`,
+  not by grepping Player.log for the headline text. Still open: a named org with a map location.

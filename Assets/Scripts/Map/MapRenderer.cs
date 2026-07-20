@@ -80,6 +80,8 @@ namespace Meridian.Map
         // Supranational-union membership registry (derived from WorldAlignments, not serialized —
         // rebuilt on load). Passive effects are baked into economy/national state at seed.
         public UnionSystem Unions { get; private set; }
+        // Internal-terrorism ticker (stateless; per-country threat lives on NationalState).
+        public TerrorismSystem Terrorism { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -187,6 +189,11 @@ namespace Meridian.Map
             Unions = UnionSystem.Build(World.Countries);
             Unions.ApplyPassiveEffects(Economy, National);
             Wars.Unions = Unions; // mutual-defence on war declaration
+
+            // Internal terrorism: seed each country's starting threat from its grievance level so
+            // genuinely unstable states begin with a simmering insurgency.
+            Terrorism = new TerrorismSystem();
+            TerrorismSystem.SeedThreat(Economy, National);
             // Spot checks in the boot log: a war pair, a bloc-floor pair (France also proves
             // the ISO_A3="-99" fallback works — without it FRA resolves to nothing and gets no
             // EU floor), and a curated-pair-overrides-bloc case (GRC-TUR are both NATO).
@@ -198,6 +205,11 @@ namespace Meridian.Map
             // → standing + readiness bonus), so both effects should be non-zero.
             if (iDeu >= 0)
                 Debug.Log($"[map] union effects DEU: memberships={Unions.MembershipsOf(iDeu).Count} exportBonus={Economy.States[iDeu].TradeAgreementExportBonus:0.000} (expect >0 from EU) allianceStanding={National.States[iDeu].AllianceStandingBonus:0.0} allianceReadiness={National.States[iDeu].AllianceReadinessBonus:0.0} (expect >0 from NATO)");
+            // Terror-threat spot-check: a repressive/unstable country (Syria) should seed a higher
+            // threat than a free, content one (Norway).
+            int iSyr = FindIso("SYR"), iNor = FindIso("NOR");
+            if (iSyr >= 0 && iNor >= 0)
+                Debug.Log($"[map] terror seed: SYR threat={National.States[iSyr].TerrorThreat:0.0} vs NOR threat={National.States[iNor].TerrorThreat:0.0} (expect SYR > NOR)");
             CountryNames = new GeoWorldNames(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Name : "?");
             WorldAI = new WorldAI(i => i >= 0 && i < World.Countries.Count ? World.Countries[i].Continent : "");
 
@@ -277,6 +289,9 @@ namespace Meridian.Map
             // passive effects — they're already baked into the loaded economy/national fields.
             Unions = UnionSystem.Build(World.Countries);
             if (Wars != null) Wars.Unions = Unions;
+            // Threat level is serialized on NationalState; the ticker is stateless, just needs to
+            // exist. Don't reseed (that would wipe a loaded game's accumulated threat).
+            Terrorism ??= new TerrorismSystem();
 
             // Route paths aren't serialized (see BuiltRoute.PathMercator) — re-plan each one
             // deterministically from its city endpoints so loaded roads/rail still follow the

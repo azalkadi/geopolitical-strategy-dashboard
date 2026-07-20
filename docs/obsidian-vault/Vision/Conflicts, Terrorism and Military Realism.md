@@ -75,6 +75,22 @@ Nigeria's northeast, and similar real patterns elsewhere) are the honest referen
 "growing internal threat" should feel like, without the game needing to model any specific real
 group's actual current operational details.
 
+> [!success] Status: ✅ Built (`Sim/TerrorismSystem`). A per-country `TerrorThreat` (0-100, on
+> `NationalState` so it serializes) that **grows from real grievance** — political repression
+> (low `FreedomSpeech`), a miserable population (low `PublicMood`), and mass unemployment — held
+> down by security capacity (defence spending + readiness). Above the attack threshold it
+> **periodically strikes**: each attack dents growth, drains the treasury, and knocks public mood
+> and approval, surfacing as a Security news toast (escalating from ~monthly at the threshold to
+> ~weekly at maximum threat). Fought via a **counter-terror operation** on the Military tab
+> (INTERNAL SECURITY card) that spends treasury to cut the threat now — but with the real
+> counterinsurgency nuance the vision asks for: a **heavy hand in a low-freedom state works less
+> well and breeds fresh grievance**, so force alone can't hold it; the durable fix is freedoms,
+> jobs and mood. Modelled by grievance/region, not by naming real groups. Verified live (forced
+> scenario: FS=8, unemployment 20%, mood 25 → grievance 54): threat sustained 45-59, 10 attacks
+> fired over ~130 days visibly hitting growth and mood, counter-op cut threat 59→50 and flagged
+> the heavy-handed backlash. **Still open:** a named/visible org with a location on the map,
+> territory it contests, and cross-border spillover.
+
 ## Bases, equipment, and nuclear realism
 - **Base types**: air bases, naval bases, ground bases, and *foreign* bases (a country hosting
   another country's military presence — real and geopolitically significant, e.g. US bases

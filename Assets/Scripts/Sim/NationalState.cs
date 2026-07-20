@@ -42,6 +42,12 @@ namespace Meridian.Sim
         public float AllianceStandingBonus;
         public float AllianceReadinessBonus;
 
+        // Internal terrorism / insurgency threat (0-100) — a domestic security problem distinct
+        // from interstate war (see Sim/TerrorismSystem). Grows from grievance (repression, low
+        // public mood, high unemployment), suppressed by security capacity and the player's
+        // counter-terror operations. When high, it periodically strikes the economy and mood.
+        public float TerrorThreat;
+
         // Live, per-game parliament — a mutable COPY of CountryProfiles.Parties made at seed, so
         // elections reshuffle THIS game's seat shares without corrupting the shared static data
         // (same copy-on-seed rule as EconomyState.Companies). Null/empty for countries without

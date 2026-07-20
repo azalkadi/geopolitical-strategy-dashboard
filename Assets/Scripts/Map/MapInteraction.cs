@@ -214,6 +214,10 @@ namespace Meridian.Map
 
                 MaybeRunElections(simDay);
 
+                if (map.Terrorism != null)
+                    foreach (var headline in map.Terrorism.TickAll(map.Economy, map.National, map.CountryNames, PlayerState.CountryIndex, simDay))
+                        WorldFeed.Push("Security", headline);
+
                 CheckElection(simDay);
                 LogEconomyDiagnostic();
                 MaybeRunDiplomacyDiag();
@@ -223,6 +227,7 @@ namespace Meridian.Map
                 MaybeRunBillsDiag();
                 MaybeRunContextMenuDiag();
                 MaybeRunManpowerDiag();
+                MaybeRunTerrorDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -495,6 +500,43 @@ namespace Meridian.Map
                 contextMenuDiagClosed = true;
                 CloseContextMenu();
                 Debug.Log($"[ctxmenudiag] closed context menu, ContextMenuCountry={ContextMenuCountry} (expect -1)");
+            }
+        }
+
+        // Dev-only: MERIDIAN_DIAG_TERROR=1 forces a severe-grievance scenario on the player at
+        // day 10 (repression + mass unemployment + misery, threat pushed over the attack
+        // threshold) and logs the threat + economic damage over the following year, then runs a
+        // counter-terror operation at day 120 — verifies the whole loop (grievance → threat →
+        // attacks hitting the economy → the counter-measure cutting it) from Player.log alone.
+        bool terrorDiagSet, terrorDiagOpDone;
+        long terrorDiagNextLog;
+        void MaybeRunTerrorDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_TERROR") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.National == null) return;
+            var e = map.Economy.States[me];
+            var n = map.National.States[me];
+
+            if (!terrorDiagSet && simDay >= 10)
+            {
+                terrorDiagSet = true;
+                n.FreedomSpeech = 8f; e.Unemployment = 20f; n.PublicMood = 25f;
+                n.TerrorThreat = 45f;
+                Debug.Log($"[terrordiag] day {simDay} forced grievance FS=8 unemp=20 mood=25 -> grievance={TerrorismSystem.Grievance(e, n):0.0}, threat set to 45");
+                terrorDiagNextLog = simDay + 40;
+            }
+            if (terrorDiagSet && simDay >= terrorDiagNextLog)
+            {
+                terrorDiagNextLog = simDay + 40;
+                Debug.Log($"[terrordiag] day {simDay}: threat={n.TerrorThreat:0.0} growth={e.GrowthRate:0.00} mood={n.PublicMood:0.0} treasury={e.Treasury:0.0} totalAttacksWorld={map.Terrorism.TotalAttacks}");
+            }
+            if (terrorDiagSet && !terrorDiagOpDone && simDay >= 120)
+            {
+                terrorDiagOpDone = true;
+                float before = n.TerrorThreat;
+                string msg = TerrorismSystem.LaunchOperation(e, n);
+                Debug.Log($"[terrordiag] day {simDay} OPERATION: threat {before:0.0}->{n.TerrorThreat:0.0} — {msg}");
             }
         }
 

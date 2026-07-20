@@ -1193,6 +1193,8 @@ namespace Meridian.UI
             if (e != null) LiveStat("Military strength", () => $"{WarSystem.Strength(e, n):0.0}");
             EndCard();
 
+            DrawTerrorism(n, e, sel == me);
+
             if (sel == me)
             {
                 StartCard();
@@ -1206,6 +1208,33 @@ namespace Meridian.UI
             {
                 DrawForeignMilitary(me, sel);
             }
+        }
+
+        // Internal-terrorism security card. Shows the threat level; for the player's own country
+        // adds a counter-terror operation button. Only rendered once a threat actually exists so
+        // stable countries aren't cluttered with a permanent zero bar.
+        void DrawTerrorism(NationalState n, EconomyState e, bool isOwn)
+        {
+            if (n == null || n.TerrorThreat < 1f) return;
+            StartCard();
+            SectionHeader("INTERNAL SECURITY");
+            StatBar("Terror threat", () => n.TerrorThreat, GameTheme.Negative, () => n.TerrorThreat < TerrorismSystem.AttackThreshold);
+            if (n.TerrorThreat >= TerrorismSystem.AttackThreshold)
+                HelpText("Above the attack threshold — militants periodically strike the economy and public.");
+
+            if (isOwn && e != null)
+            {
+                var opBtn = MakeButton($"Launch Counter-Terror Operation  (${System.Math.Max(0.5, e.Gdp * 0.004):0.0}B)", 12,
+                    GameTheme.Muted(GameTheme.Negative, 0.4f), GameTheme.Negative, GameTheme.TextPrimary, () =>
+                    {
+                        ShowToast(PlayerState.CountryName, TerrorismSystem.LaunchOperation(e, n));
+                        builtForCategory = (NationCategory)(-1);
+                    }, align: TextAnchor.MiddleLeft);
+                opBtn.style.height = 30; opBtn.style.marginTop = 6;
+                currentContainer.Add(opBtn);
+                HelpText("Force cuts the threat now, but a heavy hand in a low-freedom state works less well and breeds grievance. The lasting fix is freedoms, jobs and public mood.");
+            }
+            EndCard();
         }
 
         // Your own Military tab: every war you're in, its momentum, and the ways out.
