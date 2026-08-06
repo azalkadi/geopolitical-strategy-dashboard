@@ -32,11 +32,64 @@ why this matters — the other machine's session can and does land commits betwe
 The [[Development Roadmap.canvas]] in `docs/obsidian-vault/` tracks the big chronological
 stages; this file's Current status section tracks the finer-grained "since last session" delta.
 
+## How the user works with you (read once, it changes how you should behave)
+
+- **The user does not write code and cannot easily read numbers/dense text** (a stated
+  condition). Live-coding through Claude is their only path to building this. So: **you** make the
+  implementation decisions. Don't hand back options and ask which to pick — choose the realistic
+  one, build it, and explain what now works in plain language.
+- **Write action-first**: lead with the next action, number multi-step work, no preamble/recap/
+  "hope this helps", cap lists at ~5. (This mirrors the `i-have-adhd` plugin the user installed.)
+- **Standing instruction: "if it's realistic, add it — don't ask permission first."** Adding real
+  depth (real parties, real companies, real conflicts, real mechanics) is always in scope.
+- **Realism is the whole point.** The goal is a *crazy realistic* geopolitical sim. Prefer
+  hand-researched real data over formulas that merely look plausible, and be honest in comments
+  and docs about what's real vs. approximated — that honesty pattern is used consistently
+  throughout `Sim/` and the vault, and should be maintained.
+- **Never overclaim verification.** If you didn't watch it work in a real run, say so explicitly.
+  There is precedent throughout Current status for flagging "verified by code inspection only" or
+  "visual confirmation pending" — do that rather than rounding up to "done".
+- **Push verified work to `master` yourself** so the user can access it from the other machine;
+  they'll ask if they want something held back.
+- The vision lives in `docs/obsidian-vault/Vision/` (6 pillars) with
+  `Feature Relationships.canvas` mapping how everything connects. Update the relevant Vision page
+  + canvas node status when you ship something, not just this file.
+
+## FIRST TIME ON A NEW MACHINE — read this before anything else
+
+If you're a fresh Claude on a **different computer** than the one that wrote the last session
+entry, do this in order:
+
+1. **Get the code.**
+   ```
+   git clone https://github.com/azalkadi/geopolitical-strategy-dashboard.git
+   ```
+   The Unity project is the `MeridianUnity/` folder inside the repo. **All paths in this file are
+   relative to `MeridianUnity/`** — `cd` there first.
+2. **Always `git fetch origin` and reconcile before you start working.** This project is worked on
+   from two machines (a home PC and a work computer). Diverging and force-pushing over the other
+   machine's night of work is the single worst thing you can do here. Check with
+   `git rev-list --left-right --count origin/master...HEAD` — anything other than `0 0` means
+   reconcile (fast-forward / merge) *before* writing code.
+3. **Install Unity 6000.5.3f1** via Unity Hub and sign in with a free Personal license. Batchmode
+   licensing then works with no extra setup. A different Unity version may silently reimport
+   assets and produce spurious diffs — match the version.
+4. **Verify the toolchain before trusting anything:** run the compile check below. If it prints
+   `OK: all scripts compiled`, you're good to work.
+5. **Paths that are specific to the ORIGINAL home PC** (`C:\Users\PC\...`) appear in this file and
+   in some diagnostics — translate them to your machine. The two that matter:
+   - Runtime log: `%USERPROFILE%\AppData\LocalLow\DefaultCompany\MeridianUnity\Player.log`
+   - Build output: `MeridianUnity\Build\Windows\Meridian.exe`
+6. **If you cannot run Unity at all** (e.g. you're a cloud/web session): you can still do real
+   work — data curation, docs, design, C# that you reason about carefully — but you **must** label
+   it UNVERIFIED in your session entry so the next machine knows to build-and-verify it. Never
+   claim something is verified if you didn't watch a build and a `Player.log`.
+
 ## Running it
 
 Unity Editor **6000.5.3f1** (Unity 6.5) is the target, installed via Unity Hub with an
-activated free Personal license (already signed in — batchmode licensing works with no further
-setup).
+activated free Personal license (already signed in on the home PC — batchmode licensing works
+with no further setup).
 
 **Headless build-fix loop** (works without opening the Unity Editor UI at all):
 
@@ -71,6 +124,50 @@ loaded correctly without eyeballing the map).
 If multiple `Meridian.exe` processes end up running at once (common if you relaunch without
 killing the old one first) you'll get confusing overlapping-window behavior. Kill stragglers
 first: `powershell -Command "Get-Process -Name Meridian -ErrorAction SilentlyContinue | Stop-Process -Force"`.
+
+### How to VERIFY a feature without clicking anything (the core workflow here)
+
+Pixel-clicking automation is unreliable on the home PC, so **every gameplay system is verifiable
+from `Player.log` alone** via environment variables. This is the established way to prove a change
+works — set the vars, launch the exe, read the log, grep for the diagnostic tag.
+
+| Env var | What it does | Log tag |
+|---|---|---|
+| `MERIDIAN_AUTOSTART=<country>` | Skip the start screen, govern that country (or `1` for the first) | `[diag] ... engaged` |
+| `MERIDIAN_AUTOPILOT=1` | Auto-answer decision-event modals — **required for any long run**, or the sim freezes at the first popup | `[autopilot]` |
+| `MERIDIAN_LOADSAVE=1` | Auto-continue the saved game at boot (tests the load path) | `[diag]` |
+| `MERIDIAN_DIAG_DIPLOMACY=1` | Scripted aid / trade-agreement / denounce self-test | `[dipdiag]` |
+| `MERIDIAN_DIAG_WAR=1` | Declares a war, logs score/exhaustion every 60 days | `[wardiag]` |
+| `MERIDIAN_DIAG_SAVE=1` | Saves and re-reads, comparing values | `[savediag]` |
+| `MERIDIAN_DIAG_INFRA=1` | Builds a road, logs terrain route + completion + logistics bonus | `[infradiag]` |
+| `MERIDIAN_DIAG_BILLS=1` | 4 phases: tax bill → freedom bill → regime change → company ownership | `[billsdiag]` |
+| `MERIDIAN_DIAG_CONTEXTMENU=1` | Opens/closes the right-click menu programmatically | `[ctxmenudiag]` |
+| `MERIDIAN_DIAG_MANPOWER=1` | Cranks public staffing, logs innovation/mood/unemployment/growth | `[manpowerdiag]` |
+| `MERIDIAN_DIAG_AILEGIS=1` | Logs every AI-country tax bill proposed | `[ailegis]` |
+| `MERIDIAN_DIAG_ELECTION=1` | Logs every general election and the resulting seat shift | `[electiondiag]` |
+| `MERIDIAN_DIAG_TERROR=1` | Forces a grievance scenario, logs threat/attacks/counter-op | `[terrordiag]` |
+
+Typical verification run (PowerShell):
+
+```powershell
+$env:MERIDIAN_AUTOSTART = "United States"
+$env:MERIDIAN_AUTOPILOT = "1"
+$env:MERIDIAN_DIAG_ELECTION = "1"
+Start-Process ".\Build\Windows\Meridian.exe"
+Start-Sleep -Seconds 90     # ~1 sim-year at default speed
+Get-Process Meridian | Stop-Process -Force
+Select-String -Path "$env:USERPROFILE\AppData\LocalLow\DefaultCompany\MeridianUnity\Player.log" -Pattern "electiondiag"
+```
+
+**Three traps that have burned previous sessions:**
+1. **No `MERIDIAN_AUTOPILOT=1` on a long run** → the sim freezes at the first decision modal and
+   you'll conclude a feature "doesn't fire" when it simply never got there. This exact mistake
+   produced a false negative on AI legislation.
+2. **Grepping the log for UI toast text** → toasts go to the on-screen WorldFeed, *not*
+   `Debug.Log`. Terrorism attacks are counted in `TerrorismSystem.TotalAttacks` for this reason.
+   If a feature surfaces as a toast, add a counter or a `Debug.Log`; don't grep for the headline.
+3. **Trusting a clean build as proof** → always read `Player.log` and grep for
+   `Exception|NullRef` (excluding the noisy `Licensing` lines) before claiming success.
 
 ## Layout
 
