@@ -665,7 +665,7 @@ namespace Meridian.Map
                 // Only the big economies are newsworthy; the rest legislate quietly.
                 if (e.Gdp > 400.0) WorldFeed.Push("World", headline);
                 if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_AILEGIS") != null)
-                    Debug.Log($"[ailegis] day {day}: #{aiLegisCount} {c.Name} ({(parties != null ? "vote" : "decree")}) {kind} {oldV:0.0}->{newV:0.0} deficitRatio={deficitRatio:0.000} lean={lean:0.00}");
+                    Debug.Log($"[ailegis] day {day}: #{aiLegisCount} {c.Name} ({(parties != null ? "vote" : "decree")}) {kind} {oldV:0.0}->{newV:0.0} deficitRatio={deficitRatio:0.000} lean={lean:0.00} billsRetained={map.Legislature.Bills.Count}");
             }
         }
 

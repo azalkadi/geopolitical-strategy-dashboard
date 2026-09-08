@@ -285,13 +285,15 @@ namespace Meridian.Sim
                 }
             }
 
-            // Prune old resolved bills so the list stays bounded once AI countries are also
-            // legislating (258 countries proposing over game-years would otherwise grow it
-            // without limit). Pending bills are always kept; resolved ones survive 60 days so the
-            // player's own recent outcomes still show in the ministry panels' bill history.
-            if (Bills.Count > 64)
-                Bills.RemoveAll(b => b.Status != BillStatus.Pending && day - b.DecisionDay > 60);
-
+            // NO PRUNING. Bills are permanent memory (Consequence Engine Pillar 3: "costs arrive
+            // late" — a decision in year one must still be traceable in year forty). This used to
+            // delete resolved bills after 60 days to bound the list; that quietly made the
+            // legislature amnesiac, which is exactly the shallowness the design exists to fix.
+            //
+            // The cost is affordable: AI legislation runs ~1 proposal/4-5 days globally, so a
+            // century of play accumulates order-10k small objects — a few MB of save JSON, not a
+            // leak. If this ever does need bounding, compress OLD bills into a lighter record;
+            // never delete the fact that they happened.
             return headlines ?? Empty;
         }
         static readonly List<string> Empty = new();
