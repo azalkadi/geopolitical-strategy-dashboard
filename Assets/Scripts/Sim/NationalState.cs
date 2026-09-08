@@ -117,7 +117,7 @@ namespace Meridian.Sim
 
         // Advances one simulated day. gdpRankPercentile in [0,1], 1 == largest economy in the
         // world this tick (see NationalSystem.TickAll, which computes it once across all countries).
-        public void Tick(EconomyState e, double gdpRankPercentile)
+        public void Tick(EconomyState e, double gdpRankPercentile, float ledgerForeignGov = 50f)
         {
             float approvalTarget = Clampf(50f + e.GrowthRate * 4f - (e.Unemployment - 7f) * 2f - System.Math.Max(0f, e.Inflation - 4f) * 3f, 0f, 100f);
             ApprovalRating = Clampf(ApprovalRating + (approvalTarget - ApprovalRating) * 0.01f, 0f, 100f);
@@ -136,7 +136,14 @@ namespace Meridian.Sim
             InnovationIndex = Clampf(InnovationIndex + (innovationTarget - InnovationIndex) * 0.01f, 0f, 100f);
 
             double openness = e.Gdp > 0.01 ? e.Exports / e.Gdp : 0.0;
-            float standingTarget = Clampf((float)(gdpRankPercentile * 50.0) + (float)System.Math.Min(20.0, openness * 40.0) + ApprovalRating * 0.3f + AllianceStandingBonus, 0f, 100f);
+            // §3: the LEDGER is the dominant term — standing is a smoothed view of the
+            // ForeignGovernments observer, not an independent composite. Structural facts
+            // (economic weight, trade openness, approval, alliances) still matter, but as a
+            // minority influence; what a government DID is what foreign governments score.
+            float structural = (float)(gdpRankPercentile * 50.0)
+                             + (float)System.Math.Min(20.0, openness * 40.0)
+                             + ApprovalRating * 0.3f + AllianceStandingBonus;
+            float standingTarget = Clampf(ledgerForeignGov * 0.7f + structural * 0.3f, 0f, 100f);   // ← the ledger now drives reputation
             InternationalStanding = Clampf(InternationalStanding + (standingTarget - InternationalStanding) * 0.01f, 0f, 100f);
 
             // Healthcare spending is the daily-life lever: people feel underfunded hospitals
@@ -186,7 +193,7 @@ namespace Meridian.Sim
         // Ticks every country once. Computes each country's GDP-rank percentile fresh each call
         // (cheap at 258 countries) since InnovationIndex/InternationalStanding are relative to
         // the rest of the world, not absolute.
-        public void TickAll(EconomySystem economy)
+        public void TickAll(EconomySystem economy, LegitimacySystem legit = null)
         {
             int n = economy.States.Count;
             var gdps = new double[n];
@@ -201,7 +208,15 @@ namespace Meridian.Sim
                 percentile[order[rank]] = n > 1 ? (double)rank / (n - 1) : 0.5;
 
             for (int i = 0; i < States.Count && i < n; i++)
-                States[i].Tick(economy.States[i], percentile[i]);
+            {
+                // Consequence Engine §3 migration: InternationalStanding is no longer written
+                // directly by war/diplomacy/legislation. Those events record to the legitimacy
+                // ledger, and standing now DRIFTS TOWARD the ledger's ForeignGovernments score —
+                // so it is a smoothed *view* of one observer, not a second competing number.
+                var led = legit?.Of(i);
+                float fg = led != null ? led.Get(Observer.ForeignGovernments) : 50f;
+                States[i].Tick(economy.States[i], percentile[i], fg);
+            }
         }
     }
 }

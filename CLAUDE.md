@@ -905,6 +905,22 @@ terrorism, (5) tiered city icons, then further down the vision list.
     **It flags a blocker to clear first: bloc membership is immutable** (`UnionSystem` re-derives
     it from static `WorldAlignments` on every load), and `ApplyPassiveEffects` adds to
     `TradeAgreementExportBonus` without ever subtracting, so mutable membership would double-count.
+  - **[§3 migration] InternationalStanding is now a VIEW of the ledger, not a rival number.**
+    War/diplomacy/legislation no longer write `InternationalStanding` directly — every one of
+    those reputation events records to the ledger instead, and `NationalState.Tick` drifts standing
+    toward `ledgerForeignGov * 0.7 + structural * 0.3` (structural = GDP rank, trade openness,
+    approval, alliance bonus). The ledger is deliberately the DOMINANT term: a first attempt used
+    only a `(ledger-50)` offset and standing sat at 83 while the ledger said 48 — the structural
+    terms drowned it, so the "ledger drives reputation" claim was false until reweighted. Verified
+    live: standing now settles ~57-58, tracking the ledger. Legislature `Apply` takes the ledger
+    (threaded through `TickAll` alongside `dip`); regime change and freedom bills record
+    multi-observer deltas instead of nudging one bar.
+  - **Bills are permanent memory** — `TickAll`'s 60-day prune is gone (Pillar 3). Verified:
+    `billsRetained` tracks proposals 1:1 over ~800 days. If it ever needs bounding, compress old
+    bills; never delete that they happened.
+  - **Still not migrated:** the structural 30% still bypasses the ledger (a full migration would
+    fold economic weight/openness into the ledger as slow drift). `UnionSystem.AllianceStandingBonus`
+    also still feeds standing structurally rather than as recorded events.
   - Next: §4 (accession + crowd) after making union membership mutable, then §5 (institutions and
     the overrule cycle).
 - **Overnight session status: 6 features shipped + verified** (infra dividend, elections, unions,

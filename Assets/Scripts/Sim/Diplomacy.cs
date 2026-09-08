@@ -88,7 +88,6 @@ namespace Meridian.Sim
             double cost = System.Math.Max(0.2, donor.Gdp * 0.0005);
             donor.Treasury -= cost;
             ChangeRelation(from, to, +12f);
-            donorNat.InternationalStanding = Clampf(donorNat.InternationalStanding + 1.5f, 0f, 100f);
             MarkActed(from, to, day);
             // Aid buys warmth abroad and grumbling at home — money sent away is money not spent
             // here. Opposite directions on purpose (§3).
@@ -121,7 +120,6 @@ namespace Meridian.Sim
         {
             ChangeRelation(from, to, -15f);
             fromNat.ApprovalRating = Clampf(fromNat.ApprovalRating + 1.5f, 0f, 100f);
-            fromNat.InternationalStanding = Clampf(fromNat.InternationalStanding - 1f, 0f, 100f);
             MarkActed(from, to, day);
             // THE demonstration case for §3: the same act that plays as courage at home reads as
             // unpredictability in every foreign chancellery. Never average these.

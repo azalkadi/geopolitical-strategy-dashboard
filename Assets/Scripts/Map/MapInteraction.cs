@@ -178,7 +178,7 @@ namespace Meridian.Map
             {
                 simDay++;
                 map.Economy.TickAll();
-                map.National?.TickAll(map.Economy);
+                map.National?.TickAll(map.Economy, map.Legitimacy);
                 map.Diplomacy?.TickAll();
 
                 if (map.Wars != null && map.National != null && map.Diplomacy != null)
@@ -208,7 +208,7 @@ namespace Meridian.Map
                 if (map.Legislature != null)
                 {
                     MaybeAILegislate(simDay);
-                    foreach (var headline in map.Legislature.TickAll(simDay, map.Economy, map.National, map.CountryNames, map.Diplomacy))
+                    foreach (var headline in map.Legislature.TickAll(simDay, map.Economy, map.National, map.CountryNames, map.Diplomacy, map.Legitimacy))
                         WorldFeed.Push("Parliament", headline);
                 }
 
@@ -580,7 +580,7 @@ namespace Meridian.Map
                 // 3) A repressive crackdown — force FreedomSpeech low so it counts as heavy-handed.
                 map.National.States[me].FreedomSpeech = 10f;
                 TerrorismSystem.LaunchOperation(map.Economy.States[me], map.National.States[me], map.Legitimacy, me, simDay);
-                Debug.Log($"[legitdiag] heavy-handed counter-terror op: {DumpLedger(led)} spread={map.Legitimacy.Spread(me):0.0}");
+                Debug.Log($"[legitdiag] heavy-handed counter-terror op: {DumpLedger(led)} spread={map.Legitimacy.Spread(me):0.0} InternationalStanding={map.National.States[me].InternationalStanding:0.0}");
 
                 // The payoff: the causal trace the design demands (§12) — "why is this happening".
                 foreach (var line in map.Legitimacy.Trace(me, Observer.ReligiousAuthority))
@@ -594,7 +594,7 @@ namespace Meridian.Map
             {
                 legitDiagNextLog = simDay + 200;
                 var led = map.Legitimacy.Of(me);
-                Debug.Log($"[legitdiag] day {simDay}: {DumpLedger(led)} memory={led.Memory.Count}");
+                Debug.Log($"[legitdiag] day {simDay}: {DumpLedger(led)} memory={led.Memory.Count} InternationalStanding={map.National.States[me].InternationalStanding:0.0} (should track foreign-governments)");
             }
         }
 

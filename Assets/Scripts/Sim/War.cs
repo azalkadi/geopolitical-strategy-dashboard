@@ -80,7 +80,8 @@ namespace Meridian.Sim
             // Diplomatic fallout: relations to the floor, aggressor loses standing worldwide.
             dip.ChangeRelation(attacker, defender, -100f);
             var aggressorNat = nat.States[attacker];
-            aggressorNat.InternationalStanding = Clampf(aggressorNat.InternationalStanding - 6f, 0f, 100f);
+            // (Standing is no longer written here — the ledger record below is the single source
+            // of truth for reputation events, and NationalSystem.TickAll drifts standing to it.)
 
             // Mutual defence: attacking a military-alliance member turns that member's whole bloc
             // against the aggressor — every ally's relations with the aggressor drop hard, and the
@@ -93,7 +94,9 @@ namespace Meridian.Sim
                 foreach (int ally in allies)
                     if (ally != attacker) dip.ChangeRelation(attacker, ally, -25f);
                 if (allies.Count > 0)
-                    aggressorNat.InternationalStanding = Clampf(aggressorNat.InternationalStanding - 4f, 0f, 100f);
+                    Legit?.Record(attacker, day, "Attacked a member of a military alliance",
+                        "Striking an allied state turns its whole bloc against you",
+                        LegitimacySystem.Deltas(foreignGovernments: -6f, blocMembers: -4f));
             }
 
             // Rally-round-the-flag: both governments get a short-term approval bump; the

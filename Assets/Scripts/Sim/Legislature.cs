@@ -245,7 +245,7 @@ namespace Meridian.Sim
         // Resolves any bill whose day has come. Returns headlines (empty list most days).
         // `nat` is optional (callers that only ever propose tax bills can pass null); freedom
         // bills are a no-op without it.
-        public List<string> TickAll(long day, EconomySystem econ, NationalSystem nat, GeoWorldNames names, DiplomacySystem dip = null)
+        public List<string> TickAll(long day, EconomySystem econ, NationalSystem nat, GeoWorldNames names, DiplomacySystem dip = null, LegitimacySystem legit = null)
         {
             List<string> headlines = null;
             foreach (var b in Bills)
@@ -255,7 +255,7 @@ namespace Meridian.Sim
                 if (b.IsDecree)
                 {
                     b.Status = BillStatus.Passed;
-                    Apply(b, econ, nat, dip);
+                    Apply(b, econ, nat, dip, legit);
                     if (b.IsRegimeChange)
                         (headlines ??= new List<string>()).Add(
                             $"{names.Name(b.CountryIndex)} completes its transition to {GovLabel(b.NewGovernment ?? GovernmentType.Unspecified)}.");
@@ -273,7 +273,7 @@ namespace Meridian.Sim
                 if (yes > 0.5f)
                 {
                     b.Status = BillStatus.Passed;
-                    Apply(b, econ, nat, dip);
+                    Apply(b, econ, nat, dip, legit);
                     (headlines ??= new List<string>()).Add(
                         $"{names.Name(b.CountryIndex)}: bill passes {yes * 100f:0}–{(1f - yes) * 100f:0} — {b.KindLabel} is now {Fmt(b, b.NewValue)}.");
                 }
@@ -299,7 +299,7 @@ namespace Meridian.Sim
         static readonly List<string> Empty = new();
         static string Unit(Bill b) => b.IsFreedom ? "" : "%";
 
-        static void Apply(Bill b, EconomySystem econ, NationalSystem nat, DiplomacySystem dip)
+        static void Apply(Bill b, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, LegitimacySystem legit)
         {
             if (b.IsRegimeChange)
             {
@@ -315,7 +315,21 @@ namespace Meridian.Sim
                 float standingDelta =
                     wasPluralistic && !nowPluralistic ? -25f :
                     !wasPluralistic && nowPluralistic ? 12f : -3f;
-                n.InternationalStanding = Clampf(n.InternationalStanding + standingDelta, 0f, 100f);
+                // §3 migration: reputation events go to the ledger, not to a single bar.
+                // Losing pluralism is punished hardest by foreign governments and bloc members
+                // (who wrote rules against it); gaining it earns credit from populations too.
+                legit?.Record(b.CountryIndex, b.DecisionDay,
+                    $"Changed government to {GovLabel(b.NewGovernment.Value)}",
+                    wasPluralistic && !nowPluralistic
+                        ? "Abandoning pluralism is remembered by every state that watched it"
+                        : (!wasPluralistic && nowPluralistic
+                            ? "Adopting pluralism earns credit that force cannot buy"
+                            : "A change of system carries transitional uncertainty"),
+                    LegitimacySystem.Deltas(
+                        foreignGovernments: standingDelta,
+                        foreignPopulations: standingDelta * 0.5f,
+                        blocMembers: standingDelta * 0.6f,
+                        religiousAuthority: standingDelta * 0.2f));
 
                 // The world reacts bilaterally, not just to a global standing number: democracies
                 // (pluralistic governments) recoil from a country that abandons pluralism and
@@ -352,8 +366,18 @@ namespace Meridian.Sim
                 // Legislature and Real Taxes.md's "freedoms as real levers with real
                 // consequences" requirement. Asymmetric on purpose (losing standing is easy,
                 // earning it back is slow), same spirit as real reputational politics.
+                // Tightening freedoms costs far more than loosening them earns — asymmetric on
+                // purpose, and the religious/moral authority reacts hardest of all (§3).
                 float delta = b.NewValue - b.OldValue;
-                n.InternationalStanding = Clampf(n.InternationalStanding + (delta < 0 ? delta * 0.3f : delta * 0.08f), 0f, 100f);
+                float mag = delta < 0 ? delta * 0.3f : delta * 0.08f;
+                legit?.Record(b.CountryIndex, b.DecisionDay,
+                    delta < 0 ? $"Tightened {b.KindLabel.ToLowerInvariant()}" : $"Expanded {b.KindLabel.ToLowerInvariant()}",
+                    delta < 0 ? "Restricting liberties is watched closely abroad and from the pulpit"
+                              : "Expanding liberties earns slow credit",
+                    LegitimacySystem.Deltas(
+                        foreignPopulations: mag * 1.2f,
+                        foreignGovernments: mag,
+                        religiousAuthority: mag * 0.8f));
                 return;
             }
 
