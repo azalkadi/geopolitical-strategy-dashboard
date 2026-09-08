@@ -32,6 +32,9 @@ namespace Meridian.Sim
         // (mutual defence) — see Declare. Not serialized; rebuilt with the registry on load.
         [Newtonsoft.Json.JsonIgnore] public UnionSystem Unions;
 
+        // Consequence Engine §3 ledger, set by MapRenderer (see DiplomacySystem.Legit).
+        [Newtonsoft.Json.JsonIgnore] public LegitimacySystem Legit;
+
         public const float DeclareRelationCeiling = 35f; // can only declare on countries you're cold with
         public const float ConcessionScoreThreshold = 40f;
         public const double ReparationsGdpFraction = 0.02;
@@ -98,6 +101,15 @@ namespace Meridian.Sim
             aggressorNat.ApprovalRating = Clampf(aggressorNat.ApprovalRating + 3f, 0f, 100f);
             var defenderNat = nat.States[defender];
             defenderNat.ApprovalRating = Clampf(defenderNat.ApprovalRating + 5f, 0f, 100f);
+
+            // War is the sharpest divergence in the ledger: a rally at home, a collapse
+            // everywhere else. The rally is also the shallowest — exhaustion takes it back (see
+            // TickAll), while the foreign and moral costs are permanent memory.
+            Legit?.Record(attacker, day, "Declared war",
+                "Starting a war rallies your own public briefly and costs you standing with every other observer",
+                LegitimacySystem.Deltas(ownPopulation: +4.0f, foreignPopulations: -6.0f,
+                                        foreignGovernments: -9.0f, religiousAuthority: -5.0f,
+                                        blocMembers: -4.0f, ownMilitary: -1.0f));
             return w;
         }
 

@@ -92,7 +92,7 @@ namespace Meridian.Map
         public bool SaveNow()
         {
             if (map?.Economy == null || map.National == null || map.Diplomacy == null || map.Wars == null) return false;
-            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature);
+            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy);
         }
 
         // Autosave: quitting mid-game shouldn't cost the player their run.
@@ -228,6 +228,7 @@ namespace Meridian.Map
                 MaybeRunContextMenuDiag();
                 MaybeRunManpowerDiag();
                 MaybeRunTerrorDiag();
+                MaybeRunLegitimacyDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -544,6 +545,66 @@ namespace Meridian.Map
                 string msg = TerrorismSystem.LaunchOperation(e, n);
                 Debug.Log($"[terrordiag] day {simDay} OPERATION: threat {before:0.0}->{n.TerrorThreat:0.0} — {msg}");
             }
+        }
+
+        // Dev-only: MERIDIAN_DIAG_LEGITIMACY=1 exercises the Consequence Engine §3 ledger — the
+        // point being to PROVE observers diverge rather than move together. It denounces a rival
+        // (courage at home, unpredictability abroad), sends aid (the reverse), and runs a
+        // heavy-handed counter-terror op (moral authority collapses while the base approves),
+        // then dumps all six observer scores, the spread, and the causal trace for the two most
+        // divergent observers. If the six numbers ever move in lockstep, the design is broken.
+        bool legitDiagDone;
+        long legitDiagNextLog;
+        void MaybeRunLegitimacyDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_LEGITIMACY") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.Legitimacy == null || map.Diplomacy == null) return;
+
+            if (!legitDiagDone && simDay >= 15)
+            {
+                legitDiagDone = true;
+                var led = map.Legitimacy.Of(me);
+                Debug.Log($"[legitdiag] day {simDay} BASELINE: {DumpLedger(led)} spread={map.Legitimacy.Spread(me):0.0}");
+
+                // 1) Denounce the frostiest state — the cleanest opposite-direction case.
+                var frostiest = map.Diplomacy.RankedFor(me, friendliest: false, topN: 1)[0];
+                map.Diplomacy.Denounce(me, frostiest.index, map.National.States[me], simDay);
+                Debug.Log($"[legitdiag] denounced {map.World.Countries[frostiest.index].Name}: {DumpLedger(led)}");
+
+                // 2) Send aid to the friendliest — should move the SAME observers the other way.
+                var friendliest = map.Diplomacy.RankedFor(me, friendliest: true, topN: 1)[0];
+                map.Diplomacy.SendAid(me, friendliest.index, map.Economy.States[me], map.National.States[me], simDay);
+                Debug.Log($"[legitdiag] sent aid to {map.World.Countries[friendliest.index].Name}: {DumpLedger(led)}");
+
+                // 3) A repressive crackdown — force FreedomSpeech low so it counts as heavy-handed.
+                map.National.States[me].FreedomSpeech = 10f;
+                TerrorismSystem.LaunchOperation(map.Economy.States[me], map.National.States[me], map.Legitimacy, me, simDay);
+                Debug.Log($"[legitdiag] heavy-handed counter-terror op: {DumpLedger(led)} spread={map.Legitimacy.Spread(me):0.0}");
+
+                // The payoff: the causal trace the design demands (§12) — "why is this happening".
+                foreach (var line in map.Legitimacy.Trace(me, Observer.ReligiousAuthority))
+                    Debug.Log($"[legitdiag] TRACE religious authority | {line}");
+                foreach (var line in map.Legitimacy.Trace(me, Observer.ForeignGovernments))
+                    Debug.Log($"[legitdiag] TRACE foreign governments | {line}");
+                Debug.Log($"[legitdiag] permanent memory entries={led.Memory.Count} (never pruned — Pillar 3)");
+                legitDiagNextLog = simDay + 200;
+            }
+            if (legitDiagDone && simDay >= legitDiagNextLog)
+            {
+                legitDiagNextLog = simDay + 200;
+                var led = map.Legitimacy.Of(me);
+                Debug.Log($"[legitdiag] day {simDay}: {DumpLedger(led)} memory={led.Memory.Count}");
+            }
+        }
+
+        static string DumpLedger(LegitimacyLedger led)
+        {
+            if (led == null) return "(none)";
+            var parts = new List<string>();
+            for (int o = 0; o < ObserverExt.Count; o++)
+                parts.Add($"{((Observer)o).Label()}={led.Scores[o]:0.0}");
+            return string.Join(" | ", parts);
         }
 
         // AI countries legislate too — not just the player. Each day a small deterministic

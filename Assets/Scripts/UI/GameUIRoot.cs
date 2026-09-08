@@ -1227,7 +1227,8 @@ namespace Meridian.UI
                 var opBtn = MakeButton($"Launch Counter-Terror Operation  (${System.Math.Max(0.5, e.Gdp * 0.004):0.0}B)", 12,
                     GameTheme.Muted(GameTheme.Negative, 0.4f), GameTheme.Negative, GameTheme.TextPrimary, () =>
                     {
-                        ShowToast(PlayerState.CountryName, TerrorismSystem.LaunchOperation(e, n));
+                        ShowToast(PlayerState.CountryName, TerrorismSystem.LaunchOperation(
+                            e, n, map.Legitimacy, interaction.Selected, interaction.SimDay));
                         builtForCategory = (NationCategory)(-1);
                     }, align: TextAnchor.MiddleLeft);
                 opBtn.style.height = 30; opBtn.style.marginTop = 6;

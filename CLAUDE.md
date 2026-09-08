@@ -345,6 +345,20 @@ Related: automation (computer-use) clicks on this machine intermittently land on
 UI element — see the memory note on batched clicks, and prefer Player.log-based verification
 (env-var diagnostics like the diplomacy self-test) over pixel-clicking for anything precise.
 
+## ⚠ BLOCKER as of 2026-09-08: Unity licence invalid
+
+`Tools\build.ps1` exits 198 with `No valid Unity Editor license found. Please activate your
+license.` (licensing client reports `Found 0 entitlement groups and 0 free entitlements`). The
+machine clock moved from 2026-07-21 to 2026-09-08 and the Personal licence needs re-validation.
+
+**Nothing can be compiled, built or verified until the user opens Unity Hub and signs in /
+reactivates.** This is a user action — it cannot be fixed from a Claude session. Until then, treat
+every build-dependent claim as unverified, and do not merge unverified branches to `master`.
+
+**Work parked because of this:** branch `consequence-engine/legitimacy-ledger` — the Consequence
+Engine §3 legitimacy ledger, written but never compiled. First job after the licence works:
+`Tools\build.ps1 -Mode compile`, fix whatever it says, run `MERIDIAN_DIAG_LEGITIMACY=1`, then merge.
+
 ## Current status (as of the last worked session)
 
 Everything below is built, launched, and verified via Player.log + visual checks:
