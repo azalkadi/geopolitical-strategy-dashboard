@@ -921,8 +921,20 @@ terrorism, (5) tiered city icons, then further down the vision list.
   - **Still not migrated:** the structural 30% still bypasses the ledger (a full migration would
     fold economic weight/openness into the ledger as slow drift). `UnionSystem.AllianceStandingBonus`
     also still feeds standing structurally rather than as recorded events.
-  - Next: §4 (accession + crowd) after making union membership mutable, then §5 (institutions and
-    the overrule cycle).
+  - **[§4 step 0] Bloc membership is now MUTABLE and SERIALIZED** — the precondition for
+    accession. `UnionSystem` holds `List<MutableBloc>` (seeded from `WorldAlignments` at world
+    start, then owned by the save via `SaveGame.Unions`); only the country→blocs index is rebuilt
+    on load. Re-deriving membership from static data on load would have silently undone every
+    accession. New `AddMember`/`RemoveMember` recompute effects from scratch.
+    **The double-count trap is fixed:** the union dividend moved out of the shared
+    `TradeAgreementExportBonus` into its own `EconomyState.UnionExportBonus`, and
+    `ApplyPassiveEffects` now SETS every value (never `+=`), so recomputing is idempotent and
+    leaving a bloc actually removes the benefit. `MERIDIAN_DIAG_UNIONJOIN=1` verified live: NOR
+    joins EU (2→3 memberships, bonus 0.0150→0.0750), two extra recomputes leave it at 0.0750,
+    leaving returns it to 0.0150. Also fixed a boot assertion that still read the old field and
+    printed `0.000 (expect >0)` — misleading to anyone reading the log.
+  - Next: §4 proper (invitation pipeline, coercion, refusal memory, then the crowd) per
+    `docs/obsidian-vault/Vision/Accession and the Crowd.md`, then §5 (institutions/overrule).
 - **Overnight session status: 6 features shipped + verified** (infra dividend, elections, unions,
   terrorism, capital markers, regime-change diplomacy shock), each its own pushed commit.
   Continuing down the vision list if the loop runs on.

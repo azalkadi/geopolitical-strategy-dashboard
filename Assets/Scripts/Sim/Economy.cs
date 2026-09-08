@@ -84,6 +84,11 @@ namespace Meridian.Sim
         // adds a small slice of extra export propensity for BOTH signatories).
         public float TradeAgreementExportBonus;
 
+        // Union-derived single-market dividend, kept SEPARATE from TradeAgreementExportBonus so
+        // UnionSystem can recompute it from scratch on every membership change without
+        // double-counting a field the player's own trade deals also mutate. See Sim/Unions.cs.
+        public float UnionExportBonus;
+
         // Growth dividend (%/yr) from the player's completed domestic road/rail links — better
         // internal logistics is a real productivity boost. Recomputed from the country's
         // completed BuiltRoutes whenever one finishes (see MapInteraction.RecomputeLogistics);
@@ -100,7 +105,7 @@ namespace Meridian.Sim
         public float ExportPropensity;
         public float ImportPropensity;
 
-        public double Exports => Gdp * (ExportPropensity + TradeAgreementExportBonus);
+        public double Exports => Gdp * (ExportPropensity + TradeAgreementExportBonus + UnionExportBonus);
         // Higher tariffs suppress imports (each 10 points of tariff cuts import propensity ~5%).
         public double Imports => Gdp * ImportPropensity * (1.0 - TaxTariff / 100.0 * 0.5);
         public double TradeBalance => Exports - Imports;
@@ -215,7 +220,7 @@ namespace Meridian.Sim
             // agreements add a small openness dividend on top.
             float spendBoost = (SpendInfrastructure - 3.0f) * 0.10f
                              + (SpendEducation - 4.5f) * 0.05f
-                             + TradeAgreementExportBonus * 4.0f
+                             + (TradeAgreementExportBonus + UnionExportBonus) * 4.0f
                              + LogisticsBonus; // player-built road/rail connectivity dividend
             // Sector composition drifts and feeds a small bounded productivity nudge into trend
             // growth — a tech/finance/services-weighted economy grows a hair faster than an

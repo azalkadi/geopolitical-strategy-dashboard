@@ -42,6 +42,9 @@ namespace Meridian.Sim
         // Consequence Engine §3: six-observer ledger + PERMANENT memory. Must persist or
         // Pillar 3 ("costs arrive late") is meaningless across a save.
         public LegitimacySystem Legitimacy;
+        // §4: bloc membership is mutable now, so it belongs to the save. Re-deriving it from
+        // static WorldAlignments on load would silently undo every accession.
+        public UnionSystem Unions;
 
         public Dictionary<string, float[]> History;
     }
@@ -52,7 +55,7 @@ namespace Meridian.Sim
 
         public static bool SaveExists() => File.Exists(SavePath);
 
-        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars, InfrastructureSystem infra, LegislatureSystem legis, LegitimacySystem legit)
+        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars, InfrastructureSystem infra, LegislatureSystem legis, LegitimacySystem legit, UnionSystem unions)
         {
             try
             {
@@ -77,6 +80,7 @@ namespace Meridian.Sim
                     Infrastructure = infra,
                     Legislature = legis,
                     Legitimacy = legit,
+                    Unions = unions,
                     History = new Dictionary<string, float[]>
                     {
                         ["gdp"] = PlayerHistory.Gdp.ToArray(),

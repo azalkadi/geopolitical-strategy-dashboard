@@ -190,7 +190,7 @@ namespace Meridian.Map
             // Supranational unions: build the membership registry and bake in each member's
             // passive per-function effect (economic trade lift / military standing + readiness /
             // intelligence standing). Seed-time only — the effects live in serialized fields.
-            Unions = UnionSystem.Build(World.Countries);
+            Unions = UnionSystem.Seed(World.Countries);
             Unions.ApplyPassiveEffects(Economy, National);
             Wars.Unions = Unions; // mutual-defence on war declaration
 
@@ -214,7 +214,7 @@ namespace Meridian.Map
             // Union spot-check: Germany is in the EU (economic → export bonus) and NATO (military
             // → standing + readiness bonus), so both effects should be non-zero.
             if (iDeu >= 0)
-                Debug.Log($"[map] union effects DEU: memberships={Unions.MembershipsOf(iDeu).Count} exportBonus={Economy.States[iDeu].TradeAgreementExportBonus:0.000} (expect >0 from EU) allianceStanding={National.States[iDeu].AllianceStandingBonus:0.0} allianceReadiness={National.States[iDeu].AllianceReadinessBonus:0.0} (expect >0 from NATO)");
+                Debug.Log($"[map] union effects DEU: memberships={Unions.MembershipsOf(iDeu).Count} unionExportBonus={Economy.States[iDeu].UnionExportBonus:0.000} (expect >0 from EU) allianceStanding={National.States[iDeu].AllianceStandingBonus:0.0} allianceReadiness={National.States[iDeu].AllianceReadinessBonus:0.0} (expect >0 from NATO)");
             // Terror-threat spot-check: a repressive/unstable country (Syria) should seed a higher
             // threat than a free, content one (Norway).
             int iSyr = FindIso("SYR"), iNor = FindIso("NOR");
@@ -301,7 +301,11 @@ namespace Meridian.Map
             }
             // Rebuild the union membership registry (derived, not serialized). Do NOT re-apply
             // passive effects — they're already baked into the loaded economy/national fields.
-            Unions = UnionSystem.Build(World.Countries);
+            // Membership comes FROM THE SAVE now (accessions must survive a reload); only the
+            // derived lookup index is rebuilt. Older saves have no Unions — seed fresh.
+            Unions = save.Unions ?? UnionSystem.Seed(World.Countries);
+            Unions.RebuildIndex(World.Countries);
+            Unions.ApplyPassiveEffects(Economy, National);   // idempotent: SETs, never accumulates
             if (Wars != null) Wars.Unions = Unions;
             // Threat level is serialized on NationalState; the ticker is stateless, just needs to
             // exist. Don't reseed (that would wipe a loaded game's accumulated threat).

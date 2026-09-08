@@ -92,7 +92,7 @@ namespace Meridian.Map
         public bool SaveNow()
         {
             if (map?.Economy == null || map.National == null || map.Diplomacy == null || map.Wars == null) return false;
-            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy);
+            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy, map.Unions);
         }
 
         // Autosave: quitting mid-game shouldn't cost the player their run.
@@ -229,6 +229,7 @@ namespace Meridian.Map
                 MaybeRunManpowerDiag();
                 MaybeRunTerrorDiag();
                 MaybeRunLegitimacyDiag();
+                MaybeRunUnionMembershipDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -605,6 +606,40 @@ namespace Meridian.Map
             for (int o = 0; o < ObserverExt.Count; o++)
                 parts.Add($"{((Observer)o).Label()}={led.Scores[o]:0.0}");
             return string.Join(" | ", parts);
+        }
+
+        // Dev-only: MERIDIAN_DIAG_UNIONJOIN=1 proves §4 step 0 — that bloc membership is now
+        // MUTABLE, and that the effects recompute is IDEMPOTENT. The old code added into
+        // TradeAgreementExportBonus and never subtracted, so any membership change would have
+        // silently doubled the bonus; this asserts the opposite by recomputing twice and by
+        // making a state leave again.
+        bool unionDiagDone;
+        void MaybeRunUnionMembershipDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_UNIONJOIN") == null) return;
+            if (unionDiagDone || simDay < 12 || map.Unions == null) return;
+            unionDiagDone = true;
+
+            // Norway is deliberately NOT an EU member in the curated data — a clean test subject.
+            int nor = map.World.Countries.FindIndex(c => c.IsoA3 == "NOR");
+            if (nor < 0) return;
+            var e = map.Economy.States[nor];
+
+            Debug.Log($"[uniondiag] BEFORE join: NOR memberships={map.Unions.MembershipsOf(nor).Count} unionExportBonus={e.UnionExportBonus:0.0000}");
+
+            map.Unions.AddMember("European Union", "NOR", map.World.Countries, map.Economy, map.National);
+            float afterJoin = e.UnionExportBonus;
+            Debug.Log($"[uniondiag] AFTER join:  NOR memberships={map.Unions.MembershipsOf(nor).Count} unionExportBonus={afterJoin:0.0000}");
+
+            // The actual bug test: recompute twice more. The value must NOT move.
+            map.Unions.ApplyPassiveEffects(map.Economy, map.National);
+            map.Unions.ApplyPassiveEffects(map.Economy, map.National);
+            Debug.Log($"[uniondiag] after 2 extra recomputes: unionExportBonus={e.UnionExportBonus:0.0000} " +
+                      $"(MUST equal {afterJoin:0.0000} — idempotent, no double-count)");
+
+            // And leaving must actually remove the benefit.
+            map.Unions.RemoveMember("European Union", "NOR", map.World.Countries, map.Economy, map.National);
+            Debug.Log($"[uniondiag] AFTER leave: NOR memberships={map.Unions.MembershipsOf(nor).Count} unionExportBonus={e.UnionExportBonus:0.0000}");
         }
 
         // AI countries legislate too — not just the player. Each day a small deterministic
