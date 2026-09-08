@@ -89,7 +89,8 @@ namespace Meridian.Sim
         // scales with legitimacy (rule of law): a well-governed, free state degrades the network
         // cleanly; a repressive one relies on brute force that works less well and stings the
         // public, nudging grievance back up — the deliberate real-world nuance.
-        public static string LaunchOperation(EconomyState e, NationalState n)
+        public static string LaunchOperation(EconomyState e, NationalState n,
+                                            LegitimacySystem legit = null, int country = -1, long day = 0)
         {
             double cost = System.Math.Max(0.5, e.Gdp * 0.004);
             e.Treasury -= cost;
@@ -98,6 +99,20 @@ namespace Meridian.Sim
             n.TerrorThreat = Clampf(n.TerrorThreat - cut, 0f, 100f);
             bool heavyHanded = legitimacy < 0.4f;
             if (heavyHanded) n.PublicMood = Clampf(n.PublicMood - 2f, 0f, 100f);
+
+            // §3: security operations read completely differently depending on whether they are
+            // conducted within the law. Under a free system it's policing; under a repressive one
+            // it's repression — and the religious/moral authority is the observer that reacts
+            // hardest, exactly as the design demands (it can end a reign with no war declared).
+            legit?.Record(country, day, "Launched a counter-terror operation",
+                heavyHanded
+                    ? "Conducted outside the rule of law, it read as repression rather than policing"
+                    : "Conducted within the law, it read as legitimate policing",
+                heavyHanded
+                    ? LegitimacySystem.Deltas(ownPopulation: +1.5f, foreignPopulations: -3.0f,
+                                              religiousAuthority: -5.0f, ownMilitary: +1.0f)
+                    : LegitimacySystem.Deltas(ownPopulation: +2.0f, foreignGovernments: +1.0f,
+                                              religiousAuthority: +0.5f, ownMilitary: +1.0f));
             return $"Counter-terror operation (${cost:0.0}B): threat cut by {cut:0}. " +
                    (heavyHanded ? "Heavy-handed tactics unsettle the public — force alone won't hold it down."
                                 : "Conducted within the law; addressing grievances keeps it down for good.");

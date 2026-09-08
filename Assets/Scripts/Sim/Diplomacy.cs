@@ -23,6 +23,11 @@ namespace Meridian.Sim
         public const float AgreementThreshold = 65f;
         public const float AgreementExportBonus = 0.015f; // per agreement, both sides
 
+        // Consequence Engine §3: set by MapRenderer so every diplomatic act records against the
+        // six-observer ledger no matter which entry point fired it (panel, right-click menu,
+        // diagnostic). [JsonIgnore] — the ledger serializes once on its own, not per system.
+        [Newtonsoft.Json.JsonIgnore] public LegitimacySystem Legit;
+
         // Cooldown bookkeeping so the player can't spam +12 aid every tick. Keyed by pair.
         public Dictionary<long, long> LastActionDay = new();
         public const long ActionCooldownDays = 90;
@@ -85,6 +90,11 @@ namespace Meridian.Sim
             ChangeRelation(from, to, +12f);
             donorNat.InternationalStanding = Clampf(donorNat.InternationalStanding + 1.5f, 0f, 100f);
             MarkActed(from, to, day);
+            // Aid buys warmth abroad and grumbling at home — money sent away is money not spent
+            // here. Opposite directions on purpose (§3).
+            Legit?.Record(from, day, "Sent foreign aid",
+                "Money sent abroad reads as generosity overseas and as waste at home",
+                LegitimacySystem.Deltas(ownPopulation: -1.0f, foreignPopulations: +2.5f, foreignGovernments: +2.0f));
             return $"Aid package delivered (${cost:0.0}B) — relations improved.";
         }
 
@@ -99,6 +109,10 @@ namespace Meridian.Sim
             eb.TradeAgreementExportBonus += AgreementExportBonus;
             ChangeRelation(a, b, +5f);
             MarkActed(a, b, day);
+            // Keeping agreements is the thing foreign governments actually score you on.
+            Legit?.Record(a, day, "Signed a trade agreement",
+                "Binding yourself to an agreement reads as predictability abroad and prosperity at home",
+                LegitimacySystem.Deltas(ownPopulation: +1.5f, foreignGovernments: +3.0f, blocMembers: +1.0f));
             return "Trade agreement signed — exports rise on both sides.";
         }
 
@@ -109,6 +123,11 @@ namespace Meridian.Sim
             fromNat.ApprovalRating = Clampf(fromNat.ApprovalRating + 1.5f, 0f, 100f);
             fromNat.InternationalStanding = Clampf(fromNat.InternationalStanding - 1f, 0f, 100f);
             MarkActed(from, to, day);
+            // THE demonstration case for §3: the same act that plays as courage at home reads as
+            // unpredictability in every foreign chancellery. Never average these.
+            Legit?.Record(from, day, "Publicly denounced another state",
+                "Defiance of a rival plays as courage at home and as unpredictability abroad",
+                LegitimacySystem.Deltas(ownPopulation: +3.0f, foreignPopulations: -1.0f, foreignGovernments: -4.0f));
             return "Denunciation delivered — the base loves it; embassies do not.";
         }
 

@@ -39,6 +39,9 @@ namespace Meridian.Sim
         public WarSystem Wars;
         public InfrastructureSystem Infrastructure;
         public LegislatureSystem Legislature;
+        // Consequence Engine §3: six-observer ledger + PERMANENT memory. Must persist or
+        // Pillar 3 ("costs arrive late") is meaningless across a save.
+        public LegitimacySystem Legitimacy;
 
         public Dictionary<string, float[]> History;
     }
@@ -49,7 +52,7 @@ namespace Meridian.Sim
 
         public static bool SaveExists() => File.Exists(SavePath);
 
-        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars, InfrastructureSystem infra, LegislatureSystem legis)
+        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars, InfrastructureSystem infra, LegislatureSystem legis, LegitimacySystem legit)
         {
             try
             {
@@ -73,6 +76,7 @@ namespace Meridian.Sim
                     Wars = wars,
                     Infrastructure = infra,
                     Legislature = legis,
+                    Legitimacy = legit,
                     History = new Dictionary<string, float[]>
                     {
                         ["gdp"] = PlayerHistory.Gdp.ToArray(),

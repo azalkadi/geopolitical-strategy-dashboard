@@ -345,6 +345,15 @@ Related: automation (computer-use) clicks on this machine intermittently land on
 UI element — see the memory note on batched clicks, and prefer Player.log-based verification
 (env-var diagnostics like the diplomacy self-test) over pixel-clicking for anything precise.
 
+## Unity licence: lapsed 2026-09-08, RESOLVED same day
+
+For the record, since it will probably recur: after the machine clock jumped 2026-07-21 →
+2026-09-08 the Personal licence vanished entirely (no `Unity_lic.ulf`, no Hub licence folder) and
+every build failed with `exit 198 / No valid Unity Editor license found`. **Fix is a user action,
+not something a Claude session can do:** Unity Hub → sign in → Preferences → Licenses → Add → free
+Personal licence. Then `Tools\build.ps1 -Mode compile` should print `OK: all scripts compiled`.
+If builds start failing with exit 198 again, this is why.
+
 ## Current status (as of the last worked session)
 
 Everything below is built, launched, and verified via Player.log + visual checks:
@@ -865,6 +874,39 @@ terrorism, (5) tiered city icons, then further down the vision list.
   doesn't move relations. `MERIDIAN_DIAG_BILLS` regime phase verified live: USA→OneServiceState
   dropped standing 51.3→36.7 AND relations with Germany 38.2→30.2 (a democracy recoiling), zero
   exceptions.
+- **THE CONSEQUENCE ENGINE — new north-star design (2026-09-08).** The user supplied a full design
+  brief, saved verbatim-in-substance as `docs/obsidian-vault/Vision/Consequence Engine.md` with the
+  STACK block filled for Meridian. Its thesis: the reference product (Geo-Political Simulator 2026)
+  is criticised as *surface level* despite 175 countries × 600 fields — **the gap is not data, it
+  is consequence.** Four pillars: legitimacy is the real currency; consent scales and force does
+  not; costs arrive late; institutions bind the player. **Read that file before doing further
+  design work** — it also lists things to actively NOT build (§14).
+  - **It conflicts with what Meridian already is, deliberately.** §14 bans a single reputation bar
+    — `NationalState.InternationalStanding` IS that bar and war/diplomacy/unions/regime-change all
+    read it. Pillar 3 demands permanent memory — `LegislatureSystem.TickAll` still prunes resolved
+    bills after 60 days. Both are migration targets, tracked in the Consequence Engine doc's
+    mapping table. **Do not "fix" these by averaging the ledger or by adding an overall score.**
+  - **[§13 step 1a] Legitimacy ledger — BUILT AND VERIFIED.** New `Sim/Legitimacy.cs`: six
+    independent observers (own population, foreign populations, foreign governments, religious
+    authority, bloc members, own military), **permanent never-pruned memory**, and `Trace()` which
+    answers "why is this happening" with years attached (§12 causal trace). There is deliberately
+    **no Average()/Overall anywhere** — the file header explains why; do not add one for a UI bar,
+    show six bars. Recorded *inside* the Sim actions (`DiplomacySystem.Legit`, `WarSystem.Legit`,
+    `TerrorismSystem.LaunchOperation`) rather than at UI call sites, so panel, right-click menu, AI
+    and diagnostics all count. Persisted via `SaveGame.Legitimacy`; older saves seed a fresh ledger.
+    Built *alongside* `InternationalStanding`, not replacing it — removing that in one commit
+    breaks four systems at once with nothing verifiable.
+  - `MERIDIAN_DIAG_LEGITIMACY=1` **verified live**: spread 0 → 8.5 with observers moving in
+    opposite directions on the same acts — denounce (own population 50→53 while foreign
+    governments 50→46), aid reversing that, heavy-handed counter-terror (own population ▲53.5,
+    religious authority ▼45). Causal trace and permanent memory both confirmed, zero exceptions.
+  - **[§4] Design spec written, not built:** `docs/obsidian-vault/Vision/Accession and the Crowd.md`
+    — invitation terms, derived `ImpliedCoercion`, permanent refusal memory, and the crowd.
+    **It flags a blocker to clear first: bloc membership is immutable** (`UnionSystem` re-derives
+    it from static `WorldAlignments` on every load), and `ApplyPassiveEffects` adds to
+    `TradeAgreementExportBonus` without ever subtracting, so mutable membership would double-count.
+  - Next: §4 (accession + crowd) after making union membership mutable, then §5 (institutions and
+    the overrule cycle).
 - **Overnight session status: 6 features shipped + verified** (infra dividend, elections, unions,
   terrorism, capital markers, regime-change diplomacy shock), each its own pushed commit.
   Continuing down the vision list if the loop runs on.

@@ -82,6 +82,9 @@ namespace Meridian.Map
         public UnionSystem Unions { get; private set; }
         // Internal-terrorism ticker (stateless; per-country threat lives on NationalState).
         public TerrorismSystem Terrorism { get; private set; }
+        // The legitimacy ledger — six independent observers per state + permanent memory.
+        // See docs/obsidian-vault/Vision/Consequence Engine.md §3. Never averaged.
+        public LegitimacySystem Legitimacy { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -195,6 +198,12 @@ namespace Meridian.Map
             // genuinely unstable states begin with a simmering insurgency.
             Terrorism = new TerrorismSystem();
             TerrorismSystem.SeedThreat(Economy, National);
+
+            // Legitimacy ledger: every state starts middling with all six observers; divergence
+            // is earned through actions (Consequence Engine §3).
+            Legitimacy = LegitimacySystem.Seed(World.Countries.Count);
+            Diplomacy.Legit = Legitimacy;
+            Wars.Legit = Legitimacy;
             // Spot checks in the boot log: a war pair, a bloc-floor pair (France also proves
             // the ISO_A3="-99" fallback works — without it FRA resolves to nothing and gets no
             // EU floor), and a curated-pair-overrides-bloc case (GRC-TUR are both NATO).
@@ -250,6 +259,10 @@ namespace Meridian.Map
             // deserialize these as null.
             Infrastructure = save.Infrastructure ?? new InfrastructureSystem();
             Legislature = save.Legislature ?? new LegislatureSystem();
+            // Pre-Consequence-Engine saves have no ledger — seed a fresh one rather than crashing.
+            Legitimacy = save.Legitimacy ?? LegitimacySystem.Seed(World.Countries.Count);
+            if (Diplomacy != null) Diplomacy.Legit = Legitimacy;
+            if (Wars != null) Wars.Legit = Legitimacy;
 
             // Migration: saves written before population dynamics existed deserialize with
             // Population = 0 — reseed those from the geo data instead of simulating a
