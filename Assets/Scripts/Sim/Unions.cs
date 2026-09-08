@@ -28,6 +28,12 @@ namespace Meridian.Sim
         public WorldAlignments.UnionType Type;
         public float Floor;
         public List<string> MemberIsos = new();
+
+        // Members admitted with AccessionTerms.GuaranteesPreserved — they kept their outside
+        // security relationships, so this bloc's MUTUAL DEFENCE does not extend to them (see
+        // MilitaryAlliesOf). The concession that bought their yes is the concession that hollows
+        // the alliance out. §4.
+        public List<string> GuaranteedMembers = new();
     }
 
     public class UnionSystem
@@ -115,6 +121,13 @@ namespace Meridian.Sim
             return true;
         }
 
+        string IsoOf(int country)
+        {
+            if (isoIndex == null) return null;
+            foreach (var kv in isoIndex) if (kv.Value == country) return kv.Key;
+            return null;
+        }
+
         int PresentCount(MutableBloc bloc)
         {
             int c = 0;
@@ -168,9 +181,16 @@ namespace Meridian.Sim
             foreach (var bloc in byCountry[country])
             {
                 if (bloc.Type != WorldAlignments.UnionType.Military) continue;
+                // A member that kept its outside guarantees is not covered by, and does not
+                // answer, this bloc's mutual defence.
+                if (bloc.GuaranteedMembers.Count > 0 && IsoOf(country) != null
+                    && bloc.GuaranteedMembers.Contains(IsoOf(country))) continue;
                 foreach (var iso in bloc.MemberIsos)
+                {
+                    if (bloc.GuaranteedMembers.Contains(iso)) continue;
                     if (isoIndex.TryGetValue(iso, out int ci) && ci != country && !allies.Contains(ci))
                         allies.Add(ci);
+                }
             }
             return allies;
         }

@@ -85,6 +85,8 @@ namespace Meridian.Map
         // The legitimacy ledger — six independent observers per state + permanent memory.
         // See docs/obsidian-vault/Vision/Consequence Engine.md §3. Never averaged.
         public LegitimacySystem Legitimacy { get; private set; }
+        // §4 accession: invitations, coercion, permanent refusal memory.
+        public AccessionSystem Accession { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -202,6 +204,7 @@ namespace Meridian.Map
             // Legitimacy ledger: every state starts middling with all six observers; divergence
             // is earned through actions (Consequence Engine §3).
             Legitimacy = LegitimacySystem.Seed(World.Countries.Count);
+            Accession = new AccessionSystem();
             Diplomacy.Legit = Legitimacy;
             Wars.Legit = Legitimacy;
             // Spot checks in the boot log: a war pair, a bloc-floor pair (France also proves
@@ -261,6 +264,7 @@ namespace Meridian.Map
             Legislature = save.Legislature ?? new LegislatureSystem();
             // Pre-Consequence-Engine saves have no ledger — seed a fresh one rather than crashing.
             Legitimacy = save.Legitimacy ?? LegitimacySystem.Seed(World.Countries.Count);
+            Accession = save.Accession ?? new AccessionSystem();
             if (Diplomacy != null) Diplomacy.Legit = Legitimacy;
             if (Wars != null) Wars.Legit = Legitimacy;
 

@@ -92,7 +92,7 @@ namespace Meridian.Map
         public bool SaveNow()
         {
             if (map?.Economy == null || map.National == null || map.Diplomacy == null || map.Wars == null) return false;
-            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy, map.Unions);
+            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy, map.Unions, map.Accession);
         }
 
         // Autosave: quitting mid-game shouldn't cost the player their run.
@@ -214,6 +214,11 @@ namespace Meridian.Map
 
                 MaybeRunElections(simDay);
 
+                if (map.Accession != null)
+                    foreach (var headline in map.Accession.TickAll(simDay, map.Economy, map.National, map.Diplomacy,
+                                 map.Legitimacy, map.Unions, map.Wars, map.World.Countries, map.CountryNames))
+                        WorldFeed.Push("Accession", headline);
+
                 if (map.Terrorism != null)
                     foreach (var headline in map.Terrorism.TickAll(map.Economy, map.National, map.CountryNames, PlayerState.CountryIndex, simDay))
                         WorldFeed.Push("Security", headline);
@@ -230,6 +235,7 @@ namespace Meridian.Map
                 MaybeRunTerrorDiag();
                 MaybeRunLegitimacyDiag();
                 MaybeRunUnionMembershipDiag();
+                MaybeRunAccessionDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -640,6 +646,70 @@ namespace Meridian.Map
             // And leaving must actually remove the benefit.
             map.Unions.RemoveMember("European Union", "NOR", map.World.Countries, map.Economy, map.National);
             Debug.Log($"[uniondiag] AFTER leave: NOR memberships={map.Unions.MembershipsOf(nor).Count} unionExportBonus={e.UnionExportBonus:0.0000}");
+        }
+
+        // Dev-only: MERIDIAN_DIAG_ACCESSION=1 exercises §4. Three assertions, all readable from
+        // Player.log: (1) a GENEROUS offer to a warm state is accepted and the terms hollow the
+        // bloc (guaranteed member excluded from mutual defence); (2) a COERCIVE offer may be
+        // accepted but permanently damages the inviter's ledger with observers who were never
+        // involved — accepted AND worse off, the central claim of the design; (3) refusal is
+        // PERMANENT, so a re-invite scores ~20 lower with higher coercion.
+        bool accDiagOffered, accDiagReported;
+        int accWarm = -1, accCold = -1;
+        void MaybeRunAccessionDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_ACCESSION") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.Accession == null || map.Unions == null) return;
+
+            if (!accDiagOffered && simDay >= 12)
+            {
+                accDiagOffered = true;
+                string bloc = map.Unions.MembershipsOf(me).Count > 0 ? map.Unions.MembershipsOf(me)[0].Name : "European Union";
+
+                accWarm = map.Diplomacy.RankedFor(me, friendliest: true, topN: 1)[0].index;
+                accCold = map.Diplomacy.RankedFor(me, friendliest: false, topN: 1)[0].index;
+
+                // (1) generous, no pressure
+                var generous = new AccessionTerms { ArmyRetained = true, FlagRetained = true, LawRetained = true, GuaranteesPreserved = true, VoteWeight = 1f };
+                var i1 = map.Accession.Offer(me, accWarm, bloc, map.World.Countries[accWarm].IsoA3, generous, false, false,
+                    simDay, map.Economy.States[accWarm], map.Economy.States[me], map.National.States[me]);
+                Debug.Log($"[accdiag] GENEROUS offer to {map.World.Countries[accWarm].Name} ({bloc}) decides day {i1.DecisionDay} (eval {i1.DecisionDay - simDay}d) termsBonus={generous.GenerosityScore()}");
+
+                // (2) coercive, harsh terms
+                var harsh = new AccessionTerms { VoteWeight = 0.4f };
+                var i2 = map.Accession.Offer(me, accCold, bloc, map.World.Countries[accCold].IsoA3, harsh, true, true,
+                    simDay, map.Economy.States[accCold], map.Economy.States[me], map.National.States[me]);
+                Debug.Log($"[accdiag] COERCIVE offer to {map.World.Countries[accCold].Name} decides day {i2.DecisionDay} termsBonus={harsh.GenerosityScore()}");
+                var led0 = map.Legitimacy.Of(me);
+                Debug.Log($"[accdiag] inviter ledger BEFORE: foreignGov={led0.Get(Observer.ForeignGovernments):0.0} foreignPop={led0.Get(Observer.ForeignPopulations):0.0} blocMembers={led0.Get(Observer.BlocMembers):0.0}");
+            }
+
+            if (accDiagOffered && !accDiagReported && map.Accession.Open.Count == 0 && map.Accession.Resolved.Count >= 2)
+            {
+                accDiagReported = true;
+                foreach (var r in map.Accession.Resolved)
+                    Debug.Log($"[accdiag] RESOLVED {map.World.Countries[r.To].Name}: {r.Status} score={r.FinalScore:0.0} coercion={r.ImpliedCoercion:0.00} ({r.Reason})");
+                var led = map.Legitimacy.Of(me);
+                Debug.Log($"[accdiag] inviter ledger AFTER: foreignGov={led.Get(Observer.ForeignGovernments):0.0} foreignPop={led.Get(Observer.ForeignPopulations):0.0} blocMembers={led.Get(Observer.BlocMembers):0.0} (coercion should have cost all three)");
+
+                // Terms that bind: a guaranteed member must NOT be pulled into mutual defence.
+                foreach (var b in map.Unions.Blocs)
+                    if (b.GuaranteedMembers.Count > 0)
+                        Debug.Log($"[accdiag] {b.Name} has {b.GuaranteedMembers.Count} guaranteed member(s) excluded from mutual defence — the bloc grew but got hollower");
+
+                // Refusal permanence: re-invite anyone who refused and show the penalty.
+                foreach (var rr in map.Accession.Refusals)
+                {
+                    var t = new AccessionTerms { ArmyRetained = true, FlagRetained = true };
+                    var again = map.Accession.Offer(me, rr.Target, "European Union", map.World.Countries[rr.Target].IsoA3, t, false, false,
+                        simDay, map.Economy.States[rr.Target], map.Economy.States[me], map.National.States[me]);
+                    again.ImpliedCoercion = map.Accession.ComputeCoercion(again, map.Economy.States[me], map.National.States[me], map.Wars, simDay);
+                    float sc = map.Accession.AcceptanceScore(again, map.Diplomacy, map.Legitimacy, map.Economy.States[me], map.Economy.States[rr.Target]);
+                    Debug.Log($"[accdiag] RE-INVITE {map.World.Countries[rr.Target].Name}: score={sc:0.0} coercion={again.ImpliedCoercion:0.00} priorRefusals={map.Accession.RefusalCount(me, rr.Target)} (-20/refusal, permanent)");
+                    break;
+                }
+            }
         }
 
         // AI countries legislate too — not just the player. Each day a small deterministic

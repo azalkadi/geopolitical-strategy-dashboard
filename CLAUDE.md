@@ -933,8 +933,27 @@ terrorism, (5) tiered city icons, then further down the vision list.
     joins EU (2→3 memberships, bonus 0.0150→0.0750), two extra recomputes leave it at 0.0750,
     leaving returns it to 0.0150. Also fixed a boot assertion that still read the old field and
     printed `0.000 (expect >0)` — misleading to anyone reading the log.
-  - Next: §4 proper (invitation pipeline, coercion, refusal memory, then the crowd) per
-    `docs/obsidian-vault/Vision/Accession and the Crowd.md`, then §5 (institutions/overrule).
+  - **[§4] Invitation pipeline BUILT AND VERIFIED** (`Sim/Accession.cs`). Offers carry terms
+    (army/flag/law/guarantees retained, vote weight); large states deliberate up to 3 years;
+    `ImpliedCoercion` is DERIVED every tick from real signals (war, tariff rises since the offer,
+    mobilisation, public deadline, inevitability framing, re-invite soon after refusal) — never
+    authored. Refusal is permanent (-20 cumulative, no cooldown). Accepting mutates real bloc
+    membership via `UnionSystem.AddMember`, and **generous terms genuinely hollow the bloc**: a
+    member admitted with `GuaranteesPreserved` goes into `MutableBloc.GuaranteedMembers` and is
+    excluded from mutual defence in `MilitaryAlliesOf`.
+  - **Two balance bugs were caught by the diagnostic and fixed before commit** — worth knowing
+    because both LOOKED fine in a green build: (1) the score had a ~70-point floor before
+    relations were consulted, so hostile Russia *accepted* annexation-by-invitation at 81; base is
+    now 0, relations weigh 0.8, and relations <25 subtracts 30. (2) The accession reward
+    (+3/+4/+3/+4) outweighed the coercion penalty, making coercion **profitable** — the exact
+    inversion of the design. The reward is now scaled by `(1 - coercion)`, so a state dragged in
+    under pressure earns the inviter nothing.
+  - `MERIDIAN_DIAG_ACCESSION=1` verified live: Monaco accepts generous terms (122) and NATO gains
+    a guaranteed member excluded from mutual defence; Russia refuses coercion (19, was 81); the
+    inviter's ForeignGovernments ledger drops 50→45.6 from the pressure; re-inviting Russia scores
+    26.3 with priorRefusals=1. Zero exceptions.
+  - Next: **the crowd** (§4's second half — populations acting independently of their governments,
+    with no UI to start/aim/stop it), then §5 (institutions and the overrule cycle).
 - **Overnight session status: 6 features shipped + verified** (infra dividend, elections, unions,
   terrorism, capital markers, regime-change diplomacy shock), each its own pushed commit.
   Continuing down the vision list if the loop runs on.
