@@ -46,6 +46,7 @@ namespace Meridian.Sim
         // static WorldAlignments on load would silently undo every accession.
         public UnionSystem Unions;
         public AccessionSystem Accession;
+        public CrowdSystem Crowds;
 
         public Dictionary<string, float[]> History;
     }
@@ -56,7 +57,7 @@ namespace Meridian.Sim
 
         public static bool SaveExists() => File.Exists(SavePath);
 
-        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars, InfrastructureSystem infra, LegislatureSystem legis, LegitimacySystem legit, UnionSystem unions, AccessionSystem accession)
+        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars, InfrastructureSystem infra, LegislatureSystem legis, LegitimacySystem legit, UnionSystem unions, AccessionSystem accession, CrowdSystem crowds)
         {
             try
             {
@@ -83,6 +84,7 @@ namespace Meridian.Sim
                     Legitimacy = legit,
                     Unions = unions,
                     Accession = accession,
+                    Crowds = crowds,
                     History = new Dictionary<string, float[]>
                     {
                         ["gdp"] = PlayerHistory.Gdp.ToArray(),

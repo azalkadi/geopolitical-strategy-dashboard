@@ -117,6 +117,17 @@ namespace Meridian.Sim
             return ev;
         }
 
+        // A continuous pressure that is NOT an event. Ongoing phenomena (a crowd standing in the
+        // street for months) move an observer every single day, and recording one permanent memory
+        // entry per day would drown the causal trace that Record() exists to keep readable. The
+        // event is recorded once when the thing starts; this is the drip that follows it.
+        public void Drift(int country, Observer o, float delta)
+        {
+            var led = Of(country);
+            if (led == null) return;
+            led.Scores[(int)o] = Clampf(led.Scores[(int)o] + delta, 0f, 100f);
+        }
+
         // Convenience builder so call sites read like the design doc rather than like array maths.
         public static float[] Deltas(
             float ownPopulation = 0f, float foreignPopulations = 0f, float foreignGovernments = 0f,

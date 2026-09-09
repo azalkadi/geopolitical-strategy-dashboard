@@ -92,7 +92,7 @@ namespace Meridian.Map
         public bool SaveNow()
         {
             if (map?.Economy == null || map.National == null || map.Diplomacy == null || map.Wars == null) return false;
-            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy, map.Unions, map.Accession);
+            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy, map.Unions, map.Accession, map.Crowds);
         }
 
         // Autosave: quitting mid-game shouldn't cost the player their run.
@@ -214,6 +214,11 @@ namespace Meridian.Map
 
                 MaybeRunElections(simDay);
 
+                if (map.Crowds != null)
+                    foreach (var headline in map.Crowds.TickAll(simDay, map.Economy, map.National, map.Diplomacy,
+                                 map.Legitimacy, map.Accession, map.World.Countries, map.CountryNames))
+                        WorldFeed.Push("The Street", headline);
+
                 if (map.Accession != null)
                     foreach (var headline in map.Accession.TickAll(simDay, map.Economy, map.National, map.Diplomacy,
                                  map.Legitimacy, map.Unions, map.Wars, map.World.Countries, map.CountryNames))
@@ -236,6 +241,7 @@ namespace Meridian.Map
                 MaybeRunLegitimacyDiag();
                 MaybeRunUnionMembershipDiag();
                 MaybeRunAccessionDiag();
+                MaybeRunCrowdDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -710,6 +716,124 @@ namespace Meridian.Map
                     break;
                 }
             }
+        }
+
+        // MERIDIAN_DIAG_CROWD=1 - the §4 crowd (Sim/Crowd.cs). Four things have to be visible in
+        // Player.log or the mechanic is not real: (1) formation happens ONLY in the gap between a
+        // population and its own government - all three conditions logged; (2) the crowd pushes a
+        // pending accession WITHOUT the inviter incurring any coercion penalty, because the
+        // inviter did nothing; (3) firing on it is catastrophic across every observer at once;
+        // (4) asking it to go home costs the player too. There is no UI for any of this and there
+        // must never be - the diag calls the resolution branches directly for exactly that reason.
+        bool crowdDiagArmed, crowdDiagFormed, crowdDiagResolved, crowdReportedAccession;
+        long crowdDiagArmedDay = -1;
+        readonly List<int> crowdTargets = new List<int>();
+        void MaybeRunCrowdDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_CROWD") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.Crowds == null || map.Legitimacy == null || map.Accession == null) return;
+
+            // PHASE A - force the three conditions. Note what is being forced: decades of earned
+            // regard abroad, a cold government, and a miserable population. The player can only
+            // ever move the first of those.
+            if (!crowdDiagArmed && simDay >= 15)
+            {
+                crowdDiagArmed = true; crowdDiagArmedDay = simDay;
+                map.Legitimacy.Of(me).Scores[(int)Observer.ForeignPopulations] = 88f;
+                Debug.Log($"[crowddiag] {map.World.Countries[me].Name} foreignPopulations legitimacy set to 88 (threshold {CrowdSystem.MinForeignPopLegitimacy})");
+
+                var cold = map.Diplomacy.RankedFor(me, friendliest: false, topN: 4);
+                for (int k = 0; k < cold.Count && k < 4; k++)
+                {
+                    int t = cold[k].index;
+                    crowdTargets.Add(t);
+                    float rel = map.Diplomacy.GetRelation(me, t);
+                    if (rel >= CrowdSystem.MaxGovernmentRelations) map.Diplomacy.ChangeRelation(me, t, 20f - rel);
+                    map.National.States[t].PublicMood = 30f;
+                    map.National.States[t].ReadinessIndex = 72f;   // a defended line, for rule 3
+                    Debug.Log($"[crowddiag] target {map.World.Countries[t].Name}: relations={map.Diplomacy.GetRelation(me, t):0.0} (<35) mood={map.National.States[t].PublicMood:0.0} (<45) readiness={map.National.States[t].ReadinessIndex:0.0}");
+                }
+
+                // Something for the street to be about: an invitation the government has not
+                // answered. The crowd will answer it for them.
+                if (crowdTargets.Count > 0 && map.Unions != null)
+                {
+                    int t0 = crowdTargets[0];
+                    string bloc = map.Unions.MembershipsOf(me).Count > 0 ? map.Unions.MembershipsOf(me)[0].Name : "European Union";
+                    var terms = new AccessionTerms { ArmyRetained = true, FlagRetained = true, LawRetained = true, VoteWeight = 1f };
+                    var inv = map.Accession.Offer(me, t0, bloc, map.World.Countries[t0].IsoA3, terms, false, false,
+                        simDay, map.Economy.States[t0], map.Economy.States[me], map.National.States[me]);
+                    Debug.Log($"[crowddiag] pending invitation to {map.World.Countries[t0].Name} ({bloc}), decides day {inv.DecisionDay}, no pressure applied");
+                }
+            }
+
+            // PHASE B - formation.
+            if (crowdDiagArmed && !crowdDiagFormed && map.Crowds.ActiveCrowds().Count > 0)
+            {
+                crowdDiagFormed = true;
+                foreach (var c in map.Crowds.ActiveCrowds())
+                    Debug.Log($"[crowddiag] FORMED day {c.StartedDay} in {map.World.Countries[c.In].Name} for {map.World.Countries[c.Toward].Name}, size={c.Size:0.0} - nobody called them");
+            }
+
+            // PHASE C - let it stand for a while, then force both endings.
+            if (crowdDiagFormed && !crowdDiagResolved && simDay >= crowdDiagArmedDay + 70)
+            {
+                crowdDiagResolved = true;
+                var active = map.Crowds.ActiveCrowds();
+                Debug.Log($"[crowddiag] after 70 days: {active.Count} active crowd(s)");
+                foreach (var c in active)
+                {
+                    var govLed = map.Legitimacy.Of(c.In);
+                    Debug.Log($"[crowddiag]   {map.World.Countries[c.In].Name}: size={c.Size:0.0} pressure=+{c.Pressure:0.0} govOwnPopLegitimacy={govLed.Get(Observer.OwnPopulation):0.0} approval={map.National.States[c.In].ApprovalRating:0.0} casualtiesAtLine={c.Casualties}");
+                }
+                foreach (var inv in map.Accession.Open)
+                    if (inv.From == me)
+                        Debug.Log($"[crowddiag]   invitation to {map.World.Countries[inv.To].Name}: crowdPressure=+{inv.CrowdPressure:0.0} impliedCoercion={inv.ImpliedCoercion:0.00} (the player applied none)");
+
+                var myLed = map.Legitimacy.Of(me);
+                Debug.Log($"[crowddiag] RULE 3 - inviter ownPopulation={myLed.Get(Observer.OwnPopulation):0.0}; casualties at a defended line cost the inviter -10 with its OWN people for a shot it never fired");
+
+                List<string> hl = null;
+                // Ending 1: the government bends.
+                if (active.Count > 0)
+                {
+                    var c = active[0];
+                    map.Crowds.Concede(c, simDay, map.Diplomacy, map.Legitimacy, map.Accession, map.CountryNames, ref hl);
+                    Debug.Log($"[crowddiag] CONCEDED in {map.World.Countries[c.In].Name}: {c.Ending}");
+                }
+                // Ending 2: the government fires. Dump every observer - the point is that one act
+                // moves all six at once and none of them ever forget it.
+                if (active.Count > 1)
+                {
+                    var c = active[1];
+                    var before = (float[])map.Legitimacy.Of(c.In).Scores.Clone();
+                    map.Crowds.OrderForceAgainst(c, c.In, simDay, map.Diplomacy, map.Legitimacy, map.CountryNames, ref hl);
+                    var after = map.Legitimacy.Of(c.In).Scores;
+                    Debug.Log($"[crowddiag] FIRED UPON in {map.World.Countries[c.In].Name}: {c.Ending}");
+                    for (int o = 0; o < ObserverExt.Count; o++)
+                        Debug.Log($"[crowddiag]   {((Observer)o).Label()}: {before[o]:0.0} -> {after[o]:0.0} ({after[o] - before[o]:+0.0;-0.0;0})");
+                }
+                // Ending 3 (rule 1): the player asks them to go home. Deliberately has no button.
+                if (active.Count > 2)
+                {
+                    var c = active[2];
+                    var b4 = map.Legitimacy.Of(me).Get(Observer.ForeignPopulations);
+                    map.Crowds.AttemptDisperse(c, me, simDay, map.Legitimacy, map.CountryNames);
+                    Debug.Log($"[crowddiag] DISPERSE ATTEMPT by {map.World.Countries[me].Name}: foreignPopulations {b4:0.0} -> {map.Legitimacy.Of(me).Get(Observer.ForeignPopulations):0.0} - asking a crowd that gathered for you to go home reads as betrayal");
+                }
+                if (hl != null) foreach (var h in hl) Debug.Log($"[crowddiag] headline: {h}");
+            }
+
+            // PHASE D - the concession lands as an accession with ZERO coercion charged.
+            if (crowdDiagResolved && !crowdReportedAccession)
+                foreach (var r in map.Accession.Resolved)
+                    if (r.From == me && r.GovernmentConceded)
+                    {
+                        crowdReportedAccession = true;
+                        Debug.Log($"[crowddiag] ACCESSION VIA THE STREET: {map.World.Countries[r.To].Name} {r.Status} - {r.Reason}, coercion={r.ImpliedCoercion:0.00} (won without pressure, so no permanent penalty)");
+                        break;
+                    }
         }
 
         // AI countries legislate too — not just the player. Each day a small deterministic

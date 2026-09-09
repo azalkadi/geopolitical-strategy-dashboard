@@ -62,6 +62,13 @@ namespace Meridian.Sim
         public float InviterReadinessAtOffer;
 
         public float ImpliedCoercion;     // 0..1, derived every tick — never authored
+        // Set by CrowdSystem, not by the inviter — a population in the street is not a lever the
+        // player pulls. Capped at +30 by the score: a crowd tilts a decision, it does not make it.
+        public float CrowdPressure;
+        // A government that yielded to its own people. Accepts regardless of score, and carries
+        // NO coercion penalty for the inviter, because the inviter did not do it.
+        public bool GovernmentConceded;
+
         public AccessionStatus Status = AccessionStatus.Pending;
         public string Reason = "";
         public float FinalScore;
@@ -167,6 +174,7 @@ namespace Meridian.Sim
             score += prosperityPull;
 
             score += inv.Terms.GenerosityScore();
+            score += Mathf.Min(30f, inv.CrowdPressure);          // §6: the street, not the state
             score += inv.ImpliedCoercion * 25f;                  // works NOW, costs forever
             score -= 20f * RefusalCount(inv.From, inv.To);       // permanent, cumulative
             return score;
@@ -191,7 +199,7 @@ namespace Meridian.Sim
 
                 float score = AcceptanceScore(inv, dip, legit, econ.States[inv.From], econ.States[inv.To]);
                 inv.FinalScore = score;
-                bool accepted = score > 50f;
+                bool accepted = score > 50f || inv.GovernmentConceded;
 
                 // The permanent price of pressure — charged whatever the answer, and visible to
                 // every observing state, not just the one that was pressured.
@@ -217,7 +225,9 @@ namespace Meridian.Sim
                             bloc.GuaranteedMembers.Add(inv.TargetIso);
                     }
                     inv.Status = AccessionStatus.Accepted;
-                    inv.Reason = $"accepted at score {score:0}";
+                    inv.Reason = inv.GovernmentConceded
+                        ? $"government conceded to a crowd (score was {score:0})"
+                        : $"accepted at score {score:0}";
                     dip.ChangeRelation(inv.From, inv.To, +15f);
                     // The reward is for CONSENT, so it is scaled by how freely the yes was given.
                     // A state dragged in under maximum pressure earns the inviter nothing at all —

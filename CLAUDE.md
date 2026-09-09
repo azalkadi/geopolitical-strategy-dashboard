@@ -146,6 +146,7 @@ works — set the vars, launch the exe, read the log, grep for the diagnostic ta
 | `MERIDIAN_DIAG_AILEGIS=1` | Logs every AI-country tax bill proposed | `[ailegis]` |
 | `MERIDIAN_DIAG_ELECTION=1` | Logs every general election and the resulting seat shift | `[electiondiag]` |
 | `MERIDIAN_DIAG_TERROR=1` | Forces a grievance scenario, logs threat/attacks/counter-op | `[terrordiag]` |
+| `MERIDIAN_DIAG_CROWD=1` | Forces the three crowd conditions, logs formation, both resolutions and all three rules | `[crowddiag]` |
 
 Typical verification run (PowerShell):
 
@@ -153,13 +154,26 @@ Typical verification run (PowerShell):
 $env:MERIDIAN_AUTOSTART = "United States"
 $env:MERIDIAN_AUTOPILOT = "1"
 $env:MERIDIAN_DIAG_ELECTION = "1"
-Start-Process ".\Build\Windows\Meridian.exe"
+# ALWAYS launch verification runs on the SECONDARY monitor, windowed, and ALWAYS keep the PID.
+$p = Start-Process ".\Build\Windows\Meridian.exe" -PassThru `
+     -ArgumentList "-monitor","2","-screen-fullscreen","0","-screen-width","1600","-screen-height","900"
 Start-Sleep -Seconds 90     # ~1 sim-year at default speed
-Get-Process Meridian | Stop-Process -Force
+Stop-Process -Id $p.Id -Force        # NEVER `Get-Process Meridian | Stop-Process`
 Select-String -Path "$env:USERPROFILE\AppData\LocalLow\DefaultCompany\MeridianUnity\Player.log" -Pattern "electiondiag"
 ```
 
-**Three traps that have burned previous sessions:**
+**Do not disturb the user's own session.** They play on the primary 3440x1440 monitor while you
+work. `Get-Process Meridian | Stop-Process -Force` kills *their* running game too — this has
+already happened once. Always capture the PID from `-PassThru` and kill only that. Always pass
+`-monitor 2` so your window opens on the smaller 1920x1200 display and never steals their screen.
+
+**Four traps that have burned previous sessions:**
+0. **`runInBackground` was 0** until 2026-09-09, so a launched build *paused the moment it lost
+   focus* — a scripted run would sit on the loading screen for its whole 190-second window and
+   produce a Player.log that stopped at `[diag] MERIDIAN_AUTOSTART engaged`, looking exactly like
+   a feature that never fired. It is now 1 in `ProjectSettings.asset`. If verification runs ever
+   go silent again, check that first.
+
 1. **No `MERIDIAN_AUTOPILOT=1` on a long run** → the sim freezes at the first decision modal and
    you'll conclude a feature "doesn't fire" when it simply never got there. This exact mistake
    produced a false negative on AI legislation.
@@ -355,6 +369,39 @@ Personal licence. Then `Tools\build.ps1 -Mode compile` should print `OK: all scr
 If builds start failing with exit 198 again, this is why.
 
 ## Current status (as of the last worked session)
+
+### 2026-09-09 — Consequence Engine §4 second half: THE CROWD (`Sim/Crowd.cs`)
+
+Verified headless with `MERIDIAN_DIAG_CROWD=1`, zero exceptions. This is the mechanic the design
+brief calls the most distinctive and the most easily ruined, so read `Sim/Crowd.cs`'s header before
+touching it — the constraints are the feature.
+
+- **A crowd forms only in the gap between a population and its own government.** All three
+  conditions must hold: the inviter's `ForeignPopulations` legitimacy > 75, the target
+  government's relations with the inviter < 35, and the target's `PublicMood` < 45.
+- **There is NO UI to start, aim, or stop one, and there must never be.** `AttemptDisperse()` and
+  `OrderForceAgainst()` are public so their cost is defined and testable; they are wired to
+  nothing. Adding a button for either kills the mechanic outright.
+- **Rule 2 verified**: Nigeria fired on the crowd and moved all six observers at once —
+  ownPop 16.2 -> 1.2, foreignPop 38 -> 13, foreignGov 47 -> 35, religious 42 -> 22,
+  blocMembers 50 -> 40, ownMilitary 48 -> 43. Permanent, never pruned.
+- **Rule 3 verified**: 16-20 casualties at defended lines the player never fired on cost Indonesia
+  -10 `OwnPopulation` per incident (50 -> 33 across the run). The observer the player most needs
+  is the one that punishes them for other people's dead.
+- **Rule 1 verified**: asking a crowd gathered *for you* to go home costs -12 foreignPopulations,
+  -6 ownPopulation.
+- **The payoff**: Moldova acceded to ASEAN because its government conceded to the street —
+  `coercion=0.00`, so none of §4's permanent coercion penalty applied. Winning through consent
+  costs nothing; winning through pressure costs forever. That asymmetry is the whole design.
+- Crowds also erode the target government daily (`OwnPopulation` -0.3/day via the new
+  `LegitimacySystem.Drift`, which deliberately does *not* write a memory entry — one event per day
+  would drown the causal trace; approval -0.4/day) and push a pending invitation by +2/day capped
+  at +30. A crowd tilts a decision; it does not make it.
+- `CrowdSystem` is serialized in `SaveGame.Crowds`, ticked before `AccessionSystem` (so a
+  concession resolves the same day), and pushes headlines to the `"The Street"` WorldFeed channel.
+
+Next: §5 institutions and the overrule cycle (`times_overruled` 0/1/2 + restoration play).
+
 
 Everything below is built, launched, and verified via Player.log + visual checks:
 - Web Mercator projection across all layers; vector/imagery alignment confirmed from world

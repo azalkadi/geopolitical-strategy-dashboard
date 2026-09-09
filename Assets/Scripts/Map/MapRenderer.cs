@@ -87,6 +87,8 @@ namespace Meridian.Map
         public LegitimacySystem Legitimacy { get; private set; }
         // §4 accession: invitations, coercion, permanent refusal memory.
         public AccessionSystem Accession { get; private set; }
+        // §4 second half: crowds. Nothing here is player-directed — see Sim/Crowd.cs.
+        public CrowdSystem Crowds { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -205,6 +207,7 @@ namespace Meridian.Map
             // is earned through actions (Consequence Engine §3).
             Legitimacy = LegitimacySystem.Seed(World.Countries.Count);
             Accession = new AccessionSystem();
+            Crowds = new CrowdSystem();
             Diplomacy.Legit = Legitimacy;
             Wars.Legit = Legitimacy;
             // Spot checks in the boot log: a war pair, a bloc-floor pair (France also proves
@@ -265,6 +268,7 @@ namespace Meridian.Map
             // Pre-Consequence-Engine saves have no ledger — seed a fresh one rather than crashing.
             Legitimacy = save.Legitimacy ?? LegitimacySystem.Seed(World.Countries.Count);
             Accession = save.Accession ?? new AccessionSystem();
+            Crowds = save.Crowds ?? new CrowdSystem();
             if (Diplomacy != null) Diplomacy.Legit = Legitimacy;
             if (Wars != null) Wars.Legit = Legitimacy;
 
