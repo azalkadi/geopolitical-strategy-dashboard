@@ -851,6 +851,8 @@ namespace Meridian.Map
         bool instDiagFounded, instDiagAdvisoryLogged, instDiagDissolvedLogged, instDiagRestored, instDiagVoteLogged;
         float[] instLedgerLastTick;
         float instPeakBeforeBreak;
+        bool instCtxPreLogged;
+        long instCtxOpenUntil = -1;   // holds the player's own context menu open so the §5 UI branch actually renders
         void MaybeRunInstitutionDiag()
         {
             if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_INSTITUTION") == null) return;
@@ -858,6 +860,20 @@ namespace Meridian.Map
             if (me < 0 || map.Institutions == null || map.Legitimacy == null) return;
             var led = map.Legitimacy.Of(me);
 
+            // The branch the player meets FIRST -- the two founding actions -- renders before any
+            // institution exists, which is before the early-return below, so it has to be driven
+            // here or it would ship unverified.
+            if (!instDiagFounded && simDay >= 8 && simDay < 12)
+            {
+                ContextMenuCountry = me;
+                ContextMenuScreenPos = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                if (!instCtxPreLogged && simDay >= 10)
+                {
+                    instCtxPreLogged = true;
+                    Debug.Log($"[instdiag] context menu rendered on own country day {simDay}: institutions=0 (offering: found binding court / advisory council)");
+                    CloseContextMenu();
+                }
+            }
             if (!instDiagFounded && simDay >= 12)
             {
                 instDiagFounded = true;
@@ -874,6 +890,7 @@ namespace Meridian.Map
                 // Issue the first ruling immediately so the whole ladder fits in one run.
                 var r1 = map.Institutions.MaybeIssue(inst, simDay, map.Economy, map.National, map.Diplomacy, map.Wars, map.Accession, map.CountryNames);
                 if (r1 != null) Debug.Log($"[instdiag] RULING 1 ({r1.Kind}): {r1.Demand}; deadline day {r1.DeadlineDay}. Player will NOT comply (tariff stays at {map.Economy.States[me].TaxTariff:0}).");
+                instCtxOpenUntil = simDay + 4;
             }
 
             if (!instDiagFounded) return;
@@ -909,6 +926,7 @@ namespace Meridian.Map
                 if (hl != null) foreach (var h in hl) Debug.Log($"[instdiag] headline: {h}");
 
                 // And now risk everything: drop own-population standing so the removal clause fires.
+                instCtxOpenUntil = simDay + 4;
                 led.Scores[(int)Observer.OwnPopulation] = 25f;
                 Debug.Log($"[instdiag] ownPopulation forced to 25 - below 30, so the removal clause the restored body carries will fire next tick");
             }
@@ -921,6 +939,22 @@ namespace Meridian.Map
                     Debug.Log($"[instdiag]   {((Observer)o).Label()}: {led.Scores[o]:0.0}");
                 float ceilingNow = led.Get(Observer.BlocMembers) + (InstitutionSystem.AccrualCap(i0) - i0.Accrued[(int)Observer.BlocMembers]);
                 Debug.Log($"[instdiag] VERDICT blocMembers now {led.Get(Observer.BlocMembers):0.0}, peak before the first overrule {instPeakBeforeBreak:0.0}, and the restored body's ceiling is {ceilingNow:0.0} at x{i0.AccrualRate:0.0}/day accrual (cap {InstitutionSystem.AccrualCap(i0):0} vs {InstitutionSystem.AccrualCapPerObserver:0} originally) - restoring has to BEAT never having broken it, not merely draw level");
+            }
+
+            // Render the player's own context menu on the days above. If anything in the §5 UI
+            // branch throws, it lands in Player.log as an exception rather than as a menu the
+            // player quietly never sees.
+            if (simDay <= instCtxOpenUntil)
+            {
+                ContextMenuCountry = me;
+                ContextMenuScreenPos = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                if (simDay == instCtxOpenUntil)
+                {
+                    var im = map.Institutions.FoundedBy(me);
+                    Debug.Log($"[instdiag] context menu rendered on own country day {simDay}: institutions={im.Count}" +
+                              (im.Count > 0 ? $" status={im[0].Status} binding={im[0].Binding} pendingRuling={(im[0].PendingRuling() != null)}" : " (offering: found binding court / advisory council)"));
+                    CloseContextMenu();
+                }
             }
 
             instLedgerLastTick = (float[])led.Scores.Clone();

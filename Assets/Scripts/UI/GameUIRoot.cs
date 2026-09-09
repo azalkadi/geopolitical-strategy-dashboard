@@ -2003,6 +2003,79 @@ namespace Meridian.UI
                 interaction.SelectCountry(target));
 
             int me = PlayerState.CountryIndex;
+
+            // §5 INSTITUTIONS — the only actions in this menu that bind the PLAYER rather than
+            // giving them a new way to bind somebody else. There is deliberately no "overrule"
+            // button: overruling is what happens when you simply carry on, and the pending ruling
+            // is shown here so that carrying on is a choice you made rather than one you missed.
+            if (PlayerState.State == GameState.Playing && me >= 0 && target == me && map.Institutions != null)
+            {
+                string blocName = map.Unions != null && map.Unions.MembershipsOf(me).Count > 0
+                    ? map.Unions.MembershipsOf(me)[0].Name : "the Union";
+                var mine = map.Institutions.FoundedBy(me);
+                Institution inst = mine.Count > 0 ? mine[0] : null;
+
+                if (inst == null)
+                {
+                    var isos = new List<string>();
+                    if (map.Unions != null && map.Unions.MembershipsOf(me).Count > 0)
+                        isos.AddRange(map.Unions.MembershipsOf(me)[0].MemberIsos);
+
+                    AddAction("⚖ Found a binding court", GameTheme.Muted(GameTheme.Accent, 0.35f), GameTheme.Accent, () =>
+                    {
+                        var created = map.Institutions.Found($"Court of {blocName}", blocName, me, interaction.SimDay,
+                            binding: true, removalClause: true, isos, map.Legitimacy, map.CountryNames);
+                        ShowToast(PlayerState.CountryName,
+                            $"{created.Name} founded. Its rulings bind you, and it can vote your government out. Everyone noticed.");
+                        builtForCategory = (NationCategory)(-1);
+                    });
+                    AddAction("Found an advisory council", GameTheme.BgButton, GameTheme.BgButtonHover, () =>
+                    {
+                        var created = map.Institutions.Found($"Council of {blocName}", blocName, me, interaction.SimDay,
+                            binding: false, removalClause: false, isos, map.Legitimacy, map.CountryNames);
+                        ShowToast(PlayerState.CountryName,
+                            $"{created.Name} founded. It advises. Everyone noticed that too.");
+                        builtForCategory = (NationCategory)(-1);
+                    });
+                }
+                else if (inst.Status == InstitutionStatus.Dissolved)
+                {
+                    AddAction($"⚖ Restore {inst.Name} — binding", GameTheme.Muted(GameTheme.Accent, 0.35f), GameTheme.Accent, () =>
+                    {
+                        List<string> hl = null;
+                        map.Institutions.Restore(inst, interaction.SimDay, map.Legitimacy, map.CountryNames, ref hl);
+                        ShowToast(PlayerState.CountryName,
+                            $"{inst.Name} restored with binding power and a removal clause over you. It costs more than founding it did.");
+                        builtForCategory = (NationCategory)(-1);
+                    });
+                }
+                else
+                {
+                    var status = MakeLabel(
+                        $"{inst.Name} — {(inst.Status == InstitutionStatus.Advisory ? "ADVISORY" : inst.Binding ? "BINDING" : "active")}"
+                        + (inst.TimesOverruled > 0 ? $" · overruled {inst.TimesOverruled}×" : ""),
+                        10, inst.TimesOverruled > 0 ? GameTheme.Negative : GameTheme.TextDim);
+                    status.style.marginTop = 6;
+                    contextMenu.Add(status);
+
+                    var pending = inst.PendingRuling();
+                    if (pending != null)
+                    {
+                        var demand = MakeLabel($"Ruling: {pending.Demand} — by day {pending.DeadlineDay}", 10, GameTheme.Accent);
+                        demand.style.whiteSpace = WhiteSpace.Normal;
+                        demand.style.marginTop = 2;
+                        contextMenu.Add(demand);
+                        var warn = MakeLabel(
+                            inst.TimesOverruled == 0
+                                ? "Ignore it and it becomes advisory."
+                                : "Ignore it and it dissolves, with everything it earned you.",
+                            10, GameTheme.Negative);
+                        warn.style.whiteSpace = WhiteSpace.Normal;
+                        contextMenu.Add(warn);
+                    }
+                }
+            }
+
             if (PlayerState.State == GameState.Playing && me >= 0 && target != me
                 && map.Diplomacy != null && map.Wars != null)
             {

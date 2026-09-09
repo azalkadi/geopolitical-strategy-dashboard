@@ -398,9 +398,15 @@ An institution is **the only thing in the game that binds the player**.
    ownPopulation 25 -> 37, foreignGov 43 -> 53, blocMembers 36 -> 44, ownMilitary 40 -> 46.
    A leader who survives a removal vote really is more legitimate after.
 
-**Known gap, flagged honestly:** there is no UI to found or restore an institution yet, so in
-actual play the system only ticks — the diagnostic is currently the only thing that founds one.
-The next commit adds the entry point.
+**UI entry point** (right-click your OWN country): `⚖ Found a binding court` / `Found an advisory
+council` when you have none, `⚖ Restore <name> — binding` once it has dissolved, and while one is
+alive the menu shows its status, any pending ruling, and what ignoring it will cost. There is
+deliberately **no overrule button** — overruling is what happens when you simply carry on, and the
+ruling is shown so that carrying on is a choice you made rather than one you missed.
+Three of the four branches were driven in a real run and render clean (`institutions=0`;
+`Active binding=False pendingRuling=True`; `Active binding=True`). **Not yet rendered: the
+`Dissolved` branch** — the diagnostic restores the moment it detects dissolution, so that one
+button is verified by inspection only.
 
 
 ### 2026-09-09 — Consequence Engine §4 second half: THE CROWD (`Sim/Crowd.cs`)
