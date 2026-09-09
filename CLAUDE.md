@@ -147,6 +147,7 @@ works — set the vars, launch the exe, read the log, grep for the diagnostic ta
 | `MERIDIAN_DIAG_ELECTION=1` | Logs every general election and the resulting seat shift | `[electiondiag]` |
 | `MERIDIAN_DIAG_TERROR=1` | Forces a grievance scenario, logs threat/attacks/counter-op | `[terrordiag]` |
 | `MERIDIAN_DIAG_CROWD=1` | Forces the three crowd conditions, logs formation, both resolutions and all three rules | `[crowddiag]` |
+| `MERIDIAN_DIAG_INSTITUTION=1` | Walks the whole §5 overrule ladder in one run: found, overrule, dissolve, restore, removal vote | `[instdiag]` |
 
 Typical verification run (PowerShell):
 
@@ -369,6 +370,38 @@ Personal licence. Then `Tools\build.ps1 -Mode compile` should print `OK: all scr
 If builds start failing with exit 198 again, this is why.
 
 ## Current status (as of the last worked session)
+
+### 2026-09-09 — Consequence Engine §5: institutions and the overrule cycle (`Sim/Institutions.cs`)
+
+Verified headless with `MERIDIAN_DIAG_INSTITUTION=1`, zero exceptions, whole ladder in one run.
+An institution is **the only thing in the game that binds the player**.
+
+- `times_overruled` 0 -> 1 -> 2: weight, then advisory (accrual STOPS, blocMembers -18), then
+  dissolution — which removes **exactly** the legitimacy the body ever generated, tracked
+  per-observer in `Institution.Accrued`. Not decayed. Removed.
+- An **advisory body still issues rulings** (`inst.IsAlive`, not `Status == Active`). Gating
+  issuance on Active made the second rung unreachable — the ladder needs it.
+- Compliance is measured against **the world**, never against a button: `Satisfied()` re-checks
+  whether the war actually ended / the coercion actually dropped / the tariff actually fell.
+- **The restoration play**: `Restore()` forces `Binding = true` and `HasRemovalClause = true`
+  (the members' price), costs ownMilitary -8 and ownPopulation -5 up front, and pays +12/+10/+8.
+
+**Two design failures the diagnostic caught, both invisible in a green build:**
+1. Restoring only ever *drew level* with the peak it destroyed — it raised the accrual RATE but
+   not the CEILING, so §5's "highest-value move in the game" was arithmetically false. Fixed:
+   `AccrualCap(inst) = 25 * (1 + TimesRestored)`. Verified ceiling is now **94.0 vs a pre-break
+   peak of 55.2**.
+2. The removal clause only became live at the exact moment it was unsurvivable (support 30.9 vs a
+   threshold of 40 — the player was removed immediately after restoring, and could never make the
+   play the design is built around). Fixed: `+ TimesRestored * 12` — rebuilding a body with power
+   over yourself is evidence in your own removal vote. Verified **survived**, and survival paid
+   ownPopulation 25 -> 37, foreignGov 43 -> 53, blocMembers 36 -> 44, ownMilitary 40 -> 46.
+   A leader who survives a removal vote really is more legitimate after.
+
+**Known gap, flagged honestly:** there is no UI to found or restore an institution yet, so in
+actual play the system only ticks — the diagnostic is currently the only thing that founds one.
+The next commit adds the entry point.
+
 
 ### 2026-09-09 — Consequence Engine §4 second half: THE CROWD (`Sim/Crowd.cs`)
 

@@ -92,7 +92,7 @@ namespace Meridian.Map
         public bool SaveNow()
         {
             if (map?.Economy == null || map.National == null || map.Diplomacy == null || map.Wars == null) return false;
-            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy, map.Unions, map.Accession, map.Crowds);
+            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy, map.Unions, map.Accession, map.Crowds, map.Institutions);
         }
 
         // Autosave: quitting mid-game shouldn't cost the player their run.
@@ -214,6 +214,11 @@ namespace Meridian.Map
 
                 MaybeRunElections(simDay);
 
+                if (map.Institutions != null)
+                    foreach (var headline in map.Institutions.TickAll(simDay, map.Economy, map.National, map.Diplomacy,
+                                 map.Legitimacy, map.Wars, map.Accession, map.World.Countries, map.CountryNames))
+                        WorldFeed.Push("Institutions", headline);
+
                 if (map.Crowds != null)
                     foreach (var headline in map.Crowds.TickAll(simDay, map.Economy, map.National, map.Diplomacy,
                                  map.Legitimacy, map.Accession, map.World.Countries, map.CountryNames))
@@ -242,6 +247,7 @@ namespace Meridian.Map
                 MaybeRunUnionMembershipDiag();
                 MaybeRunAccessionDiag();
                 MaybeRunCrowdDiag();
+                MaybeRunInstitutionDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -834,6 +840,90 @@ namespace Meridian.Map
                         Debug.Log($"[crowddiag] ACCESSION VIA THE STREET: {map.World.Countries[r.To].Name} {r.Status} - {r.Reason}, coercion={r.ImpliedCoercion:0.00} (won without pressure, so no permanent penalty)");
                         break;
                     }
+        }
+
+        // MERIDIAN_DIAG_INSTITUTION=1 - the §5 overrule cycle (Sim/Institutions.cs). Walks the
+        // whole ladder in one run and prints the numbers at each rung, because the design's central
+        // claim is arithmetic and either survives contact with the log or does not:
+        //   found -> accrue -> overrule (advisory) -> overrule (dissolved, ALL accrual removed)
+        //   -> restore with binding power -> survive a removal vote
+        // The claim to check: restoring is worth MORE than never having broken it.
+        bool instDiagFounded, instDiagAdvisoryLogged, instDiagDissolvedLogged, instDiagRestored, instDiagVoteLogged;
+        float[] instLedgerLastTick;
+        float instPeakBeforeBreak;
+        void MaybeRunInstitutionDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_INSTITUTION") == null) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.Institutions == null || map.Legitimacy == null) return;
+            var led = map.Legitimacy.Of(me);
+
+            if (!instDiagFounded && simDay >= 12)
+            {
+                instDiagFounded = true;
+                // A tariff the institution will have something to say about.
+                map.Economy.States[me].TaxTariff = 18f;
+                var before = (float[])led.Scores.Clone();
+                var isos = new List<string>();
+                if (map.Unions != null && map.Unions.MembershipsOf(me).Count > 0)
+                    isos.AddRange(map.Unions.MembershipsOf(me)[0].MemberIsos);
+                string bloc = map.Unions != null && map.Unions.MembershipsOf(me).Count > 0 ? map.Unions.MembershipsOf(me)[0].Name : "the union";
+                var inst = map.Institutions.Found("Court of " + bloc, bloc, me, simDay, false, true, isos, map.Legitimacy, map.CountryNames);
+                Debug.Log($"[instdiag] FOUNDED {inst.Name} by {map.World.Countries[me].Name}: binding={inst.Binding} removalClause={inst.HasRemovalClause} members={inst.MemberIsos.Count}");
+                Debug.Log($"[instdiag]   blocMembers {before[(int)Observer.BlocMembers]:0.0}->{led.Get(Observer.BlocMembers):0.0}  foreignGov {before[(int)Observer.ForeignGovernments]:0.0}->{led.Get(Observer.ForeignGovernments):0.0}  ownMilitary {before[(int)Observer.OwnMilitary]:0.0}->{led.Get(Observer.OwnMilitary):0.0} (the army dislikes being bound)");
+                // Issue the first ruling immediately so the whole ladder fits in one run.
+                var r1 = map.Institutions.MaybeIssue(inst, simDay, map.Economy, map.National, map.Diplomacy, map.Wars, map.Accession, map.CountryNames);
+                if (r1 != null) Debug.Log($"[instdiag] RULING 1 ({r1.Kind}): {r1.Demand}; deadline day {r1.DeadlineDay}. Player will NOT comply (tariff stays at {map.Economy.States[me].TaxTariff:0}).");
+            }
+
+            if (!instDiagFounded) return;
+            var i0 = map.Institutions.FoundedBy(me).Count > 0 ? map.Institutions.FoundedBy(me)[0] : null;
+            if (i0 == null) return;
+            instLedgerLastTick ??= (float[])led.Scores.Clone();
+
+            // Rung 1: advisory.
+            if (!instDiagAdvisoryLogged && i0.TimesOverruled == 1)
+            {
+                instDiagAdvisoryLogged = true;
+                instPeakBeforeBreak = instLedgerLastTick[(int)Observer.BlocMembers];
+                Debug.Log($"[instdiag] OVERRULED ONCE on day {simDay}: status={i0.Status}, accrual stops. blocMembers {instPeakBeforeBreak:0.0}->{led.Get(Observer.BlocMembers):0.0}  foreignGov ->{led.Get(Observer.ForeignGovernments):0.0}");
+                Debug.Log($"[instdiag]   accrued so far and still standing: blocMembers=+{i0.Accrued[(int)Observer.BlocMembers]:0.0} foreignGov=+{i0.Accrued[(int)Observer.ForeignGovernments]:0.0} (this is what a second overrule destroys)");
+                var r2 = map.Institutions.MaybeIssue(i0, simDay, map.Economy, map.National, map.Diplomacy, map.Wars, map.Accession, map.CountryNames);
+                if (r2 != null) Debug.Log($"[instdiag] RULING 2 ({r2.Kind}): {r2.Demand}; deadline day {r2.DeadlineDay}. An advisory body still rules - that is all it can do.");
+            }
+
+            // Rung 2: dissolved, and the exact accrual removed.
+            if (!instDiagDissolvedLogged && i0.Status == InstitutionStatus.Dissolved)
+            {
+                instDiagDissolvedLogged = true;
+                Debug.Log($"[instdiag] DISSOLVED on day {simDay} after overrule #{i0.TimesOverruled}. blocMembers {instLedgerLastTick[(int)Observer.BlocMembers]:0.0}->{led.Get(Observer.BlocMembers):0.0}  foreignGov {instLedgerLastTick[(int)Observer.ForeignGovernments]:0.0}->{led.Get(Observer.ForeignGovernments):0.0}  religious ->{led.Get(Observer.ReligiousAuthority):0.0}");
+                Debug.Log($"[instdiag]   every point it ever generated is gone, not decayed: accrued now {i0.Accrued[(int)Observer.BlocMembers]:0.0}/{i0.Accrued[(int)Observer.ForeignGovernments]:0.0}");
+
+                // THE RESTORATION PLAY.
+                List<string> hl = null;
+                var b4 = (float[])led.Scores.Clone();
+                map.Institutions.Restore(i0, simDay, map.Legitimacy, map.CountryNames, ref hl);
+                instDiagRestored = true;
+                Debug.Log($"[instdiag] RESTORED: binding={i0.Binding} removalClause={i0.HasRemovalClause} timesRestored={i0.TimesRestored} accrualRate x{i0.AccrualRate:0.0} (was x1.0)");
+                Debug.Log($"[instdiag]   blocMembers {b4[(int)Observer.BlocMembers]:0.0}->{led.Get(Observer.BlocMembers):0.0}  foreignGov {b4[(int)Observer.ForeignGovernments]:0.0}->{led.Get(Observer.ForeignGovernments):0.0}  ownPopulation {b4[(int)Observer.OwnPopulation]:0.0}->{led.Get(Observer.OwnPopulation):0.0} (admitting it publicly costs at home)  ownMilitary {b4[(int)Observer.OwnMilitary]:0.0}->{led.Get(Observer.OwnMilitary):0.0}");
+                if (hl != null) foreach (var h in hl) Debug.Log($"[instdiag] headline: {h}");
+
+                // And now risk everything: drop own-population standing so the removal clause fires.
+                led.Scores[(int)Observer.OwnPopulation] = 25f;
+                Debug.Log($"[instdiag] ownPopulation forced to 25 - below 30, so the removal clause the restored body carries will fire next tick");
+            }
+
+            if (instDiagRestored && !instDiagVoteLogged && i0.RemovalVoteHeld)
+            {
+                instDiagVoteLogged = true;
+                Debug.Log($"[instdiag] REMOVAL VOTE day {i0.RemovalVoteDay}: survived={i0.SurvivedRemovalVote}");
+                for (int o = 0; o < ObserverExt.Count; o++)
+                    Debug.Log($"[instdiag]   {((Observer)o).Label()}: {led.Scores[o]:0.0}");
+                float ceilingNow = led.Get(Observer.BlocMembers) + (InstitutionSystem.AccrualCap(i0) - i0.Accrued[(int)Observer.BlocMembers]);
+                Debug.Log($"[instdiag] VERDICT blocMembers now {led.Get(Observer.BlocMembers):0.0}, peak before the first overrule {instPeakBeforeBreak:0.0}, and the restored body's ceiling is {ceilingNow:0.0} at x{i0.AccrualRate:0.0}/day accrual (cap {InstitutionSystem.AccrualCap(i0):0} vs {InstitutionSystem.AccrualCapPerObserver:0} originally) - restoring has to BEAT never having broken it, not merely draw level");
+            }
+
+            instLedgerLastTick = (float[])led.Scores.Clone();
         }
 
         // AI countries legislate too — not just the player. Each day a small deterministic

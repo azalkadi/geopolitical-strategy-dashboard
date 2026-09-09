@@ -89,6 +89,8 @@ namespace Meridian.Map
         public AccessionSystem Accession { get; private set; }
         // §4 second half: crowds. Nothing here is player-directed — see Sim/Crowd.cs.
         public CrowdSystem Crowds { get; private set; }
+        // §5: the only system that binds the player. See Sim/Institutions.cs.
+        public InstitutionSystem Institutions { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -208,6 +210,7 @@ namespace Meridian.Map
             Legitimacy = LegitimacySystem.Seed(World.Countries.Count);
             Accession = new AccessionSystem();
             Crowds = new CrowdSystem();
+            Institutions = new InstitutionSystem();
             Diplomacy.Legit = Legitimacy;
             Wars.Legit = Legitimacy;
             // Spot checks in the boot log: a war pair, a bloc-floor pair (France also proves
@@ -269,6 +272,7 @@ namespace Meridian.Map
             Legitimacy = save.Legitimacy ?? LegitimacySystem.Seed(World.Countries.Count);
             Accession = save.Accession ?? new AccessionSystem();
             Crowds = save.Crowds ?? new CrowdSystem();
+            Institutions = save.Institutions ?? new InstitutionSystem();
             if (Diplomacy != null) Diplomacy.Legit = Legitimacy;
             if (Wars != null) Wars.Legit = Legitimacy;
 
