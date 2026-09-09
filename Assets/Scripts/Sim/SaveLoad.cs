@@ -48,6 +48,7 @@ namespace Meridian.Sim
         public AccessionSystem Accession;
         public CrowdSystem Crowds;
         public InstitutionSystem Institutions;
+        public ConvergenceSystem Convergence;
 
         public Dictionary<string, float[]> History;
     }
@@ -58,7 +59,7 @@ namespace Meridian.Sim
 
         public static bool SaveExists() => File.Exists(SavePath);
 
-        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars, InfrastructureSystem infra, LegislatureSystem legis, LegitimacySystem legit, UnionSystem unions, AccessionSystem accession, CrowdSystem crowds, InstitutionSystem institutions)
+        public static bool Save(long simDay, float daysPerSecond, EconomySystem econ, NationalSystem nat, DiplomacySystem dip, WarSystem wars, InfrastructureSystem infra, LegislatureSystem legis, LegitimacySystem legit, UnionSystem unions, AccessionSystem accession, CrowdSystem crowds, InstitutionSystem institutions, ConvergenceSystem convergence)
         {
             try
             {
@@ -87,6 +88,7 @@ namespace Meridian.Sim
                     Accession = accession,
                     Crowds = crowds,
                     Institutions = institutions,
+                    Convergence = convergence,
                     History = new Dictionary<string, float[]>
                     {
                         ["gdp"] = PlayerHistory.Gdp.ToArray(),

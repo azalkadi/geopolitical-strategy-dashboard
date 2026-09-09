@@ -59,8 +59,12 @@ namespace Meridian.Sim
         public float SpendEducation = 4.5f;
         public float SpendHealthcare = 6.0f;
         public float SpendInfrastructure = 3.0f;
+        // §6: the per-capita convergence programme. Zero under production-share budgeting, and a
+        // genuinely enormous line once adopted -- it is meant to hurt the budget, because that is
+        // the trade the doctrine actually is.
+        public float SpendConvergence = 0f;
         public const float SpendBase = 6.5f;
-        public float TotalSpendingRate => SpendBase + SpendEducation + SpendHealthcare + SpendInfrastructure;
+        public float TotalSpendingRate => SpendBase + SpendEducation + SpendHealthcare + SpendInfrastructure + SpendConvergence;
 
         // Manpower allocation — a PEOPLE resource, distinct from the money spending levers above.
         // Percentages of the labour force directed into public healthcare/education/research

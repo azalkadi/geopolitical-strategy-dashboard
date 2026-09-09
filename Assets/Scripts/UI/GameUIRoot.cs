@@ -801,7 +801,77 @@ namespace Meridian.UI
                 EndCard();
             }
 
+            DrawConvergence(interaction.Selected, e);
             DrawInfrastructureBuilder(interaction.Selected, e);
+        }
+
+        // §6. The number that matters is the ratio between the richest and poorest PROVINCE, not
+        // any national average -- averages are exactly what hides a neglected interior. The card
+        // names both provinces, because "3.4x" means nothing and "Jakarta against Papua" means
+        // everything.
+        //
+        // Deliberately absent: any explanation of the absorption constraint. The player is told
+        // what administrative capacity IS and what feeds it, and never that it will one day become
+        // the thing stopping them. §6 is explicit that this must be discoverable, not a tooltip.
+        void DrawConvergence(int countryIdx, EconomyState e)
+        {
+            if (map.Convergence == null) return;
+            var st = map.Convergence.Of(countryIdx);
+            if (st == null || st.Count <= 1) return;
+            bool own = countryIdx == PlayerState.CountryIndex;
+
+            ProvinceCell hi = null, lo = null;
+            foreach (var c in map.Convergence.ProvincesOf(countryIdx))
+            {
+                if (hi == null || c.Wealth > hi.Wealth) hi = c;
+                if (lo == null || c.Wealth < lo.Wealth) lo = c;
+            }
+
+            StartCard();
+            SectionHeader("REGIONAL CONVERGENCE");
+            LiveStat("Provincial wealth gap", () => $"{st.GapRatio:0.00}x", () => st.GapRatio <= 2.5f);
+            if (hi != null && lo != null)
+            {
+                Stat("Richest province", $"{hi.Name} ({hi.Wealth:0.00})");
+                Stat("Poorest province", $"{lo.Name} ({lo.Wealth:0.00})");
+            }
+            Stat("Provinces", $"{st.Count}");
+            Stat("Budget doctrine", st.Doctrine == BudgetDoctrine.PerCapita ? "Per capita" : "Production share");
+            LiveStat("Administrative capacity", () => $"{st.AdminCapacity:0}", () => st.AdminCapacity >= 45f);
+
+            if (own)
+            {
+                if (st.Doctrine == BudgetDoctrine.ProductionShare)
+                {
+                    var btn = MakeButton("ADOPT PER-CAPITA BUDGETING", 12, GameTheme.Muted(GameTheme.Accent, 0.35f), GameTheme.Accent,
+                        GameTheme.TextPrimary, () =>
+                        {
+                            map.Convergence.SetDoctrine(countryIdx, BudgetDoctrine.PerCapita, interaction.SimDay,
+                                map.Economy, map.Legitimacy, map.CountryNames);
+                            ShowToast(PlayerState.CountryName, "Per-capita budgeting adopted. Every province is now promised the same spending per person.");
+                            builtForCategory = (NationCategory)(-1);
+                        });
+                    btn.style.height = 30; btn.style.marginTop = 6;
+                    currentContainer.Add(btn);
+                }
+                else
+                {
+                    AddSlider("Convergence programme", () => e.SpendConvergence, 0f, 15f, v => e.SpendConvergence = v);
+                    var btn = MakeButton("RETURN TO PRODUCTION SHARE", 12, GameTheme.BgButton, GameTheme.BgButtonHover,
+                        GameTheme.TextPrimary, () =>
+                        {
+                            map.Convergence.SetDoctrine(countryIdx, BudgetDoctrine.ProductionShare, interaction.SimDay,
+                                map.Economy, map.Legitimacy, map.CountryNames);
+                            ShowToast(PlayerState.CountryName, "Production-share budgeting restored. Provinces keep what they generate.");
+                            builtForCategory = (NationCategory)(-1);
+                        });
+                    btn.style.height = 30; btn.style.marginTop = 6;
+                    currentContainer.Add(btn);
+                }
+            }
+
+            HelpText("Production share means provinces keep what they generate — it costs nothing and the gap never closes. Per capita spends the same on every person wherever they live: it is the most expensive line in your budget and the strongest thing you can do for how your own population sees you. Administrative capacity is trained civil servants, built slowly by education spending and education staffing.");
+            EndCard();
         }
 
         // Lets the player connect two of their own cities with a new road or railway, live,

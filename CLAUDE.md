@@ -148,6 +148,7 @@ works — set the vars, launch the exe, read the log, grep for the diagnostic ta
 | `MERIDIAN_DIAG_TERROR=1` | Forces a grievance scenario, logs threat/attacks/counter-op | `[terrordiag]` |
 | `MERIDIAN_DIAG_CROWD=1` | Forces the three crowd conditions, logs formation, both resolutions and all three rules | `[crowddiag]` |
 | `MERIDIAN_DIAG_INSTITUTION=1` | Walks the whole §5 overrule ladder in one run: found, overrule, dissolve, restore, removal vote | `[instdiag]` |
+| `MERIDIAN_DIAG_CONVERGENCE=1` | Fast-forwards 33 years of §6 convergence across three countries and reports the money→capacity crossover | `[convdiag]` |
 
 Typical verification run (PowerShell):
 
@@ -370,6 +371,57 @@ Personal licence. Then `Tools\build.ps1 -Mode compile` should print `OK: all scr
 If builds start failing with exit 198 again, this is why.
 
 ## Current status (as of the last worked session)
+
+### 2026-09-10 — Consequence Engine §6: budget and convergence (`Sim/Convergence.cs`)
+
+Verified headless with `MERIDIAN_DIAG_CONVERGENCE=1`, zero exceptions. Every country is now split
+into its **real provinces**, each with its own wealth, because national averages are exactly what
+hides a neglected interior.
+
+- **The seed is real geography, not noise**: city mass, distance to the capital, and ports.
+  It produces the right answers unprompted — Indonesia 6.06x (Jakarta Raya 1.83 / Papua 0.30),
+  Argentina 7.55x (Ciudad de Buenos Aires richest), Peru 5.10x (Callao richest, Amazonas
+  poorest), Chile 4.32x (Santiago richest). No per-country authoring anywhere.
+- **Two doctrines.** Production share costs nothing and the gap never closes (verified: the
+  control sat at 2.94x for 33 straight years). Per capita is a real budget line
+  (`EconomyState.SpendConvergence`, folded into `TotalSpendingRate`) and pays the largest
+  own-population legitimacy return in the game — 50 → 85-91 across a programme.
+- **THE ABSORPTION CONSTRAINT WORKS AND IS THE POINT.** Verified across 33 years: a country on an
+  ordinary education budget is money-bound until **year 12**, then administrative capacity binds
+  and the same spending stops buying anything (6.06x → only 1.93x in 33 years). A country that
+  spent those years on education spending + education manpower reaches admin capacity 64 and is
+  **never** capacity-bound (4.32x → 1.55x). It is deliberately not a tooltip: the UI explains what
+  administrative capacity *is*, never that it will one day be the thing stopping you.
+
+**Four design failures the diagnostic caught, all invisible in a green build:**
+1. **Cities were never matched to provinces at all.** `City.Country` is `ADM0NAME` (a country
+   NAME); provinces carry `adm0_a3`. Keying both off the ISO map matched zero cities, so every
+   province on Earth was scored on ports alone — a flat 1.3x gap everywhere, with Chile's richest
+   region coming out as Arica. Both a name map and an ISO map are needed.
+2. The wealth spread was far too flat to be a real country (1.3x against a real 3-10x). Fixed with
+   a squared capital premium and a `^0.6` urban term so a primate city actually dominates.
+3. **The absorption constraint could never bind.** Difficulty was dividing the money rate, so the
+   demanded rate only ever fell and the admin ceiling was unreachable — §6's entire discovery
+   silently never happened. Difficulty belongs on the DELIVERY side.
+4. **Per-capita budgeting made you WORSE off than doing nothing** (A=47.7, C=44.8 against a
+   control at 50.0). It paid on the raw change in a ratio, so a small gap earned nothing while the
+   stall penalty fired nearly every step — the exact inversion of "the single most effective
+   legitimacy instrument in the game". Now it pays on the SHARE of the remaining gap closed, and
+   the stall penalty only fires when the programme is genuinely admin-bound.
+
+Tuning notes, since the numbers carry the design: `moneyRate = spend * 0.00042`,
+`adminCeiling = AdminCapacity * 0.00055 / difficulty`, `difficulty = 1 + 9 * progress²`. The
+squared ramp is what puts the crossover at year 12 — a linear one pulled it to year 1-2, and
+earlier constants put it at year 8 (right shape, wrong decade).
+
+**UI**: Budget tab → REGIONAL CONVERGENCE. Names both provinces rather than only printing a ratio,
+shows administrative capacity, and offers the doctrine switch plus the programme slider. Rendered
+in a real run with zero exceptions. **Not driven in that run**: the `ADOPT PER-CAPITA BUDGETING`
+branch (the diagnostic had already switched doctrine before the panel first drew) and the
+six-month-stall world-feed headline — both verified by inspection only.
+
+Next: §7 energy, chokepoints and leverage.
+
 
 ### 2026-09-09 — Consequence Engine §5: institutions and the overrule cycle (`Sim/Institutions.cs`)
 

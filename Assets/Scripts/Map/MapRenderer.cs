@@ -91,6 +91,8 @@ namespace Meridian.Map
         public CrowdSystem Crowds { get; private set; }
         // §5: the only system that binds the player. See Sim/Institutions.cs.
         public InstitutionSystem Institutions { get; private set; }
+        // §6: province-level wealth, the two budget doctrines, and the absorption constraint.
+        public ConvergenceSystem Convergence { get; private set; }
 
         // Zoom-gated layer roots (toggled by MapLayers based on camera zoom).
         public GameObject ProvincesRoot { get; private set; }
@@ -211,6 +213,7 @@ namespace Meridian.Map
             Accession = new AccessionSystem();
             Crowds = new CrowdSystem();
             Institutions = new InstitutionSystem();
+            Convergence = ConvergenceSystem.Seed(World, Economy);
             Diplomacy.Legit = Legitimacy;
             Wars.Legit = Legitimacy;
             // Spot checks in the boot log: a war pair, a bloc-floor pair (France also proves
@@ -273,6 +276,7 @@ namespace Meridian.Map
             Accession = save.Accession ?? new AccessionSystem();
             Crowds = save.Crowds ?? new CrowdSystem();
             Institutions = save.Institutions ?? new InstitutionSystem();
+            Convergence = save.Convergence ?? ConvergenceSystem.Seed(World, Economy);
             if (Diplomacy != null) Diplomacy.Legit = Legitimacy;
             if (Wars != null) Wars.Legit = Legitimacy;
 

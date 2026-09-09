@@ -92,7 +92,7 @@ namespace Meridian.Map
         public bool SaveNow()
         {
             if (map?.Economy == null || map.National == null || map.Diplomacy == null || map.Wars == null) return false;
-            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy, map.Unions, map.Accession, map.Crowds, map.Institutions);
+            return SaveLoad.Save(simDay, daysPerSecond, map.Economy, map.National, map.Diplomacy, map.Wars, map.Infrastructure, map.Legislature, map.Legitimacy, map.Unions, map.Accession, map.Crowds, map.Institutions, map.Convergence);
         }
 
         // Autosave: quitting mid-game shouldn't cost the player their run.
@@ -214,6 +214,10 @@ namespace Meridian.Map
 
                 MaybeRunElections(simDay);
 
+                if (map.Convergence != null)
+                    foreach (var headline in map.Convergence.TickAll(simDay, map.Economy, map.National, map.Legitimacy, map.CountryNames))
+                        WorldFeed.Push("Convergence", headline);
+
                 if (map.Institutions != null)
                     foreach (var headline in map.Institutions.TickAll(simDay, map.Economy, map.National, map.Diplomacy,
                                  map.Legitimacy, map.Wars, map.Accession, map.World.Countries, map.CountryNames))
@@ -248,6 +252,7 @@ namespace Meridian.Map
                 MaybeRunAccessionDiag();
                 MaybeRunCrowdDiag();
                 MaybeRunInstitutionDiag();
+                MaybeRunConvergenceDiag();
 
                 if (PlayerState.CountryIndex >= 0 && PlayerState.CountryIndex < map.Economy.States.Count)
                     PlayerHistory.Record(
@@ -958,6 +963,101 @@ namespace Meridian.Map
             }
 
             instLedgerLastTick = (float[])led.Scores.Clone();
+        }
+
+        // MERIDIAN_DIAG_CONVERGENCE=1 - §6 (Sim/Convergence.cs). Convergence is a 30-day process
+        // whose interesting behaviour lives 12-15 years out, so the diagnostic fast-forwards the
+        // REAL TickAll 200 months in one frame rather than modelling anything separately. Three
+        // countries run side by side:
+        //   A  per-capita, ordinary education spending      -> the trap
+        //   B  production-share                             -> the control: the gap never closes
+        //   C  per-capita, heavy education spending         -> sails through the transition
+        // The claim under test: money binds for the first decade, then administrative capacity
+        // binds and the same spending stops buying anything.
+        bool convDiagRan;
+        void MaybeRunConvergenceDiag()
+        {
+            if (System.Environment.GetEnvironmentVariable("MERIDIAN_DIAG_CONVERGENCE") == null) return;
+            if (convDiagRan || simDay < 12) return;
+            int me = PlayerState.CountryIndex;
+            if (me < 0 || map.Convergence == null || map.Legitimacy == null) return;
+            convDiagRan = true;
+            var cv = map.Convergence;
+
+            // Drive the real Budget-tab render so the new REGIONAL CONVERGENCE card actually
+            // builds -- a card that throws is a card the player silently never sees.
+            SelectCountry(me);
+            Meridian.UI.UIState.ActiveCategory = Meridian.UI.NationCategory.Budget;
+            Meridian.UI.UIState.PanelOpen = true;
+            Debug.Log("[convdiag] Budget tab opened on own country -- REGIONAL CONVERGENCE card renders below");
+
+            // What the seed actually produced, in real province names.
+            Debug.Log($"[convdiag] seeded province economies: {cv.Cells.Count} cells across {cv.States.Count} countries");
+            int shown = 0;
+            for (int ci = 0; ci < cv.States.Count && shown < 5; ci++)
+            {
+                var stc = cv.States[ci];
+                if (stc.Count < 12) continue;
+                shown++;
+                ProvinceCell hi = null, lo = null;
+                foreach (var c in cv.ProvincesOf(ci))
+                {
+                    if (hi == null || c.Wealth > hi.Wealth) hi = c;
+                    if (lo == null || c.Wealth < lo.Wealth) lo = c;
+                }
+                Debug.Log($"[convdiag]   {map.World.Countries[ci].Name}: {stc.Count} provinces, gap={stc.GapRatio:0.00}x  richest={hi.Name} ({hi.Wealth:0.00}) poorest={lo.Name} ({lo.Wealth:0.00})");
+            }
+
+            // Pick the three test countries.
+            int a = me, b = -1, c2 = -1;
+            for (int ci = 0; ci < cv.States.Count; ci++)
+            {
+                if (ci == a || cv.States[ci].Count < 15) continue;
+                if (b < 0) b = ci; else if (c2 < 0) { c2 = ci; break; }
+            }
+            if (b < 0 || c2 < 0) { Debug.Log("[convdiag] not enough multi-province countries to run the comparison"); return; }
+
+            cv.SetDoctrine(a, BudgetDoctrine.PerCapita, simDay, map.Economy, map.Legitimacy, map.CountryNames);
+            map.Economy.States[a].SpendConvergence = 6f;
+            cv.SetDoctrine(b, BudgetDoctrine.ProductionShare, simDay, map.Economy, map.Legitimacy, map.CountryNames);
+            cv.SetDoctrine(c2, BudgetDoctrine.PerCapita, simDay, map.Economy, map.Legitimacy, map.CountryNames);
+            map.Economy.States[c2].SpendConvergence = 6f;
+            map.Economy.States[c2].SpendEducation = 9f;      // the investment nobody tells you to make
+            map.Economy.States[c2].ManpowerEducation = 14f;
+
+            Debug.Log($"[convdiag] A={map.World.Countries[a].Name} per-capita @6% GDP, education {map.Economy.States[a].SpendEducation:0.0}%");
+            Debug.Log($"[convdiag] B={map.World.Countries[b].Name} production-share (control)");
+            Debug.Log($"[convdiag] C={map.World.Countries[c2].Name} per-capita @6% GDP, education {map.Economy.States[c2].SpendEducation:0.0}% + manpower {map.Economy.States[c2].ManpowerEducation:0.0}%");
+            Debug.Log($"[convdiag] budget cost of the doctrine: total spending {map.Economy.States[b].TotalSpendingRate:0.0}% (B) vs {map.Economy.States[a].TotalSpendingRate:0.0}% (A)");
+
+            float gA0 = cv.Of(a).GapRatio, gB0 = cv.Of(b).GapRatio, gC0 = cv.Of(c2).GapRatio;
+            float prevA = gA0, prevC = gC0;
+            long adminBoundYearA = -1, adminBoundYearC = -1;
+
+            // 200 months of the real tick, reported every two years.
+            for (int step = 1; step <= 400; step++)
+            {
+                long d = (long)step * ConvergenceSystem.StepDays;
+                foreach (var h in cv.TickAll(d, map.Economy, map.National, map.Legitimacy, map.CountryNames))
+                    Debug.Log($"[convdiag] feed: {h}");
+
+                if (adminBoundYearA < 0 && cv.Of(a).AdminBound) adminBoundYearA = d / 365;
+                if (adminBoundYearC < 0 && cv.Of(c2).AdminBound) adminBoundYearC = d / 365;
+
+                if (step % 36 == 0)
+                {
+                    var sa = cv.Of(a); var sb = cv.Of(b); var sc = cv.Of(c2);
+                    Debug.Log($"[convdiag] year {d / 365,2}: A gap={sa.GapRatio:0.00} (closed {prevA - sa.GapRatio:0.000} in 3y, admin={sa.AdminCapacity:0} bound={sa.AdminBound})  |  B gap={sb.GapRatio:0.00}  |  C gap={sc.GapRatio:0.00} (closed {prevC - sc.GapRatio:0.000} in 3y, admin={sc.AdminCapacity:0} bound={sc.AdminBound})");
+                    prevA = sa.GapRatio; prevC = sc.GapRatio;
+                }
+            }
+
+            var fa = cv.Of(a); var fb = cv.Of(b); var fc = cv.Of(c2);
+            Debug.Log($"[convdiag] AFTER 33 YEARS");
+            Debug.Log($"[convdiag]   A per-capita, ordinary education: {gA0:0.00}x -> {fa.GapRatio:0.00}x, admin capacity {fa.AdminCapacity:0}, money stopped being the binding constraint in year {adminBoundYearA}");
+            Debug.Log($"[convdiag]   B production-share (control):     {gB0:0.00}x -> {fb.GapRatio:0.00}x - the gap never closes, and it never cost anything");
+            Debug.Log($"[convdiag]   C per-capita + education:         {gC0:0.00}x -> {fc.GapRatio:0.00}x, admin capacity {fc.AdminCapacity:0}, bound from year {adminBoundYearC}");
+            Debug.Log($"[convdiag]   ownPopulation legitimacy: A={map.Legitimacy.Of(a).Get(Observer.OwnPopulation):0.0} B={map.Legitimacy.Of(b).Get(Observer.OwnPopulation):0.0} C={map.Legitimacy.Of(c2).Get(Observer.OwnPopulation):0.0}");
         }
 
         // AI countries legislate too — not just the player. Each day a small deterministic
